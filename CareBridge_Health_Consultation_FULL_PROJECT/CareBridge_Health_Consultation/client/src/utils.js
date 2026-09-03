@@ -39,3 +39,21 @@ export const roleLabel = (role) => ({
   doctor: "Doctor",
   admin: "Administrator",
 }[role] || role);
+
+export const HOSPITAL = {
+  name: "CareBridge Medical Centre",
+  short: "CareBridge",
+  campus: "Ridge Campus",
+  city: "Accra",
+  phone: "+233 30 610 4400",
+  emergency: "+233 30 610 4499",
+};
+
+export const greeting = (name) => {
+  const hour = new Date().getHours();
+  const when = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  return `${when}, ${name}`;
+};
+
+export const longDate = () =>
+  new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });

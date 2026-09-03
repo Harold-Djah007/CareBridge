@@ -1,10 +1,127 @@
-import React, { useEffect, useState } from "react";
-import { CalendarDays, MessageCircle, BedDouble, Clock3, Video, ArrowRight, Activity, UsersRound, Mail } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { CalendarDays, MessageCircle, BedDouble, Video, ArrowRight, Mail, Clock3 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../state";
 import { api } from "../api";
-import StatCard from "../components/StatCard";
-import { firstName, formatDate, formatTime, isUpcoming } from "../utils";
+import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate } from "../utils";
+
+function PatientHome({ user, appointments, wards, emails }) {
+  const next = appointments.find(isUpcoming);
+  const admission = wards.find((w) => w.status !== "declined");
+  return (
+    <>
+      <div className="identity-strip">
+        <div className="avatar large">{user.avatar}</div>
+        <div>
+          <span className="eyebrow">Patient record</span>
+          <h1 style={{ margin: "4px 0 8px" }}>{greeting(firstName(user.name))}</h1>
+          <div className="identity-meta">
+            <span>MRN <b>{user.mrn || "Pending"}</b></span>
+            <span>DOB <b>{user.dob || "—"}</b></span>
+            <span>Blood <b>{user.bloodType || "—"}</b></span>
+            <span>{user.insurance || user.city}</span>
+          </div>
+        </div>
+        <Link className="secondary-btn" to="/profile">My details</Link>
+      </div>
+
+      <div className="dashboard-grid">
+        <section className="card">
+          <div className="card-head">
+            <div><span className="eyebrow">Your next visit</span>
+              <h3>{next ? `${formatDate(next.date)} at ${formatTime(next.time)}` : "No visit booked"}</h3>
+            </div>
+          </div>
+          {next ? (
+            <>
+              <div className="appointment-feature">
+                <div className="avatar large">{next.doctor.avatar}</div>
+                <div className="grow">
+                  <strong>{next.doctor.name}</strong>
+                  <span className="muted">{next.doctor.specialty} · {next.mode === "video" ? "Video from home" : "Ridge Campus clinic"}</span>
+                  <small className="muted">{next.reason}</small>
+                </div>
+                <div className="row-actions">
+                  <Link className="secondary-btn" to={`/messages?with=${next.doctorId}`}>Message</Link>
+                  {next.mode === "video" && <Link className="primary-btn" to={`/video?with=${next.doctorId}`}><Video size={17} /> Join</Link>}
+                </div>
+              </div>
+              <h3 style={{ marginTop: 18 }}>Please bring</h3>
+              <ul className="prep-list">
+                <li>Ghana Card or other photo ID</li>
+                <li>NHIS or insurance card</li>
+                {next.reason?.toLowerCase().includes("lab") || next.reason?.toLowerCase().includes("blood") ? <li>Recent lab printouts</li> : <li>A list of medicines you take</li>}
+                {user.allergies && <li>Allergy note: {user.allergies}</li>}
+              </ul>
+            </>
+          ) : (
+            <p className="muted">When you book a doctor, the visit and a confirmation email will show here.</p>
+          )}
+        </section>
+        <section className="card">
+          <div className="card-head"><div><span className="eyebrow">At the hospital</span><h3>Admissions & notices</h3></div></div>
+          {admission ? (
+            <div className="appointment-feature">
+              <BedDouble />
+              <div className="grow">
+                <strong>{admission.ward}</strong>
+                <span className="muted">{admission.roomType} · arrive {admission.date}</span>
+              </div>
+              <span className={`status ${admission.status}`}>{admission.status}</span>
+            </div>
+          ) : <p className="muted">No bed reserved yet. You can request one before you travel.</p>}
+          <div className="quick-actions" style={{ marginTop: 8 }}>
+            <Link to="/wards"><BedDouble /><span><b>Request a bed</b><small>General, maternity, paediatric</small></span><ArrowRight size={18} /></Link>
+            <Link to="/appointments"><CalendarDays /><span><b>Book a visit</b><small>Video or at Ridge Campus</small></span><ArrowRight size={18} /></Link>
+            <Link to="/alerts"><Mail /><span><b>Notifications</b><small>{emails.length} notices on file</small></span><ArrowRight size={18} /></Link>
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}
+
+function DoctorBoard({ user, appointments, wards }) {
+  const today = appointments
+    .slice()
+    .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+  const nextId = today.find(isUpcoming)?.id;
+  const pending = wards.filter((w) => w.status === "pending").length;
+
+  return (
+    <>
+      <section className="welcome">
+        <div>
+          <span className="eyebrow">{user.department || "Outpatient"} · {user.clinic || "Consulting room"}</span>
+          <h1>{greeting(user.name.replace("Dr. ", "").split(" ")[0])}</h1>
+          <p>{longDate()} · {user.shift || "Day clinic"} · {today.filter(isUpcoming).length} patients remaining</p>
+        </div>
+        <div>
+          <div className="status confirmed">On duty</div>
+          {pending > 0 && <p style={{ marginTop: 10 }}>{pending} admission request{pending > 1 ? "s" : ""} waiting</p>}
+        </div>
+      </section>
+
+      <div className="clinic-board" style={{ marginTop: 16 }}>
+        {today.length === 0 && <div className="empty"><h3>No patients on your list</h3></div>}
+        {today.map((a) => (
+          <div className={`clinic-row ${a.id === nextId ? "next" : ""}`} key={a.id}>
+            <div className="time">{formatTime(a.time)}<div className="muted" style={{ fontSize: 11 }}>{formatDate(a.date)}</div></div>
+            <div>
+              <strong>{a.patient?.name}</strong>
+              <div className="muted">{a.reason} · {a.mode === "video" ? "Teleconsult" : "Room visit"}</div>
+            </div>
+            <div className="row-actions">
+              <span className={`status ${a.status}`}>{a.status}</span>
+              <Link className="ghost-btn" to={`/messages?with=${a.patientId}`}>Chart note</Link>
+              {a.mode === "video" && a.status !== "cancelled" && <Link className="primary-btn" to={`/video?with=${a.patientId}`}><Video size={16} /> Call</Link>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -18,58 +135,6 @@ export default function Dashboard() {
     if (user.role === "patient") api(`/emails/${user.id}`).then(setEmails);
   }, [user]);
 
-  const next = appointments.find(isUpcoming);
-  const pendingWards = wards.filter((w) => w.status === "pending").length;
-
-  return (
-    <>
-      <section className="welcome">
-        <div>
-          <span className="eyebrow">{user.role === "doctor" ? "Clinical workspace" : "Your health at a glance"}</span>
-          <h1>{user.role === "doctor" ? `Good day, ${user.name.replace("Dr. ", "").split(" ")[0]}` : `Hello, ${firstName(user.name)}`}</h1>
-          <p>{user.role === "doctor" ? "Review consultations, accept ward requests, and keep patients informed." : "Book care, join video visits, and get email alerts when anything is confirmed."}</p>
-        </div>
-        <div className="welcome-art">
-          <svg viewBox="0 0 160 90" aria-hidden="true"><path d="M8 50h28l8-20 15 45 16-55 12 30h22l8-14 10 14h25" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" /></svg>
-        </div>
-      </section>
-
-      <div className="stats-grid">
-        <StatCard icon={CalendarDays} label={user.role === "doctor" ? "Appointments" : "Upcoming visits"} value={appointments.filter(isUpcoming).length} hint="On your schedule" />
-        <StatCard icon={MessageCircle} label="Care chat" value="Live" hint="Instant messaging" />
-        <StatCard icon={user.role === "doctor" ? UsersRound : BedDouble} label={user.role === "doctor" ? "Patients" : "Ward bookings"} value={user.role === "doctor" ? new Set(appointments.map((a) => a.patientId)).size : wards.length} hint={user.role === "doctor" ? "On your list" : `${pendingWards} pending`} />
-        <StatCard icon={user.role === "patient" ? Mail : Activity} label={user.role === "patient" ? "Email alerts" : "Care status"} value={user.role === "patient" ? emails.length : "Ready"} hint={user.role === "patient" ? "Sent to your inbox" : "Services available"} />
-      </div>
-
-      <div className="dashboard-grid">
-        <section className="card">
-          <div className="card-head"><div><span className="eyebrow">Next consultation</span><h3>{next ? `${formatDate(next.date)} · ${formatTime(next.time)}` : "Nothing scheduled"}</h3></div><Clock3 size={20} /></div>
-          {next ? (
-            <div className="appointment-feature">
-              <div className="avatar large">{user.role === "doctor" ? next.patient.avatar : next.doctor.avatar}</div>
-              <div className="grow">
-                <strong>{user.role === "doctor" ? next.patient.name : next.doctor.name}</strong>
-                <span className="muted">{user.role === "doctor" ? next.reason : next.doctor.specialty}</span>
-                <small className="muted">{next.mode === "video" ? "Video consultation" : "In-person consultation"}</small>
-              </div>
-              <div className="row-actions">
-                <Link className="secondary-btn" to={`/messages?with=${user.role === "doctor" ? next.patientId : next.doctorId}`}>Message</Link>
-                {next.mode === "video" && <Link className="primary-btn" to={`/video?with=${user.role === "doctor" ? next.patientId : next.doctorId}`}><Video size={17} /> Join visit</Link>}
-              </div>
-            </div>
-          ) : <p className="muted">No upcoming consultations yet.</p>}
-        </section>
-
-        <section className="card">
-          <div className="card-head"><div><span className="eyebrow">Quick actions</span><h3>What would you like to do?</h3></div></div>
-          <div className="quick-actions">
-            <Link to="/appointments"><CalendarDays /><span><b>{user.role === "patient" ? "Book consultation" : "Manage appointments"}</b><small>Schedule and review visits</small></span><ArrowRight size={18} /></Link>
-            <Link to="/messages"><MessageCircle /><span><b>Open messages</b><small>Chat securely with care contacts</small></span><ArrowRight size={18} /></Link>
-            <Link to="/wards"><BedDouble /><span><b>{user.role === "patient" ? "Reserve a ward" : "Review ward bookings"}</b><small>{user.role === "patient" ? "Plan admission before you arrive" : "Accept or decline requests"}</small></span><ArrowRight size={18} /></Link>
-            {user.role === "patient" && <Link to="/alerts"><Mail /><span><b>Email alerts</b><small>See scheduled-visit and ward emails</small></span><ArrowRight size={18} /></Link>}
-          </div>
-        </section>
-      </div>
-    </>
-  );
+  if (user.role === "doctor") return <DoctorBoard user={user} appointments={appointments} wards={wards} />;
+  return <PatientHome user={user} appointments={appointments} wards={wards} emails={emails} />;
 }

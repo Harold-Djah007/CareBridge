@@ -51,16 +51,24 @@ export default function Profile() {
     <div>
       <div className="page-title">
         <div>
-          <span className="eyebrow">Account</span>
-          <h1>Your profile</h1>
-          <p>Keep your details current. Patients can control which email alerts they receive.</p>
+          <span className="eyebrow">{user.role === "patient" ? "Your file" : user.role === "doctor" ? "Credentials" : "Account"}</span>
+          <h1>{user.role === "patient" ? "My details" : user.role === "doctor" ? "Practice profile" : "Administrator account"}</h1>
+          <p>{user.role === "patient" ? "Contact details and which hospital notices we may email you." : "Used on letters, the clinic board, and the staff directory."}</p>
         </div>
       </div>
       <form className="card" onSubmit={save} style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 14 }}>
         <div className="appointment-feature">
           <div className="avatar large">{user.avatar}</div>
-          <div className="grow"><strong>{user.name}</strong><span className="muted">{user.email}</span><small className="muted">{user.role}</small></div>
+          <div className="grow">
+            <strong>{user.name}</strong>
+            <span className="muted">{user.email}</span>
+            {user.role === "patient" && <small className="muted">MRN {user.mrn} · {user.insurance}</small>}
+            {user.role !== "patient" && <small className="muted">{user.employeeId} · {user.department || user.specialty}</small>}
+          </div>
         </div>
+        {user.role === "patient" && user.emergencyContact && (
+          <p className="muted">Emergency contact: {user.emergencyContact}{user.allergies ? ` · Allergies: ${user.allergies}` : ""}</p>
+        )}
         <label>Full name<input value={form.name} onChange={(e) => set("name", e.target.value)} required /></label>
         <div className="form-grid">
           <label>Phone<input value={form.phone} onChange={(e) => set("phone", e.target.value)} /></label>

@@ -13,8 +13,15 @@
       "about": "Operations lead for CareBridge Hospital.",
       "status": "active",
       "years": 8,
+      "employeeId": "STAFF-1002",
+      "department": "Hospital Administration",
       "emailAlerts": true,
-      "alertPrefs": { "appointments": true, "wards": true, "messages": true, "account": true }
+      "alertPrefs": {
+        "appointments": true,
+        "wards": true,
+        "messages": true,
+        "account": true
+      }
     },
     {
       "id": "p1",
@@ -28,8 +35,19 @@
       "city": "Accra",
       "about": "Patient portal member since 2024.",
       "status": "active",
+      "mrn": "CBM-104829",
+      "dob": "12 Mar 1994",
+      "bloodType": "O+",
+      "insurance": "NHIS 8392-041-18",
+      "allergies": "Penicillin",
+      "emergencyContact": "Kwesi Mensah · +233 24 555 0108",
       "emailAlerts": true,
-      "alertPrefs": { "appointments": true, "wards": true, "messages": true, "account": true }
+      "alertPrefs": {
+        "appointments": true,
+        "wards": true,
+        "messages": true,
+        "account": true
+      }
     },
     {
       "id": "p2",
@@ -43,8 +61,19 @@
       "city": "Kumasi",
       "about": "Follow-up care for post-operative recovery.",
       "status": "active",
+      "mrn": "CBM-110472",
+      "dob": "2 Nov 1988",
+      "bloodType": "A-",
+      "insurance": "NHIS 2201-884-09",
+      "allergies": "None recorded",
+      "emergencyContact": "Akosua Asante · +233 24 555 0166",
       "emailAlerts": true,
-      "alertPrefs": { "appointments": true, "wards": true, "messages": true, "account": true }
+      "alertPrefs": {
+        "appointments": true,
+        "wards": true,
+        "messages": true,
+        "account": true
+      }
     },
     {
       "id": "d1",
@@ -59,7 +88,12 @@
       "about": "Primary care physician focused on preventive medicine and chronic condition support.",
       "years": 12,
       "available": true,
-      "status": "active"
+      "status": "active",
+      "employeeId": "STAFF-8821",
+      "department": "Outpatient · General Medicine",
+      "clinic": "Consulting Room 4",
+      "shift": "08:00–18:00",
+      "licenseNo": "MDC-GH-441902"
     },
     {
       "id": "d2",
@@ -114,15 +148,23 @@
       "available": 12,
       "capacity": 18,
       "description": "Comfortable inpatient care and overnight observation.",
-      "amenities": ["Nurse station nearby", "Visitor hours", "Meals included"]
+      "amenities": [
+        "Nurse station nearby",
+        "Visitor hours",
+        "Meals included"
+      ]
     },
     {
       "id": "medical",
       "name": "Medical Ward",
-      "available": 7,
+      "available": 6,
       "capacity": 14,
       "description": "Adult medical admissions with closer monitoring.",
-      "amenities": ["24/7 observation", "Medication support", "Family updates"]
+      "amenities": [
+        "24/7 observation",
+        "Medication support",
+        "Family updates"
+      ]
     },
     {
       "id": "maternity",
@@ -130,7 +172,11 @@
       "available": 5,
       "capacity": 10,
       "description": "Calm maternal and post-delivery recovery rooms.",
-      "amenities": ["Private rest area", "Newborn support", "Partner stay"]
+      "amenities": [
+        "Private rest area",
+        "Newborn support",
+        "Partner stay"
+      ]
     },
     {
       "id": "pediatric",
@@ -138,7 +184,11 @@
       "available": 8,
       "capacity": 12,
       "description": "Child-friendly rooms for younger patients.",
-      "amenities": ["Parent bed", "Play corner", "Pediatric nurses"]
+      "amenities": [
+        "Parent bed",
+        "Play corner",
+        "Pediatric nurses"
+      ]
     }
   ],
   "appointments": [
@@ -181,6 +231,26 @@
       "reason": "Post-surgery follow-up",
       "status": "pending",
       "mode": "in-person"
+    },
+    {
+      "id": "apt1788463580869",
+      "patientId": "p1",
+      "doctorId": "d3",
+      "date": "2026-09-03",
+      "time": "10:00",
+      "reason": "Consultation",
+      "status": "confirmed",
+      "mode": "video"
+    },
+    {
+      "id": "apt1788463584229",
+      "patientId": "p1",
+      "doctorId": "d3",
+      "date": "2026-09-03",
+      "time": "10:00",
+      "reason": "Consultation",
+      "status": "confirmed",
+      "mode": "video"
     }
   ],
   "wardBookings": [
@@ -201,7 +271,7 @@
       "roomType": "Shared Room",
       "date": "2026-09-10",
       "nights": 3,
-      "status": "pending",
+      "status": "confirmed",
       "notes": "Needs ground-floor access if possible"
     }
   ],
@@ -233,6 +303,13 @@
       "senderId": "p2",
       "text": "Doctor, the swelling has reduced. Should I still keep the bandage on overnight?",
       "timestamp": "2026-09-03T08:12:00.000Z"
+    },
+    {
+      "roomId": "d1-p1",
+      "senderId": "p1",
+      "text": "i feel like i am dying",
+      "id": "m1788463542761",
+      "timestamp": "2026-09-03T19:25:42.761Z"
     }
   ],
   "notifications": [
@@ -270,6 +347,55 @@
       "title": "Pending admission",
       "body": "Kofi Asante has a Medical Ward request waiting for review.",
       "read": false
+    },
+    {
+      "id": "n1788463580869889",
+      "userId": "d3",
+      "title": "New appointment",
+      "body": "A patient booked 2026-09-03 at 10:00.",
+      "read": false
+    },
+    {
+      "id": "n1788463580869420",
+      "userId": "adm1",
+      "title": "Appointment booked",
+      "body": "New visit scheduled for 2026-09-03 at 10:00.",
+      "read": false
+    },
+    {
+      "id": "n1788463580869894",
+      "userId": "p1",
+      "title": "Consultation scheduled",
+      "body": "Your visit with Dr. Abena Sarpong is set for 2026-09-03 at 10:00.",
+      "read": false
+    },
+    {
+      "id": "n1788463584229835",
+      "userId": "d3",
+      "title": "New appointment",
+      "body": "A patient booked 2026-09-03 at 10:00.",
+      "read": false
+    },
+    {
+      "id": "n1788463584229768",
+      "userId": "adm1",
+      "title": "Appointment booked",
+      "body": "New visit scheduled for 2026-09-03 at 10:00.",
+      "read": false
+    },
+    {
+      "id": "n1788463584229639",
+      "userId": "p1",
+      "title": "Consultation scheduled",
+      "body": "Your visit with Dr. Abena Sarpong is set for 2026-09-03 at 10:00.",
+      "read": false
+    },
+    {
+      "id": "n1788463643261394",
+      "userId": "p2",
+      "title": "Ward reservation accepted",
+      "body": "Your Medical Ward bed is confirmed for 2026-09-10.",
+      "read": false
     }
   ],
   "emails": [
@@ -294,6 +420,39 @@
       "status": "delivered",
       "previewUrl": null,
       "sentAt": "2026-09-03T12:10:00.000Z"
+    },
+    {
+      "id": "e1788463580869355",
+      "userId": "p1",
+      "to": "patient@carebridge.test",
+      "subject": "Your CareBridge consultation is scheduled",
+      "text": "Your video consultation has been booked.\n\nDoctor: Dr. Abena Sarpong\nDate: 2026-09-03\nTime: 10:00\nReason: Consultation\nStatus: confirmed",
+      "type": "appointment",
+      "status": "sent",
+      "previewUrl": "https://ethereal.email/message/apmpDQlT7djrnrepapnJ3.NVsWIVeOHIAAAACXKZgxzGVjq5cvdPjs8o6Dk",
+      "sentAt": "2026-09-03T19:26:20.869Z"
+    },
+    {
+      "id": "e1788463584229597",
+      "userId": "p1",
+      "to": "patient@carebridge.test",
+      "subject": "Your CareBridge consultation is scheduled",
+      "text": "Your video consultation has been booked.\n\nDoctor: Dr. Abena Sarpong\nDate: 2026-09-03\nTime: 10:00\nReason: Consultation\nStatus: confirmed",
+      "type": "appointment",
+      "status": "sent",
+      "previewUrl": "https://ethereal.email/message/apmpDQlT7djrnrepapnJ4mNZ89.4yyWlAAAAC9fbjIa.o4W1GRFqaVHf2iI",
+      "sentAt": "2026-09-03T19:26:24.229Z"
+    },
+    {
+      "id": "e1788463643261255",
+      "userId": "p2",
+      "to": "kofi@carebridge.test",
+      "subject": "Your ward reservation has been accepted",
+      "text": "Good news — your hospital bed is reserved. You can arrive knowing your ward is ready.\n\nWard: Medical Ward\nRoom: Shared Room\nArrival: 2026-09-10\nNights: 3\nStatus: confirmed",
+      "type": "ward",
+      "status": "sent",
+      "previewUrl": "https://ethereal.email/message/apmpDQlT7djrnrepapnKHfNVsWIVeOHTAAAADP0oOP0q.nZyFZB89J5bz00",
+      "sentAt": "2026-09-03T19:27:23.261Z"
     }
   ]
 }

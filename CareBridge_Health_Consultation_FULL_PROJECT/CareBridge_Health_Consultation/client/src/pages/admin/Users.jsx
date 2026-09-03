@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../api";
 import { useToast } from "../../state";
 import { roleLabel } from "../../utils";
@@ -8,8 +9,9 @@ const blank = { name: "", email: "", password: "care123", role: "patient", phone
 
 export default function AdminUsers() {
   const { push } = useToast();
+  const [params] = useSearchParams();
   const [users, setUsers] = useState([]);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(params.get("q") || "");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(blank);

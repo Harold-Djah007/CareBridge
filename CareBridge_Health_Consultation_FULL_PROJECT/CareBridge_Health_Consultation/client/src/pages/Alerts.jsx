@@ -30,9 +30,9 @@ export default function Alerts() {
     <div>
       <div className="page-title">
         <div>
-          <span className="eyebrow">{user.role === "admin" ? "Operations" : "Inbox"}</span>
-          <h1>{user.role === "admin" ? "Outbound email log" : "Email alerts"}</h1>
-          <p>{user.role === "admin" ? "Every patient alert CareBridge has sent." : "Confirmations for scheduled consultations, ward acceptance, and other care updates."}</p>
+          <span className="eyebrow">{user.role === "admin" ? "Audit" : "Hospital notices"}</span>
+          <h1>{user.role === "admin" ? "Outbound patient notices" : "Your notifications"}</h1>
+          <p>{user.role === "admin" ? "Every confirmation the hospital has emailed." : "Visit confirmations, bed decisions, and messages from your doctors."}</p>
         </div>
         {user.role === "patient" && <button className="primary-btn" onClick={test}><Mail size={16} /> Send test alert</button>}
       </div>

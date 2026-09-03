@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Video, MessageCircle, CalendarPlus } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { todayISO } from "../utils";
@@ -9,6 +9,7 @@ export default function CareTeam() {
   const { user } = useAuth();
   const { push } = useToast();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [people, setPeople] = useState([]);
   const [booking, setBooking] = useState(null);
   const [form, setForm] = useState({ date: todayISO(), time: "10:00", reason: "Consultation", mode: "video" });
@@ -30,13 +31,13 @@ export default function CareTeam() {
     <div>
       <div className="page-title">
         <div>
-          <span className="eyebrow">{user.role === "patient" ? "Care team" : "Patients"}</span>
-          <h1>{user.role === "patient" ? "Find a doctor" : "People in your care"}</h1>
-          <p>{user.role === "patient" ? "Book a visit or start a conversation. Booking emails the patient immediately." : "Message a patient or open a video room."}</p>
+          <span className="eyebrow">{user.role === "patient" ? "Specialists" : "Caseload"}</span>
+          <h1>{user.role === "patient" ? "Doctors at Ridge Campus" : "Patients under your care"}</h1>
+          <p>{user.role === "patient" ? "Choose a consultant, then pick a time that suits you." : "Open the chart, message, or start a teleconsult."}</p>
         </div>
       </div>
       <div className="people-grid">
-        {people.map((p) => (
+        {people.filter((p) => `${p.name} ${p.specialty || ""} ${p.city || ""}`.toLowerCase().includes((params.get("q") || "").toLowerCase())).map((p) => (
           <article className="person-card" key={p.id}>
             <div className="appointment-feature" style={{ border: 0, padding: 0, background: "transparent" }}>
               <div className="avatar large">{p.avatar}</div>

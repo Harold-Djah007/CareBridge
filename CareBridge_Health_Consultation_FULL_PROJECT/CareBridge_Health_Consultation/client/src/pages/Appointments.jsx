@@ -52,46 +52,64 @@ export default function Appointments() {
     <div>
       <div className="page-title">
         <div>
-          <span className="eyebrow">Appointments</span>
-          <h1>{user.role === "patient" ? "Your consultations" : "Consultation schedule"}</h1>
-          <p>{user.role === "patient" ? "Book a visit and we email you the confirmation." : "Confirm, complete, or cancel patient bookings."}</p>
+          <span className="eyebrow">{user.role === "doctor" ? "Outpatient diary" : "Visits"}</span>
+          <h1>{user.role === "patient" ? "Your appointments" : "Clinic schedule"}</h1>
+          <p>{user.role === "patient" ? "Book a video or campus visit. We send a confirmation to your email." : "Today’s list, plus upcoming and completed encounters."}</p>
         </div>
-        {(user.role === "patient" || user.role === "admin" || user.role === "doctor") && (
-          <button className="primary-btn" onClick={() => setOpen(true)}><Plus size={18} /> {user.role === "patient" ? "Book appointment" : "New appointment"}</button>
-        )}
+        <button className="primary-btn" onClick={() => setOpen(true)}><Plus size={18} /> {user.role === "patient" ? "Request a visit" : "Add slot"}</button>
       </div>
       <div className="filters">
         {["upcoming", "past", "all"].map((t) => (
           <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
         ))}
       </div>
-      <div className="list-card">
-        {rows.length === 0 ? (
-          <div className="empty"><CalendarDays size={38} /><h3>No appointments in this view</h3><p>Book a consultation to see it here.</p></div>
-        ) : rows.map((a) => (
-          <div className="appointment-row" key={a.id}>
-            <div className="date-box"><span>{new Date(a.date + "T00:00").toLocaleDateString(undefined, { month: "short" })}</span><b>{new Date(a.date + "T00:00").getDate()}</b></div>
-            <div className="avatar">{user.role === "patient" ? a.doctor.avatar : a.patient.avatar}</div>
-            <div className="grow">
-              <strong>{user.role === "patient" ? a.doctor.name : a.patient.name}</strong>
-              <span className="muted">{a.reason}</span>
-              <small className="muted"><Clock size={14} /> {formatDate(a.date)} · {formatTime(a.time)} · {a.mode === "video" ? "Video" : "In person"}</small>
+      {user.role === "doctor" ? (
+        <div className="clinic-board">
+          {rows.length === 0 ? (
+            <div className="empty"><h3>No encounters in this view</h3></div>
+          ) : rows.map((a) => (
+            <div className="clinic-row" key={a.id}>
+              <div className="time">{formatTime(a.time)}<div className="muted" style={{ fontSize: 11 }}>{formatDate(a.date)}</div></div>
+              <div>
+                <strong>{a.patient?.name}</strong>
+                <div className="muted">{a.reason} · {a.mode === "video" ? "Teleconsult" : "Face to face"}</div>
+              </div>
+              <div className="row-actions">
+                <span className={`status ${a.status}`}>{a.status}</span>
+                <Link className="ghost-btn" to={`/messages?with=${a.patientId}`}>Note</Link>
+                {a.status === "pending" && <button className="secondary-btn" onClick={() => update(a.id, "confirmed")}>Confirm</button>}
+                {a.status !== "completed" && a.status !== "cancelled" && <button className="ghost-btn" onClick={() => update(a.id, "completed")}>Done</button>}
+              </div>
             </div>
-            <span className={`status ${a.status}`}>{a.status}</span>
-            <div className="row-actions">
-              <Link className="soft-icon" title="Message" to={`/messages?with=${otherId(a)}`}><MessageCircle size={18} /></Link>
-              {a.mode === "video" && a.status !== "cancelled" && user.role !== "admin" && (
-                <Link className="soft-icon success" title="Join video" to={`/video?with=${otherId(a)}`}><Video size={18} /></Link>
-              )}
-              {user.role !== "patient" && a.status === "pending" && <button className="soft-icon success" title="Confirm" onClick={() => update(a.id, "confirmed")}><CheckCircle2 size={18} /></button>}
-              {user.role !== "patient" && a.status !== "completed" && a.status !== "cancelled" && <button className="ghost-btn" onClick={() => update(a.id, "completed")}>Complete</button>}
-              {a.status !== "cancelled" && a.status !== "completed" && (
-                <button className="soft-icon danger" title="Cancel" onClick={() => update(a.id, "cancelled")}><XCircle size={18} /></button>
-              )}
+          ))}
+        </div>
+      ) : (
+        <div className="list-card">
+          {rows.length === 0 ? (
+            <div className="empty"><CalendarDays size={38} /><h3>No appointments in this view</h3><p>Book a visit and it will appear here.</p></div>
+          ) : rows.map((a) => (
+            <div className="appointment-row" key={a.id}>
+              <div className="date-box"><span>{new Date(a.date + "T00:00").toLocaleDateString(undefined, { month: "short" })}</span><b>{new Date(a.date + "T00:00").getDate()}</b></div>
+              <div className="avatar">{user.role === "patient" ? a.doctor.avatar : a.patient.avatar}</div>
+              <div className="grow">
+                <strong>{user.role === "patient" ? a.doctor.name : a.patient.name}</strong>
+                <span className="muted">{a.reason}</span>
+                <small className="muted"><Clock size={14} /> {formatDate(a.date)} · {formatTime(a.time)} · {a.mode === "video" ? "Video" : "In person"}</small>
+              </div>
+              <span className={`status ${a.status}`}>{a.status}</span>
+              <div className="row-actions">
+                <Link className="soft-icon" title="Message" to={`/messages?with=${otherId(a)}`}><MessageCircle size={18} /></Link>
+                {a.mode === "video" && a.status !== "cancelled" && user.role !== "admin" && (
+                  <Link className="soft-icon success" title="Join video" to={`/video?with=${otherId(a)}`}><Video size={18} /></Link>
+                )}
+                {a.status !== "cancelled" && a.status !== "completed" && (
+                  <button className="soft-icon danger" title="Cancel" onClick={() => update(a.id, "cancelled")}><XCircle size={18} /></button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {open && (
         <div className="modal-backdrop" onMouseDown={() => setOpen(false)}>

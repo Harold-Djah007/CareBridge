@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Users, CalendarDays, BedDouble, Mail, Activity } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../../api";
-import StatCard from "../../components/StatCard";
+import { HOSPITAL } from "../../utils";
 
 export default function AdminOverview() {
   const [stats, setStats] = useState(null);
@@ -11,42 +10,43 @@ export default function AdminOverview() {
 
   useEffect(() => {
     api("/admin/overview").then(setStats);
-    api("/admin/emails").then((e) => setEmails(e.slice(0, 5)));
+    api("/admin/emails").then((e) => setEmails(e.slice(0, 6)));
     api("/ward-bookings").then((rows) => setPending(rows.filter((w) => w.status === "pending")));
   }, []);
 
-  if (!stats) return <p className="muted">Loading hospital overview…</p>;
+  if (!stats) return <p className="muted">Loading operations board…</p>;
+  const occupancy = Math.round(((44 - Number(stats.bedsAvailable || 0)) / 44) * 100);
 
   return (
     <div>
       <div className="page-title">
         <div>
-          <span className="eyebrow">Administration</span>
-          <h1>Hospital overview</h1>
-          <p>People, visits, beds, and every patient email alert from one console.</p>
+          <span className="eyebrow">{HOSPITAL.campus} operations</span>
+          <h1>Command centre</h1>
+          <p>People, clinic load, and beds. Notices to patients are logged as they go out.</p>
         </div>
       </div>
-      <div className="stats-grid">
-        <StatCard icon={Users} label="Patients" value={stats.patients} hint={`${stats.doctors} doctors`} />
-        <StatCard icon={CalendarDays} label="Appointments" value={stats.appointments} hint={`${stats.pendingAppointments} pending`} />
-        <StatCard icon={BedDouble} label="Ward requests" value={stats.wardBookings} hint={`${stats.pendingWards} awaiting acceptance`} />
-        <StatCard icon={Activity} label="Open beds" value={stats.bedsAvailable} hint="Across all wards" />
+      <div className="kpi-row">
+        <div className="kpi"><span>Registered patients</span><strong>{stats.patients}</strong><small>{stats.doctors} consultants on staff</small></div>
+        <div className="kpi"><span>Clinic book</span><strong>{stats.appointments}</strong><small>{stats.pendingAppointments} awaiting confirmation</small></div>
+        <div className="kpi"><span>Open beds</span><strong>{stats.bedsAvailable}</strong><small>~{occupancy}% occupied</small></div>
+        <div className="kpi"><span>Admissions queue</span><strong>{stats.pendingWards}</strong><small>{stats.wardBookings} requests this period</small></div>
       </div>
       <div className="dashboard-grid">
         <section className="card">
-          <div className="card-head"><div><span className="eyebrow">Admissions</span><h3>Pending ward requests</h3></div><Link to="/admin/hospital" className="ghost-btn">Manage</Link></div>
+          <div className="card-head"><div><span className="eyebrow">Bed board</span><h3>Waiting for a decision</h3></div><Link to="/admin/hospital" className="ghost-btn">Open bed board</Link></div>
           {pending.length === 0 && <p className="muted">No pending admissions.</p>}
           {pending.map((b) => (
             <div className="appointment-row" key={b.id}>
               <div className="avatar">{b.patient?.avatar}</div>
-              <div className="grow"><strong>{b.patient?.name}</strong><span className="muted">{b.ward} · {b.date}</span></div>
+              <div className="grow"><strong>{b.patient?.name}</strong><span className="muted">{b.ward} · {b.date} · {b.nights} nights</span></div>
               <span className="status pending">pending</span>
             </div>
           ))}
         </section>
         <section className="card">
-          <div className="card-head"><div><span className="eyebrow">Patient emails</span><h3>Latest alerts</h3></div><Link to="/alerts" className="ghost-btn"><Mail size={16} /> Full log</Link></div>
-          {emails.length === 0 && <p className="muted">No emails sent yet.</p>}
+          <div className="card-head"><div><span className="eyebrow">Notices</span><h3>Last emails to patients</h3></div><Link to="/alerts" className="ghost-btn">Full log</Link></div>
+          {emails.length === 0 && <p className="muted">No outbound notices yet.</p>}
           {emails.map((e) => (
             <div className="appointment-row" key={e.id}>
               <div className="grow"><strong>{e.subject}</strong><span className="muted">{e.to}</span></div>

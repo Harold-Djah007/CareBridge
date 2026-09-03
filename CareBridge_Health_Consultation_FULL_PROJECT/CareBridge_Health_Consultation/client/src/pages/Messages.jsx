@@ -64,9 +64,9 @@ export default function Messages() {
     <div>
       <div className="page-title">
         <div>
-          <span className="eyebrow">Secure messages</span>
-          <h1>Care conversations</h1>
-          <p>Patients are emailed when a doctor or admin writes to them.</p>
+          <span className="eyebrow">{user.role === "patient" ? "Messages" : user.role === "doctor" ? "Clinical inbox" : "Switchboard"}</span>
+          <h1>{user.role === "patient" ? "Talk to your doctors" : user.role === "doctor" ? "Patient messages" : "Internal and patient mail"}</h1>
+          <p>{user.role === "patient" ? "Ask a question before your visit. Replies also arrive by email." : user.role === "doctor" ? "Keep encounter notes in the thread. Patients are notified by email." : "Route messages across the hospital."}</p>
         </div>
       </div>
       <div className="chat-layout">

@@ -40,9 +40,9 @@ export default function WardBooking() {
     <div>
       <div className="page-title">
         <div>
-          <span className="eyebrow">Admission planning</span>
-          <h1>{user.role === "patient" ? "Reserve a ward" : "Ward booking requests"}</h1>
-          <p>{user.role === "patient" ? "Arrange a bed before arriving. Acceptance is emailed to you." : "Accept or decline incoming admission requests."}</p>
+          <span className="eyebrow">{user.role === "patient" ? "Admissions" : "Bed requests"}</span>
+          <h1>{user.role === "patient" ? "Reserve a bed before you arrive" : "Admission queue"}</h1>
+          <p>{user.role === "patient" ? "Tell the hospital which ward you need. You will get an email when a bed is accepted." : "Accept or decline incoming requests. Occupancy updates automatically."}</p>
         </div>
         {user.role === "patient" && <button className="primary-btn" onClick={() => setOpen(true)}><Plus size={18} /> Reserve a ward</button>}
       </div>
