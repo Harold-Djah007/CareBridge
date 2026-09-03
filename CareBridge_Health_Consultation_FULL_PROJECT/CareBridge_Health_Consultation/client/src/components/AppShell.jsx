@@ -1,15 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   CalendarDays, LayoutDashboard, MessageCircle, BedDouble, Video, LogOut, HeartPulse,
   Bell, Users, Mail, UserRound, Stethoscope, ClipboardList, Building2, Search, Inbox,
-  FolderOpen, ScrollText, Pill, Wallet,
+  FolderOpen, ScrollText, Pill, Wallet, Settings, LifeBuoy, HelpCircle,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
 import { api, socketUrl } from "../api";
 import { HOSPITAL, isUpcoming, longDate } from "../utils";
 import { LiveClock } from "./LiveMeter";
+import PageAtmosphere from "./PageAtmosphere";
 
 const NAV = {
   patient: [
@@ -33,6 +34,13 @@ const NAV = {
         { to: "/profile", icon: UserRound, label: "My details" },
       ],
     },
+    {
+      group: "Hospital",
+      items: [
+        { to: "/support", icon: LifeBuoy, label: "Help & support", badge: "tickets" },
+        { to: "/settings", icon: Settings, label: "Settings" },
+      ],
+    },
   ],
   doctor: [
     {
@@ -53,6 +61,13 @@ const NAV = {
         { to: "/profile", icon: UserRound, label: "Credentials" },
       ],
     },
+    {
+      group: "Hospital",
+      items: [
+        { to: "/support", icon: LifeBuoy, label: "Help & support", badge: "tickets" },
+        { to: "/settings", icon: Settings, label: "Settings" },
+      ],
+    },
   ],
   admin: [
     {
@@ -69,13 +84,69 @@ const NAV = {
     {
       group: "Communications",
       items: [
+        { to: "/support", icon: LifeBuoy, label: "Support desk", primary: true, badge: "tickets" },
         { to: "/messages", icon: MessageCircle, label: "Switchboard" },
         { to: "/alerts", icon: Mail, label: "Patient notices", primary: true },
+        { to: "/settings", icon: Settings, label: "Settings" },
         { to: "/profile", icon: UserRound, label: "My account" },
       ],
     },
   ],
 };
+
+function NavRail({ children }) {
+  const railRef = useRef(null);
+  const [glow, setGlow] = useState({ y: 8, h: 42, x: 12, visible: false });
+  const [spot, setSpot] = useState({ y: 40, visible: false });
+
+  const moveToItem = (item, nav) => {
+    if (!item || !nav) return;
+    const nr = nav.getBoundingClientRect();
+    const ir = item.getBoundingClientRect();
+    setGlow({
+      y: ir.top - nr.top + nav.scrollTop,
+      h: ir.height,
+      x: ir.left - nr.left,
+      visible: true,
+    });
+  };
+
+  const onMove = (e) => {
+    const nav = railRef.current;
+    if (!nav) return;
+    const nr = nav.getBoundingClientRect();
+    setSpot({ y: e.clientY - nr.top + nav.scrollTop, visible: true });
+    const item = e.target.closest(".nav-item");
+    if (item && nav.contains(item)) moveToItem(item, nav);
+  };
+
+  const onLeave = () => {
+    setGlow((g) => ({ ...g, visible: false }));
+    setSpot((s) => ({ ...s, visible: false }));
+  };
+
+  return (
+    <nav
+      ref={railRef}
+      className="nav-rail"
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+    >
+      <span
+        className={`nav-follow ${glow.visible ? "on" : ""}`}
+        style={{
+          transform: `translate3d(0, ${glow.y}px, 0)`,
+          height: glow.h,
+        }}
+      />
+      <span
+        className={`nav-spot ${spot.visible ? "on" : ""}`}
+        style={{ transform: `translate3d(0, ${spot.y - 48}px, 0)` }}
+      />
+      {children}
+    </nav>
+  );
+}
 
 export default function AppShell() {
   const { user, logout } = useAuth();
@@ -85,7 +156,7 @@ export default function AppShell() {
   const [notes, setNotes] = useState([]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [badges, setBadges] = useState({ visits: 0, wards: 0, messages: 0 });
+  const [badges, setBadges] = useState({ visits: 0, wards: 0, messages: 0, tickets: 0 });
 
   const groups = NAV[user.role] || NAV.patient;
   const mobileItems = groups.flatMap((g) => g.items).filter((i) => i.primary).slice(0, 5);
@@ -100,9 +171,18 @@ export default function AppShell() {
     api(`/ward-bookings?userId=${user.id}&role=${user.role}`).then((rows) => {
       setBadges((b) => ({ ...b, wards: rows.filter((w) => w.status === "pending").length }));
     }).catch(() => {});
+    api(`/tickets?userId=${user.id}&role=${user.role}`).then((rows) => {
+      setBadges((b) => ({ ...b, tickets: rows.filter((t) => t.status !== "resolved").length }));
+    }).catch(() => {});
     const socket = io(socketUrl, { autoConnect: true });
     socket.emit("join-user", user.id);
-    socket.on("notification", (n) => { push(n.title); loadNotes(); });
+    socket.on("notification", (n) => {
+      push(n.title);
+      loadNotes();
+      api(`/tickets?userId=${user.id}&role=${user.role}`).then((rows) => {
+        setBadges((b) => ({ ...b, tickets: rows.filter((t) => t.status !== "resolved").length }));
+      }).catch(() => {});
+    });
     socket.on("email-alert", (n) => { push(`Notice sent: ${n.subject}`); loadNotes(); });
     return () => socket.disconnect();
   }, [user.id]);
@@ -134,6 +214,7 @@ export default function AppShell() {
     if (key === "messages") return unread || 0;
     if (key === "visits") return badges.visits;
     if (key === "wards") return badges.wards;
+    if (key === "tickets") return badges.tickets;
     return 0;
   };
 
@@ -163,17 +244,17 @@ export default function AppShell() {
           <strong>{HOSPITAL.campus}</strong>
           <span>{HOSPITAL.city} · {longDate()}</span>
         </div>
-        <nav>
+        <NavRail>
           {groups.map((group) => (
             <div className="nav-group" key={group.group}>
               <p className="nav-label">{group.group}</p>
               {group.items.map(renderLink)}
             </div>
           ))}
-        </nav>
+        </NavRail>
         <div className="mobile-nav">{mobileItems.map(renderLink)}</div>
         <div className="sidebar-user">
-          <button className="avatar" onClick={() => navigate("/profile")}>{user.avatar}</button>
+          <button className="avatar" onClick={() => navigate("/settings")}>{user.avatar}</button>
           <div className="sidebar-user-text">
             <strong>{user.name}</strong>
             <span>{user.role === "patient" ? `MRN ${user.mrn || "—"}` : user.employeeId || user.specialty || user.department}</span>
@@ -187,6 +268,13 @@ export default function AppShell() {
             <span className="eyebrow">{topMeta}</span>
             <small className="muted">{user.role === "doctor" ? `On duty · ${user.shift || "Day clinic"}` : user.role === "patient" ? `File ${user.mrn || ""}` : user.employeeId}</small>
           </div>
+          <nav className="topbar-nav" aria-label="Hospital shortcuts">
+            <Link className="topbar-link" to={user.role === "admin" ? "/admin" : "/home"}>Home</Link>
+            {user.role === "patient" && <Link className="topbar-link" to="/pay">Pay</Link>}
+            <Link className="topbar-link" to="/support"><LifeBuoy size={15} /> Support</Link>
+            <Link className="topbar-link" to="/settings"><Settings size={15} /> Settings</Link>
+            <Link className="topbar-link" to="/guide"><HelpCircle size={15} /> Guide</Link>
+          </nav>
           <form className="top-search" onSubmit={onSearch}>
             <Search size={16} />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} />
@@ -196,7 +284,7 @@ export default function AppShell() {
             <button className="icon-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications">
               <Bell size={19} />{unread > 0 && <i className="dot" />}
             </button>
-            <button className="avatar small" onClick={() => navigate("/profile")}>{user.avatar}</button>
+            <button className="avatar small" title="Settings" onClick={() => navigate("/settings")}>{user.avatar}</button>
           </div>
           {open && (
             <div className="notice">
@@ -205,15 +293,22 @@ export default function AppShell() {
               {notes.slice(0, 8).map((n) => (
                 <div key={n.id} className={`notice-item ${n.read ? "" : "unread"}`}><b>{n.title}</b><span>{n.body}</span></div>
               ))}
-              {(user.role === "patient" || user.role === "admin") && (
-                <button className="secondary-btn full" onClick={() => { setOpen(false); navigate("/alerts"); }}>
-                  {user.role === "admin" ? "Open notice log" : "Open notifications"}
-                </button>
-              )}
+              <div className="notice-actions">
+                {(user.role === "patient" || user.role === "admin") && (
+                  <button className="secondary-btn" onClick={() => { setOpen(false); navigate("/alerts"); }}>
+                    {user.role === "admin" ? "Notice log" : "Notifications"}
+                  </button>
+                )}
+                <button className="secondary-btn" onClick={() => { setOpen(false); navigate("/support"); }}>Support desk</button>
+                <button className="ghost-btn" onClick={() => { setOpen(false); navigate("/settings"); }}>Settings</button>
+              </div>
             </div>
           )}
         </header>
-        <div className="page-wrap"><Outlet /></div>
+        <div className="page-stage">
+          <PageAtmosphere />
+          <div className="page-wrap"><Outlet /></div>
+        </div>
       </main>
     </div>
   );

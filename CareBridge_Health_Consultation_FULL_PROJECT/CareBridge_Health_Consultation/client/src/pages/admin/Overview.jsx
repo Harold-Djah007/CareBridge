@@ -31,7 +31,7 @@ export default function AdminOverview() {
         <div>
           <span className="eyebrow">{HOSPITAL.campus} operations</span>
           <h1>Operations</h1>
-          <p>Beds, clinic load, and outbound notices. Billing and receipts sit under Patient billing.</p>
+          <p>Beds, clinic load, support desk, and outbound notices. Billing sits under Patient billing.</p>
         </div>
         <OpsRadar occupancy={occupancy} pending={stats.pendingWards} beds={stats.bedsAvailable} />
       </div>
@@ -39,7 +39,7 @@ export default function AdminOverview() {
         <div className="kpi"><span>Registered patients</span><strong>{stats.patients}</strong><small>{stats.doctors} consultants on staff</small></div>
         <div className="kpi"><span>Clinic book</span><strong>{stats.appointments}</strong><small>{stats.pendingAppointments} awaiting confirmation</small></div>
         <div className="kpi"><span>Open beds</span><strong>{stats.bedsAvailable}</strong><small>~{occupancy}% occupied</small></div>
-        <div className="kpi"><span>Admissions queue</span><strong>{stats.pendingWards}</strong><small>{stats.wardBookings} requests this period</small></div>
+        <div className="kpi"><span>Support desk</span><strong>{stats.openTickets || 0}</strong><small><Link to="/support">Open the queue</Link></small></div>
       </div>
       <section className="card" style={{ marginBottom: 18 }}>
         <div className="card-head"><div><span className="eyebrow">Live occupancy</span><h3>Beds in use · {occupancy}% campus load</h3></div></div>

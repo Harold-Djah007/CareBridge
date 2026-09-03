@@ -30,7 +30,7 @@ export default function Register() {
   return (
     <div className="login-page">
       <section className="login-hero">
-        <Link to="/" className="brand large"><div className="brand-mark"><HeartPulse size={24} /></div><div><b>CareBridge</b><span>Health</span></div></Link>
+        <Link to="/" className="brand large"><div className="brand-mark live"><HeartPulse size={24} /></div><div><b>CareBridge</b><span>Health</span></div></Link>
         <div>
           <h1>Create your patient portal.</h1>
           <p className="muted">Book visits, pay published fees by MoMo, GCB, NHIS or cash, collect receipts, and reserve a ward.</p>

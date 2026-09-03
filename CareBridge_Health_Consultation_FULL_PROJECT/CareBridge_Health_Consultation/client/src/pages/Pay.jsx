@@ -16,29 +16,54 @@ export default function Pay() {
   const { user } = useAuth();
   const { push } = useToast();
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const invoiceId = params.get("invoice");
   const [invoices, setInvoices] = useState([]);
   const [accounts, setAccounts] = useState(null);
+  const [services, setServices] = useState([]);
+  const [patients, setPatients] = useState([]);
+  const [patientId, setPatientId] = useState(user.role === "patient" ? user.id : "");
   const [invoice, setInvoice] = useState(null);
-  const [method, setMethod] = useState("momo");
-  const [form, setForm] = useState({ network: "mtn", phone: user.phone || "", payerName: user.name, nhisNumber: user.insurance || "" });
+  const prefs = user.paymentPrefs || {};
+  const [method, setMethod] = useState(prefs.method || "momo");
+  const [form, setForm] = useState({
+    network: prefs.momoNetwork || "mtn",
+    phone: prefs.momoNumber || user.phone || "",
+    payerName: user.name,
+    nhisNumber: prefs.nhisNumber || user.insurance || "",
+  });
   const [payment, setPayment] = useState(null);
   const [busy, setBusy] = useState(false);
 
+  const loadBills = async (selectId) => {
+    const rows = await api(`/billing?userId=${user.id}&role=${user.role}`);
+    setInvoices(rows);
+    const dueRows = rows.filter((r) => r.status === "due");
+    const wantedId = selectId || invoiceId;
+    const next = dueRows.find((r) => r.id === wantedId) || dueRows[0] || null;
+    setInvoice(next);
+    return { rows, next };
+  };
+
   useEffect(() => {
-    api(`/billing?userId=${user.id}&role=${user.role}`).then((rows) => {
-      setInvoices(rows);
-      setInvoice(rows.find((r) => r.id === invoiceId) || rows.find((r) => r.status === "due") || null);
-    });
+    loadBills();
     api("/finance/accounts").then(setAccounts);
+    api("/finance/rates").then((r) => setServices(r.services || []));
+    if (user.role === "admin") api("/patients").then(setPatients);
   }, [user.id, user.role, invoiceId]);
+
+  const pickBill = (row) => {
+    setInvoice(row);
+    setPayment(null);
+    const next = new URLSearchParams(params);
+    next.set("invoice", row.id);
+    setParams(next, { replace: true });
+  };
 
   const start = async (e) => {
     e.preventDefault();
-    if (!invoice) return;
-    if (invoice.status === "paid") {
-      push("This bill is already paid.");
+    if (!invoice || invoice.status !== "due") {
+      push("Choose an unpaid bill on the left, or open a new one below.", "error");
       return;
     }
     setBusy(true);
@@ -72,6 +97,31 @@ export default function Pay() {
     }
   };
 
+  const raiseBill = async (serviceId) => {
+    const pid = user.role === "patient" ? user.id : patientId;
+    if (!pid) {
+      push("Choose a patient first.", "error");
+      return;
+    }
+    setBusy(true);
+    try {
+      const inv = await api("/finance/services/order", {
+        method: "POST",
+        body: JSON.stringify({ patientId: pid, actorId: user.id, serviceId }),
+      });
+      push("Bill opened. Complete payment on the right.");
+      await loadBills(inv.id);
+      setPayment(null);
+      const next = new URLSearchParams(params);
+      next.set("invoice", inv.id);
+      setParams(next, { replace: true });
+    } catch (err) {
+      push(err.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const due = invoices.filter((i) => i.status === "due");
   const paid = invoices.filter((i) => i.status === "paid");
   const merchant = accounts?.momo?.[form.network] || accounts?.momo?.mtn;
@@ -82,42 +132,72 @@ export default function Pay() {
         <div>
           <span className="eyebrow">Hospital accounts</span>
           <h1>{user.role === "admin" ? "Patient billing" : "Pay a hospital bill"}</h1>
-          <p>Amounts post to CareBridge Medical Centre Ltd. MoMo wallets and GCB Ridge are the live settlement accounts for this campus. Every paid bill issues a numbered receipt.</p>
+          <p>Select an unpaid invoice to settle it by MoMo, GCB, NHIS, or cash. Paid rows open a receipt — they are not bills. If nothing is due, open a tariff item below and pay it here.</p>
         </div>
-        <Link className="secondary-btn" to="/billing/tariff">View tariff</Link>
+        <div className="row-actions">
+          <Link className="secondary-btn" to="/billing/tariff">View tariff</Link>
+          {user.role === "patient" && <Link className="ghost-btn" to="/pharmacy">Pharmacy & labs</Link>}
+        </div>
       </div>
       <div className="dashboard-grid">
         <section className="card">
-          <h3>Outstanding</h3>
-          {due.length === 0 && <p className="muted">No unpaid invoices.</p>}
+          <h3>Outstanding — click to pay</h3>
+          {due.length === 0 && (
+            <p className="muted">No unpaid invoices. Open a published service below, or bill medicines from Pharmacy, then return here to pay.</p>
+          )}
           {due.map((i) => (
-            <button type="button" key={i.id} className={`pay-pick ${invoice?.id === i.id ? "on" : ""}`} onClick={() => { setInvoice(i); setPayment(null); }}>
+            <button type="button" key={i.id} className={`pay-pick ${invoice?.id === i.id ? "on" : ""}`} onClick={() => pickBill(i)}>
               <span>
                 <b>{i.item}</b>
-                <small>{i.date}{i.patient?.name && user.role !== "patient" ? ` · ${i.patient.name}` : ""}</small>
+                <small>{i.date}{i.patient?.name && user.role !== "patient" ? ` · ${i.patient.name}` : ""} · Pay now</small>
               </span>
               <strong>{ghs(i.amount)}</strong>
             </button>
           ))}
+
+          <div className="raise-bill">
+            <h3>Open a new bill</h3>
+            <p className="muted">This creates an unpaid invoice and loads checkout on the right. Receipts are only issued after payment.</p>
+            {user.role === "admin" && (
+              <label>Patient
+                <select value={patientId} onChange={(e) => setPatientId(e.target.value)}>
+                  <option value="">Select patient</option>
+                  {patients.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.mrn}</option>)}
+                </select>
+              </label>
+            )}
+            <div className="raise-list">
+              {services.map((s) => (
+                <button type="button" key={s.id} className="ghost-btn" disabled={busy} onClick={() => raiseBill(s.id)}>
+                  {s.name} · {ghs(s.price)}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {paid.length > 0 && (
             <>
-              <h3 style={{ marginTop: 18 }}>Receipts</h3>
+              <h3 style={{ marginTop: 18 }}>Paid receipts</h3>
+              <p className="muted">These are settled. Open a receipt to print or save PDF — they cannot be paid again.</p>
               {paid.slice(0, 8).map((i) => (
-                <Link key={i.id} className="pay-pick" to={`/receipts/${i.paymentId || i.receiptNo || i.id}`}>
-                  <span><b>{i.item}</b><small>{i.receiptNo || "Receipt"} · {i.method}</small></span>
+                <Link key={i.id} className="pay-pick receipt" to={`/receipts/${i.paymentId || i.receiptNo || i.id}`}>
+                  <span><b>{i.item}</b><small>Paid · {i.receiptNo || "Receipt"} · {i.method}</small></span>
                   <strong>{ghs(i.amount)}</strong>
                 </Link>
               ))}
             </>
           )}
         </section>
-        <section className="card">
-          {!invoice && <p className="muted">Select a bill to settle.</p>}
-          {invoice && invoice.status === "paid" && !payment && (
-            <p>This invoice is already paid. <Link to={`/receipts/${invoice.paymentId || invoice.receiptNo || invoice.id}`}><b>Open receipt</b></Link></p>
+        <section className="card pay-checkout">
+          {!invoice && (
+            <div className="empty">
+              <h3>No bill selected</h3>
+              <p>Pick an outstanding invoice, or open a new bill from the tariff list. Checkout for MoMo, bank, NHIS, and cash appears here.</p>
+            </div>
           )}
           {invoice && invoice.status === "due" && !payment && (
             <form onSubmit={start} className="pay-form">
+              <p className="eyebrow">Checkout</p>
               <p><b>{invoice.item}</b><br /><span className="muted">Amount due {ghs(invoice.amount)}</span></p>
               {METHODS.map((m) => (
                 <label className="check-row" key={m.id}>

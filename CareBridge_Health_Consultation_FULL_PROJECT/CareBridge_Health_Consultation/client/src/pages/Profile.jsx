@@ -117,6 +117,7 @@ export default function Profile() {
 
         <div className="modal-actions">
           <button className="primary-btn" disabled={saving}>{saving ? "Saving..." : "Save changes"}</button>
+          <Link className="secondary-btn" to="/settings">Password, payments & alerts</Link>
         </div>
       </form>
     </div>

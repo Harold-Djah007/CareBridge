@@ -8,6 +8,7 @@ import { Server } from "socket.io";
 import { deliverEmail, renderEmail, shouldEmail } from "./email.js";
 import { audit, ensureClinical, mountClinical } from "./clinical.js";
 import { addInvoice, consultFee, mountFinance, wardFee } from "./finance.js";
+import { mountSupport } from "./support.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +19,7 @@ const readDb = () => {
   db.emails = db.emails || [];
   db.wards = db.wards || [];
   db.payments = db.payments || [];
+  db.tickets = db.tickets || [];
   return ensureClinical(db);
 };
 const writeDb = (db) => fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
@@ -175,7 +177,24 @@ app.patch("/api/users/:id", (req, res) => {
   const db = readDb();
   const user = db.users.find((u) => u.id === req.params.id);
   if (!user) return res.status(404).json({ message: "User not found" });
-  const allowed = ["name", "phone", "city", "about", "specialty", "available", "years", "emailAlerts", "alertPrefs", "emergencyContact", "allergies", "insurance", "bloodType", "dob"];
+  if (req.body.password) {
+    if (!req.body.currentPassword || req.body.currentPassword !== user.password) {
+      return res.status(400).json({ message: "Current password is incorrect." });
+    }
+    if (String(req.body.password).length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters." });
+    }
+    user.password = req.body.password;
+  }
+  if (req.body.email !== undefined) {
+    const email = String(req.body.email).trim();
+    if (!email) return res.status(400).json({ message: "Email is required." });
+    if (db.users.some((u) => u.id !== user.id && u.email.toLowerCase() === email.toLowerCase())) {
+      return res.status(409).json({ message: "That email is already in use." });
+    }
+    user.email = email;
+  }
+  const allowed = ["name", "phone", "city", "about", "specialty", "available", "years", "emailAlerts", "alertPrefs", "emergencyContact", "allergies", "insurance", "bloodType", "dob", "paymentPrefs"];
   allowed.forEach((key) => {
     if (req.body[key] !== undefined) user[key] = req.body[key];
   });
@@ -488,11 +507,13 @@ app.get("/api/admin/overview", (_, res) => {
     pendingWards: db.wardBookings.filter((w) => w.status === "pending").length,
     messages: db.messages.length,
     bedsAvailable: (db.wards || []).reduce((sum, w) => sum + Number(w.available || 0), 0),
+    openTickets: (db.tickets || []).filter((t) => t.status !== "resolved").length,
   });
 });
 
 mountClinical(app, { readDb, writeDb, safeUser, notify, emailPatient });
 mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient });
+mountSupport(app, { readDb, writeDb, safeUser, notify, emailPatient });
 
 app.get("/api/admin/users", (_, res) => {
   const db = readDb();

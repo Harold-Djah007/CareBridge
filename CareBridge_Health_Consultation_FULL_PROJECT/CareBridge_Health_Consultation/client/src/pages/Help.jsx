@@ -1,20 +1,25 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { HOSPITAL } from "../utils";
+import { useAuth } from "../state";
 
 export default function Help() {
+  const { user } = useAuth();
   return (
-    <div className="landing">
-      <nav className="public-nav">
-        <Link to="/" className="brand"><b>{HOSPITAL.short}</b></Link>
-        <div className="links"><Link to="/login">Sign in</Link></div>
-      </nav>
+    <div className={user ? "" : "landing"}>
+      {!user && (
+        <nav className="public-nav">
+          <Link to="/" className="brand"><b>{HOSPITAL.short}</b></Link>
+          <div className="links"><Link to="/login">Sign in</Link></div>
+        </nav>
+      )}
       <div className="page-title">
         <div>
           <span className="eyebrow">{HOSPITAL.campus}</span>
           <h1>How CareBridge works</h1>
           <p>A short map of the hospital system — for patients, clinicians, and operations.</p>
         </div>
+        {user && <Link className="primary-btn" to="/support">Open help desk</Link>}
       </div>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Patients</h3>

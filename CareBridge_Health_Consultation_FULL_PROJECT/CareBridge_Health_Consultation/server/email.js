@@ -96,6 +96,7 @@ const defaultPrefs = {
   wards: true,
   messages: true,
   account: true,
+  support: true,
 };
 
 export function shouldEmail(user, type) {
@@ -106,5 +107,6 @@ export function shouldEmail(user, type) {
   if (type === "ward") return prefs.wards !== false;
   if (type === "message") return prefs.messages !== false;
   if (type === "account" || type === "test") return prefs.account !== false;
+  if (type === "support") return prefs.support !== false;
   return true;
 }

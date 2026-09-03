@@ -83,7 +83,7 @@ const SEED = {
 };
 
 export function ensureClinical(db) {
-  ["medications", "conditions", "vitals", "labs", "notes", "prescriptions", "invoices", "intakes", "consents", "audit"].forEach((k) => {
+  ["medications", "conditions", "vitals", "labs", "notes", "prescriptions", "invoices", "intakes", "consents", "audit", "tickets"].forEach((k) => {
     if (!Array.isArray(db[k])) db[k] = [];
   });
   if (!db.medications.length) {

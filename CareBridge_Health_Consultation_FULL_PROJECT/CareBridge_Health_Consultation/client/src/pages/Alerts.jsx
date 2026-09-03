@@ -37,7 +37,7 @@ export default function Alerts() {
         {user.role === "patient" && <button className="primary-btn" onClick={test}><Mail size={16} /> Send test alert</button>}
       </div>
       <div className="filters">
-        {["all", "appointment", "ward", "message", "account", "test"].map((t) => (
+        {["all", "appointment", "ward", "message", "account", "support", "test"].map((t) => (
           <button key={t} className={filter === t ? "active" : ""} onClick={() => setFilter(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
         ))}
       </div>

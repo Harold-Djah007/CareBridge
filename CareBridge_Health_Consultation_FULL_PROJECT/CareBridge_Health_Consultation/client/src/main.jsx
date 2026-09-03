@@ -27,6 +27,8 @@ import Pay from "./pages/Pay";
 import Pharmacy from "./pages/Pharmacy";
 import Receipt from "./pages/Receipt";
 import Tariff from "./pages/Tariff";
+import Settings from "./pages/Settings";
+import Support from "./pages/Support";
 import AppShell from "./components/AppShell";
 import ErrorBoundary from "./ErrorBoundary";
 
@@ -44,7 +46,7 @@ function AppRoutes() {
         <Route path="/" element={user ? <Navigate to={homeFor(user)} /> : <Landing />} />
         <Route path="/login" element={user ? <Navigate to={homeFor(user)} /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to={homeFor(user)} /> : <Register />} />
-        <Route path="/help" element={<Help />} />
+        <Route path="/help" element={user ? <Navigate to="/guide" replace /> : <Help />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/tariff" element={user ? <Navigate to="/billing/tariff" replace /> : <Tariff />} />
         <Route element={user ? <AppShell /> : <Navigate to="/login" />}>
@@ -56,6 +58,9 @@ function AppRoutes() {
           <Route path="/wards" element={<WardBooking />} />
           <Route path="/alerts" element={<RoleRoute roles={["patient", "admin"]}><Alerts /></RoleRoute>} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/support" element={<Support />} />
+          <Route path="/guide" element={<Help />} />
           <Route path="/records" element={<RoleRoute roles={["patient", "doctor", "admin"]}><ClinicalRecord /></RoleRoute>} />
           <Route path="/records/:patientId" element={<RoleRoute roles={["doctor", "admin"]}><ClinicalRecord /></RoleRoute>} />
           <Route path="/pay" element={<RoleRoute roles={["patient", "admin"]}><Pay /></RoleRoute>} />
