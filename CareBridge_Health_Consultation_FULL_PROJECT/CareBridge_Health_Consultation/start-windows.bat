@@ -1,0 +1,6 @@
+@echo off
+echo Installing dependencies...
+call npm install
+call npm run install:all
+echo Starting CareBridge...
+call npm run dev

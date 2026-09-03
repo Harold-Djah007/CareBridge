@@ -1,0 +1,90 @@
+{
+  "users": [
+    {
+      "id": "p1",
+      "role": "patient",
+      "name": "Ama Mensah",
+      "email": "patient@carebridge.test",
+      "password": "patient123",
+      "avatar": "AM",
+      "specialty": "",
+      "phone": "+233 24 555 0192"
+    },
+    {
+      "id": "d1",
+      "role": "doctor",
+      "name": "Dr. Kwame Owusu",
+      "email": "doctor@carebridge.test",
+      "password": "doctor123",
+      "avatar": "KO",
+      "specialty": "General Medicine",
+      "phone": "+233 20 555 0144"
+    },
+    {
+      "id": "d2",
+      "role": "doctor",
+      "name": "Dr. Efua Boateng",
+      "email": "efua@carebridge.test",
+      "password": "doctor123",
+      "avatar": "EB",
+      "specialty": "Cardiology",
+      "phone": "+233 27 555 0128"
+    }
+  ],
+  "appointments": [
+    {
+      "id": "a1",
+      "patientId": "p1",
+      "doctorId": "d1",
+      "date": "2026-09-05",
+      "time": "10:30",
+      "reason": "Persistent headaches and fatigue",
+      "status": "confirmed",
+      "mode": "video"
+    }
+  ],
+  "wardBookings": [
+    {
+      "id": "w1",
+      "patientId": "p1",
+      "ward": "General Ward",
+      "roomType": "Private Room",
+      "date": "2026-09-08",
+      "nights": 2,
+      "status": "confirmed",
+      "notes": "Arrival expected around 2:00 PM"
+    }
+  ],
+  "messages": [
+    {
+      "id": "m1",
+      "roomId": "p1-d1",
+      "senderId": "d1",
+      "text": "Hello Ama, I reviewed your appointment note. Please bring your recent lab results if available.",
+      "timestamp": "2026-09-03T13:15:00.000Z"
+    },
+    {
+      "id": "m2",
+      "roomId": "p1-d1",
+      "senderId": "p1",
+      "text": "Thank you doctor. I will have them ready before our consultation.",
+      "timestamp": "2026-09-03T13:18:00.000Z"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "n1",
+      "userId": "p1",
+      "title": "Appointment confirmed",
+      "body": "Your consultation with Dr. Kwame Owusu is confirmed for Sep 5 at 10:30.",
+      "read": false
+    },
+    {
+      "id": "n2",
+      "userId": "d1",
+      "title": "Upcoming consultation",
+      "body": "Ama Mensah is scheduled for Sep 5 at 10:30.",
+      "read": false
+    }
+  ]
+}
