@@ -491,7 +491,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .role-patient .chat-layout { border-radius: 26px; }
 .role-patient .mine .bubble { background: #d45a38; border-color: #d45a38; }
 .identity-strip {
-  display: grid; grid-template-columns: auto 1fr minmax(220px, 280px); gap: 16px; align-items: center;
+  display: grid; grid-template-columns: auto 1fr minmax(280px, 360px); gap: 16px; align-items: center;
   background: linear-gradient(120deg, #fff8f3, #fde4d8, #fff1e6); background-size: 200% 200%;
   animation: warmth 9s ease infinite;
   border: 1px solid var(--line); border-radius: 28px; padding: 18px 22px; margin-bottom: 18px;
