@@ -3,6 +3,7 @@ import { BedDouble, Plus, Users, CalendarDays, CheckCircle2, XCircle } from "luc
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { todayISO } from "../utils";
+import { OccupancyBars } from "../components/LiveMeter";
 
 export default function WardBooking() {
   const { user } = useAuth();
@@ -46,6 +47,16 @@ export default function WardBooking() {
         </div>
         {user.role === "patient" && <button className="primary-btn" onClick={() => setOpen(true)}><Plus size={18} /> Reserve a ward</button>}
       </div>
+      {user.role !== "patient" && (
+        <section className="card" style={{ marginBottom: 18 }}>
+          <div className="card-head"><div><span className="eyebrow">Live occupancy</span><h3>Beds currently occupied</h3></div></div>
+          <OccupancyBars items={wards.map((w) => ({
+            label: w.name,
+            value: Math.max(0, Number(w.capacity || 0) - Number(w.available || 0)),
+            max: Number(w.capacity || 1),
+          }))} />
+        </section>
+      )}
 
       {user.role === "patient" && (
         <div className="ward-grid">

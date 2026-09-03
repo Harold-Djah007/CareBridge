@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { api } from "../../api";
 import { useToast } from "../../state";
+import { OccupancyBars } from "../../components/LiveMeter";
 
 export default function AdminHospital() {
   const { push } = useToast();
@@ -38,6 +39,14 @@ export default function AdminHospital() {
           <p>Accept beds, decline requests, and keep availability accurate.</p>
         </div>
       </div>
+      <section className="card" style={{ marginBottom: 18 }}>
+        <div className="card-head"><div><span className="eyebrow">Live occupancy</span><h3>Campus bed load</h3></div></div>
+        <OccupancyBars items={wards.map((w) => ({
+          label: w.name,
+          value: Math.max(0, Number(w.capacity || 0) - Number(w.available || 0)),
+          max: Number(w.capacity || 1),
+        }))} />
+      </section>
       <div className="ward-grid">
         {wards.map((w) => (
           <div className="ward-card" key={w.id}>

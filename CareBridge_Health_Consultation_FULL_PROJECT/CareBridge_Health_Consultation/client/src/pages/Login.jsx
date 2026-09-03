@@ -4,6 +4,7 @@ import { HeartPulse, ShieldCheck, ArrowRight } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { HOSPITAL } from "../utils";
+import { Heartbeat } from "../components/LiveMeter";
 
 const STAFF = {
   doctor: { email: "doctor@carebridge.test", password: "doctor123" },
@@ -47,6 +48,8 @@ export default function Login() {
           <div className="status confirmed" style={{ display: "inline-flex", gap: 6, marginBottom: 16 }}><ShieldCheck size={14} /> {isStaff ? "Staff access" : "Patient portal"}</div>
           <h1>{isStaff ? "Clinical and operations sign-in." : "Your hospital record, in your hands."}</h1>
           <p className="muted">{isStaff ? "Doctors and administrators use this portal for clinic lists, admissions, and hospital operations." : `Book visits, message consultants, and reserve a bed at ${HOSPITAL.name}.`}</p>
+          {!isStaff && <div style={{ marginTop: 22, maxWidth: 280 }}><Heartbeat variant="patient" /></div>}
+          {isStaff && <div style={{ marginTop: 22, maxWidth: 280 }}><Heartbeat variant="doctor" /></div>}
         </div>
         <p className="muted">{HOSPITAL.phone} · Records office</p>
       </section>

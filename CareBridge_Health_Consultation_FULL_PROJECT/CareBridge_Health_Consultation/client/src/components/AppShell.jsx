@@ -8,6 +8,7 @@ import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
 import { api, socketUrl } from "../api";
 import { HOSPITAL, isUpcoming, longDate } from "../utils";
+import { LiveClock } from "./LiveMeter";
 
 const NAV = {
   patient: [
@@ -145,7 +146,7 @@ export default function AppShell() {
     <div className={`app-layout role-${user.role}`} data-role={user.role}>
       <aside className={`sidebar sidebar-${user.role}`}>
         <div className="brand">
-          <div className="brand-mark"><HeartPulse size={22} /></div>
+          <div className="brand-mark live"><HeartPulse size={22} /></div>
           <div>
             <b>{HOSPITAL.short}</b>
             <span>{user.role === "patient" ? "Patient portal" : user.role === "doctor" ? "Clinical" : "Operations"}</span>
@@ -184,6 +185,7 @@ export default function AppShell() {
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} />
           </form>
           <div className="topbar-actions">
+            {(user.role === "doctor" || user.role === "admin") && <LiveClock />}
             <button className="icon-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications">
               <Bell size={19} />{unread > 0 && <i className="dot" />}
             </button>

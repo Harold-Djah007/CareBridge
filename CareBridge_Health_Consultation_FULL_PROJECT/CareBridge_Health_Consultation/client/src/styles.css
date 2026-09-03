@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 
 :root {
   --ink: #13211e;
@@ -89,6 +89,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .feature-card svg, .step b { color: var(--teal); }
 .landing-foot { padding: 28px 7vw; border-top: 1px solid var(--line); display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; }
 
+.login-page { min-height: 100vh; display: grid; grid-template-columns: 1.05fr 0.95fr; background: #fffdf8; }
 .staff-login .login-hero { background: linear-gradient(160deg, #10242b, #163038); color: #e7eef0; }
 .staff-login .login-hero h1, .staff-login .brand b { color: #fff; }
 .staff-login .login-hero .muted, .staff-login .brand span { color: #9db0b6; }
@@ -307,4 +308,243 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
   .chat-layout { grid-template-columns: 1fr; height: 70vh; }
   .contact-panel { display: none; }
   .clinic-row { grid-template-columns: 1fr; }
+}
+
+/* ——— Live meters ——— */
+.brand-mark.live { position: relative; animation: brand-glow 2.6s ease-in-out infinite; }
+.live-clock {
+  font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums;
+  font-size: 13px; letter-spacing: 0.04em; color: var(--teal); min-width: 86px; text-align: right;
+}
+.vital-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 14px 16px 8px;
+  min-width: 220px; overflow: hidden;
+}
+.vital-card.compact { min-width: 160px; padding: 10px 12px; }
+.vital-head { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #e11d48; box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.6); animation: live-blink 1.2s ease infinite; }
+.vital-body { display: flex; align-items: center; gap: 12px; margin: 8px 0 4px; }
+.heart-wrap { position: relative; width: 44px; height: 44px; display: grid; place-items: center; }
+.pulse-ring {
+  position: absolute; inset: 0; border-radius: 50%; border: 2px solid currentColor; opacity: 0.45;
+  animation: pulse-ring 1.1s ease-out infinite;
+}
+.heart-icon { width: 28px; height: 28px; fill: currentColor; animation: heartbeat 1.1s ease-in-out infinite; z-index: 1; }
+.vital-readout { display: flex; align-items: baseline; gap: 6px; }
+.vital-readout strong { font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; }
+.vital-readout small { color: var(--muted); font-weight: 800; letter-spacing: 0.08em; }
+.ecg, .ecg-ribbon { overflow: hidden; width: 100%; height: 56px; color: currentColor; }
+.ecg-ribbon { height: 72px; pointer-events: none; }
+.ecg-track { display: flex; width: 200%; height: 100%; animation: ecg-scroll 3.6s linear infinite; }
+.ecg-track svg { width: 50%; height: 100%; display: block; }
+.ecg-track path { stroke: currentColor; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+.vital-patient { color: #d45a38; }
+.vital-doctor { color: #3ee0c7; background: #0c1e28; border-color: #1e3a46; }
+.vital-admin { color: #f5c542; background: #1a160c; border-color: #3a3014; }
+.occ-board { display: flex; flex-direction: column; gap: 12px; }
+.occ-meta { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.occ-meta span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.occ-track { height: 10px; border-radius: 99px; background: rgba(127, 127, 127, 0.18); overflow: hidden; }
+.occ-track span {
+  display: block; height: 100%; width: var(--w, 0%); border-radius: inherit; background: currentColor;
+  transform-origin: left; animation: occ-fill 1.3s cubic-bezier(.2,.8,.2,1);
+  position: relative;
+}
+.occ-track span::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 2s ease infinite;
+}
+.ops-hero, .doctor-welcome, .patient-hero { display: flex; justify-content: space-between; align-items: stretch; gap: 18px; }
+.doctor-welcome { position: relative; }
+.doctor-welcome .ecg-ribbon { position: absolute; left: 0; right: 0; bottom: 0; opacity: 0.35; }
+.doctor-welcome > *:not(.ecg-ribbon) { position: relative; z-index: 1; }
+.capacity span { animation: occ-fill 1.2s ease; transform-origin: left; }
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.22); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.14); }
+  70% { transform: scale(1); }
+}
+@keyframes pulse-ring {
+  0% { transform: scale(0.65); opacity: 0.55; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+@keyframes live-blink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.55); }
+  50% { opacity: 0.35; box-shadow: 0 0 0 6px rgba(225, 29, 72, 0); }
+}
+@keyframes ecg-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes occ-fill { from { transform: scaleX(0.08); } to { transform: scaleX(1); } }
+@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+@keyframes warmth { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes brand-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 90, 56, 0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(212, 90, 56, 0); }
+}
+@keyframes next-glow {
+  0%, 100% { background: rgba(62, 224, 199, 0.08); }
+  50% { background: rgba(62, 224, 199, 0.16); }
+}
+
+/* Patient — coral wellness (overrides shared cream) */
+.role-patient {
+  --paper: #f7ebe3; --card: #fff8f3; --line: #edd6c8; --ink: #3a241c; --muted: #8a6558;
+  --teal: #d45a38; --teal-dark: #b84428; --teal-soft: #fde4d8; --gold: #e08a4d;
+  --sidebar-bg: #fff4ea; --sidebar-ink: #3a241c; --nav-muted: #9a7164; color: var(--ink);
+}
+.role-patient .main {
+  background:
+    radial-gradient(900px 380px at 0% -10%, rgba(212, 90, 56, 0.16), transparent 55%),
+    radial-gradient(700px 300px at 100% 0%, rgba(255, 186, 140, 0.22), transparent 50%),
+    var(--paper);
+}
+.role-patient .brand-mark { background: #d45a38; border-radius: 50%; }
+.role-patient .brand-mark.live { animation-name: brand-glow; }
+.role-patient .nav-item { border-radius: 999px; }
+.role-patient .nav-item.active { background: #fde4d8; color: #b84428; }
+.role-patient .primary-btn, .role-patient .secondary-btn { border-radius: 999px; }
+.role-patient .card, .role-patient .list-card, .role-patient .person-card, .role-patient .ward-card, .role-patient .email-card {
+  border-radius: 26px; box-shadow: 0 16px 40px rgba(180, 68, 40, 0.06);
+}
+.role-patient .welcome { background: linear-gradient(135deg, #e36a45 0%, #c44a2e 52%, #8f3b2c 100%); }
+.role-patient .page-wrap { max-width: 1180px; }
+.role-patient .filters button.active { background: #d45a38; border-color: #d45a38; }
+.role-patient .chat-layout { border-radius: 26px; }
+.role-patient .mine .bubble { background: #d45a38; border-color: #d45a38; }
+.identity-strip {
+  display: grid; grid-template-columns: auto 1fr minmax(220px, 280px); gap: 16px; align-items: center;
+  background: linear-gradient(120deg, #fff8f3, #fde4d8, #fff1e6); background-size: 200% 200%;
+  animation: warmth 9s ease infinite;
+  border: 1px solid var(--line); border-radius: 28px; padding: 18px 22px; margin-bottom: 18px;
+}
+
+/* Doctor — dark clinical monitor */
+.role-doctor {
+  --paper: #07141c; --card: #10222d; --line: #1e3a46; --ink: #e7f4f6; --muted: #8aa8b0;
+  --teal: #3ee0c7; --teal-dark: #27c4ad; --teal-soft: #14363d; --gold: #7ee8ff;
+  --sidebar-bg: #050e14; --sidebar-ink: #e7f4f6; --nav-muted: #7d96a0;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  color: var(--ink); font-family: "IBM Plex Sans", sans-serif;
+}
+.role-doctor h1, .role-doctor h2, .role-doctor h3, .role-doctor .serif { font-family: "IBM Plex Sans", sans-serif; letter-spacing: -0.02em; }
+.role-doctor h1 { font-size: 26px; font-weight: 700; }
+.role-doctor .main {
+  background-image:
+    linear-gradient(rgba(62, 224, 199, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(62, 224, 199, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px; background-color: var(--paper);
+}
+.role-doctor .sidebar { border-right-color: #031016; }
+.role-doctor .brand-mark { background: #0d3d3a; color: #3ee0c7; border-radius: 6px; }
+.role-doctor .sidebar .brand span, .role-doctor .sidebar-campus span, .role-doctor .sidebar-user-text span { color: #7d96a0; }
+.role-doctor .nav-item { border-radius: 6px; }
+.role-doctor .nav-item:hover { background: rgba(62, 224, 199, 0.08); color: #fff; }
+.role-doctor .nav-item.active { background: #14363d; color: #8ee0d6; box-shadow: inset 3px 0 0 #3ee0c7; }
+.role-doctor .topbar { background: rgba(10, 24, 32, 0.92); border-bottom-color: var(--line); color: var(--ink); }
+.role-doctor .top-search { background: #0a1b24; border-color: var(--line); color: var(--muted); }
+.role-doctor .icon-btn { color: #8aa8b0; }
+.role-doctor .icon-btn:hover { background: #14363d; color: #3ee0c7; }
+.role-doctor .secondary-btn { background: #1a3340; color: var(--ink); border-radius: 6px; }
+.role-doctor .primary-btn, .role-doctor .ghost-btn { border-radius: 6px; }
+.role-doctor .card, .role-doctor .list-card, .role-doctor .stat-card, .role-doctor .person-card, .role-doctor .ward-card, .role-doctor .email-card {
+  border-radius: 8px; padding: 16px; background: var(--card);
+}
+.role-doctor .welcome {
+  background: linear-gradient(180deg, #0c2430 0%, #071820 100%);
+  min-height: 148px; border-radius: 10px; padding: 22px 24px; border: 1px solid #1e3a46;
+}
+.role-doctor input, .role-doctor select, .role-doctor textarea { background: #0a1b24; color: var(--ink); border-color: var(--line); }
+.role-doctor .filters button { background: #10222d; color: var(--ink); border-color: var(--line); }
+.role-doctor .filters button.active { background: #3ee0c7; color: #07141c; }
+.role-doctor .appointment-feature { background: #0c1e28; }
+.role-doctor .chat-layout { background: #0c1e28; border-radius: 8px; }
+.role-doctor .search-box { background: #0a1b24; }
+.role-doctor .messages { background: #07141c; }
+.role-doctor .bubble { background: #16303a; color: var(--ink); border-color: #1e3a46; }
+.role-doctor .contact.selected { background: #14363d; }
+.role-doctor .notice { background: #10222d; color: var(--ink); }
+.role-doctor .empty h3, .role-doctor .page-title p { color: var(--muted); }
+.role-doctor .empty h3 { color: var(--ink); }
+.role-doctor .date-box { background: #14363d; color: #3ee0c7; }
+.role-doctor .status.confirmed, .role-doctor .status.completed, .role-doctor .status.sent, .role-doctor .status.delivered, .role-doctor .status.active { background: #143d32; color: #7dffc2; }
+.role-doctor .status.pending, .role-doctor .status.queued { background: #3a3014; color: #f0d48a; }
+.role-doctor .table th, .role-doctor .table td { border-color: var(--line); color: var(--ink); }
+.role-doctor .modal-card { background: #fffdf8; color: #13211e; }
+.role-doctor .modal-card h2, .role-doctor .modal-card label, .role-doctor .modal-card .muted { color: #13211e; }
+.role-doctor .modal-card input, .role-doctor .modal-card select, .role-doctor .modal-card textarea { background: #fff; color: #13211e; }
+.clinic-row .time { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--teal); }
+.clinic-row.next { background: rgba(62, 224, 199, 0.1); box-shadow: inset 4px 0 0 #3ee0c7; animation: next-glow 2.4s ease-in-out infinite; }
+
+/* Admin — graphite + amber command */
+.role-admin {
+  --paper: #0c0c0e; --card: #161618; --line: #2a2a30; --ink: #f3f1ea; --muted: #a7a396;
+  --teal: #c9a227; --teal-dark: #a8861c; --teal-soft: #2a2414; --gold: #f5c542;
+  --sidebar-bg: #08080a; --sidebar-ink: #f3f1ea; --nav-muted: #9a9486;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  color: var(--ink); font-family: "IBM Plex Sans", sans-serif;
+}
+.role-admin h1, .role-admin h2, .role-admin h3, .role-admin .serif { font-family: "IBM Plex Sans", sans-serif; }
+.role-admin h1 { font-size: 24px; font-weight: 700; letter-spacing: 0.01em; }
+.role-admin .main {
+  background:
+    radial-gradient(900px 420px at 100% -20%, rgba(245, 197, 66, 0.14), transparent 50%),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,0.015) 0 12px, transparent 12px 24px),
+    var(--paper);
+}
+.role-admin .sidebar { border-right-color: #050506; }
+.role-admin .brand-mark { background: #f5c542; color: #1a1406; border-radius: 4px; }
+.role-admin .nav-item { border-radius: 4px; }
+.role-admin .nav-item:hover { background: rgba(245, 197, 66, 0.08); color: #fff; }
+.role-admin .nav-item.active { background: #2a2414; color: #f5c542; }
+.role-admin .topbar { background: rgba(12, 12, 14, 0.94); border-bottom-color: var(--line); }
+.role-admin .top-search { background: #121214; border-color: var(--line); color: var(--muted); }
+.role-admin .eyebrow { color: #f5c542; }
+.role-admin .primary-btn {
+  background: #f5c542; color: #1a1406; border-radius: 4px; text-transform: uppercase;
+  letter-spacing: 0.06em; font-size: 12px;
+}
+.role-admin .primary-btn:hover { background: #e0b13a; }
+.role-admin .secondary-btn, .role-admin .ghost-btn { border-radius: 4px; }
+.role-admin .secondary-btn { background: #2a2414; color: #f5c542; }
+.role-admin .icon-btn { color: #a7a396; }
+.role-admin .icon-btn:hover { background: #2a2414; color: #f5c542; }
+.role-admin .card, .role-admin .list-card, .role-admin .ward-card, .role-admin .email-card { border-radius: 6px; }
+.role-admin input, .role-admin select, .role-admin textarea { background: #121214; color: var(--ink); border-color: var(--line); }
+.role-admin .filters button { background: #161618; color: var(--ink); border-color: var(--line); }
+.role-admin .filters button.active { background: #f5c542; color: #1a1406; border-color: #f5c542; }
+.role-admin .search-box { background: #121214; }
+.role-admin .chat-layout { background: #121214; border-radius: 6px; }
+.role-admin .messages { background: #0c0c0e; }
+.role-admin .bubble { background: #1c1c20; color: var(--ink); border-color: #2a2a30; }
+.role-admin .notice { background: #161618; color: var(--ink); }
+.role-admin .table th, .role-admin .table td { border-color: var(--line); color: var(--ink); }
+.role-admin .appointment-feature { background: #1c1c20; }
+.role-admin .status.confirmed, .role-admin .status.completed, .role-admin .status.sent, .role-admin .status.delivered, .role-admin .status.active { background: #1d2a1c; color: #b7e0a8; }
+.role-admin .status.pending, .role-admin .status.queued { background: #2a2414; color: #f5c542; }
+.role-admin .modal-card { background: #fffdf8; color: #13211e; }
+.role-admin .modal-card h2, .role-admin .modal-card label { color: #13211e; }
+.role-admin .modal-card input, .role-admin .modal-card select, .role-admin .modal-card textarea { background: #fff; color: #13211e; }
+.role-admin .empty h3 { color: var(--ink); }
+.role-admin .occ-board { color: #f5c542; }
+.role-patient .occ-board { color: #d45a38; }
+.role-doctor .occ-board { color: #3ee0c7; }
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+.kpi { background: #121214; color: #f3f1ea; border-radius: 6px; padding: 16px 18px; border-top: 3px solid #f5c542; }
+.kpi span { display: block; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #a7a396; }
+.kpi strong { font-size: 28px; font-weight: 700; }
+.kpi small { color: #f5c542; }
+
+.landing .hero-panel { position: relative; overflow: hidden; }
+.landing .vital-card { margin-bottom: 14px; }
+
+@media (max-width: 800px) {
+  .identity-strip, .ops-hero, .doctor-welcome { grid-template-columns: 1fr; display: flex; flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .heart-icon, .pulse-ring, .ecg-track, .live-dot, .brand-mark.live, .identity-strip, .clinic-row.next, .occ-track span, .occ-track span::after {
+    animation: none !important;
+  }
 }

@@ -2,12 +2,13 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { HeartPulse, Video, MessageCircle, BedDouble, ShieldCheck, ArrowRight, Phone } from "lucide-react";
 import { HOSPITAL } from "../utils";
+import { Heartbeat } from "../components/LiveMeter";
 
 export default function Landing() {
   return (
     <div className="landing">
       <nav className="public-nav">
-        <div className="brand"><div className="brand-mark"><HeartPulse size={22} /></div><div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div></div>
+        <div className="brand"><div className="brand-mark live"><HeartPulse size={22} /></div><div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div></div>
         <div className="links">
           <a href="#services">Services</a>
           <a href="#portal">Patient portal</a>
@@ -28,6 +29,7 @@ export default function Landing() {
           <p className="muted" style={{ display: "flex", gap: 8, alignItems: "center" }}><Phone size={16} /> Emergency {HOSPITAL.emergency}</p>
         </div>
         <aside className="hero-panel">
+          <Heartbeat variant="patient" />
           <span className="eyebrow">Ridge Campus</span>
           <h3>Outpatient & admissions</h3>
           <p className="muted">General medicine, cardiology, paediatrics, orthopaedics, and inpatient wards on one site.</p>

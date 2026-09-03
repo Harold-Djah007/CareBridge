@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { CalendarDays, MessageCircle, BedDouble, Video, ArrowRight, Mail, Clock3 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { CalendarDays, BedDouble, Video, ArrowRight, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../state";
 import { api } from "../api";
 import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate } from "../utils";
+import { EcgRibbon, Heartbeat } from "../components/LiveMeter";
 
 function PatientHome({ user, appointments, wards, emails }) {
   const next = appointments.find(isUpcoming);
@@ -21,8 +22,9 @@ function PatientHome({ user, appointments, wards, emails }) {
             <span>Blood <b>{user.bloodType || "—"}</b></span>
             <span>{user.insurance || user.city}</span>
           </div>
+          <Link className="secondary-btn" to="/profile" style={{ marginTop: 12 }}>My details</Link>
         </div>
-        <Link className="secondary-btn" to="/profile">My details</Link>
+        <Heartbeat variant="patient" />
       </div>
 
       <div className="dashboard-grid">
@@ -90,16 +92,15 @@ function DoctorBoard({ user, appointments, wards }) {
 
   return (
     <>
-      <section className="welcome">
+      <section className="welcome doctor-welcome">
+        <EcgRibbon variant="doctor" />
         <div>
           <span className="eyebrow">{user.department || "Outpatient"} · {user.clinic || "Consulting room"}</span>
           <h1>{greeting(user.name.replace("Dr. ", "").split(" ")[0])}</h1>
           <p>{longDate()} · {user.shift || "Day clinic"} · {today.filter(isUpcoming).length} patients remaining</p>
-        </div>
-        <div>
-          <div className="status confirmed">On duty</div>
           {pending > 0 && <p style={{ marginTop: 10 }}>{pending} admission request{pending > 1 ? "s" : ""} waiting</p>}
         </div>
+        <Heartbeat variant="doctor" />
       </section>
 
       <div className="clinic-board" style={{ marginTop: 16 }}>
