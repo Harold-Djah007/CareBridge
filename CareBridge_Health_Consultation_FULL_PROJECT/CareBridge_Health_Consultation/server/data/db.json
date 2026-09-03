@@ -1,6 +1,22 @@
 {
   "users": [
     {
+      "id": "adm1",
+      "role": "admin",
+      "name": "Nora Addo",
+      "email": "admin@carebridge.test",
+      "password": "admin123",
+      "avatar": "NA",
+      "specialty": "Hospital Administration",
+      "phone": "+233 30 555 0100",
+      "city": "Accra",
+      "about": "Operations lead for CareBridge Hospital.",
+      "status": "active",
+      "years": 8,
+      "emailAlerts": true,
+      "alertPrefs": { "appointments": true, "wards": true, "messages": true, "account": true }
+    },
+    {
       "id": "p1",
       "role": "patient",
       "name": "Ama Mensah",
@@ -8,7 +24,27 @@
       "password": "patient123",
       "avatar": "AM",
       "specialty": "",
-      "phone": "+233 24 555 0192"
+      "phone": "+233 24 555 0192",
+      "city": "Accra",
+      "about": "Patient portal member since 2024.",
+      "status": "active",
+      "emailAlerts": true,
+      "alertPrefs": { "appointments": true, "wards": true, "messages": true, "account": true }
+    },
+    {
+      "id": "p2",
+      "role": "patient",
+      "name": "Kofi Asante",
+      "email": "kofi@carebridge.test",
+      "password": "patient123",
+      "avatar": "KA",
+      "specialty": "",
+      "phone": "+233 24 555 0177",
+      "city": "Kumasi",
+      "about": "Follow-up care for post-operative recovery.",
+      "status": "active",
+      "emailAlerts": true,
+      "alertPrefs": { "appointments": true, "wards": true, "messages": true, "account": true }
     },
     {
       "id": "d1",
@@ -18,7 +54,12 @@
       "password": "doctor123",
       "avatar": "KO",
       "specialty": "General Medicine",
-      "phone": "+233 20 555 0144"
+      "phone": "+233 20 555 0144",
+      "city": "Accra",
+      "about": "Primary care physician focused on preventive medicine and chronic condition support.",
+      "years": 12,
+      "available": true,
+      "status": "active"
     },
     {
       "id": "d2",
@@ -28,12 +69,81 @@
       "password": "doctor123",
       "avatar": "EB",
       "specialty": "Cardiology",
-      "phone": "+233 27 555 0128"
+      "phone": "+233 27 555 0128",
+      "city": "Accra",
+      "about": "Heart specialist helping patients manage blood pressure, chest pain, and recovery plans.",
+      "years": 15,
+      "available": true,
+      "status": "active"
+    },
+    {
+      "id": "d3",
+      "role": "doctor",
+      "name": "Dr. Abena Sarpong",
+      "email": "abena@carebridge.test",
+      "password": "doctor123",
+      "avatar": "AS",
+      "specialty": "Pediatrics",
+      "phone": "+233 26 555 0160",
+      "city": "Tema",
+      "about": "Gentle, family-centered care for infants, children, and adolescents.",
+      "years": 9,
+      "available": true,
+      "status": "active"
+    },
+    {
+      "id": "d4",
+      "role": "doctor",
+      "name": "Dr. Kojo Mensah",
+      "email": "kojo@carebridge.test",
+      "password": "doctor123",
+      "avatar": "KM",
+      "specialty": "Orthopedics",
+      "phone": "+233 25 555 0111",
+      "city": "Kumasi",
+      "about": "Joint, bone, and mobility care with a focus on safe recovery and rehabilitation.",
+      "years": 11,
+      "available": false,
+      "status": "active"
+    }
+  ],
+  "wards": [
+    {
+      "id": "general",
+      "name": "General Ward",
+      "available": 12,
+      "capacity": 18,
+      "description": "Comfortable inpatient care and overnight observation.",
+      "amenities": ["Nurse station nearby", "Visitor hours", "Meals included"]
+    },
+    {
+      "id": "medical",
+      "name": "Medical Ward",
+      "available": 7,
+      "capacity": 14,
+      "description": "Adult medical admissions with closer monitoring.",
+      "amenities": ["24/7 observation", "Medication support", "Family updates"]
+    },
+    {
+      "id": "maternity",
+      "name": "Maternity Ward",
+      "available": 5,
+      "capacity": 10,
+      "description": "Calm maternal and post-delivery recovery rooms.",
+      "amenities": ["Private rest area", "Newborn support", "Partner stay"]
+    },
+    {
+      "id": "pediatric",
+      "name": "Pediatric Ward",
+      "available": 8,
+      "capacity": 12,
+      "description": "Child-friendly rooms for younger patients.",
+      "amenities": ["Parent bed", "Play corner", "Pediatric nurses"]
     }
   ],
   "appointments": [
     {
-      "id": "a1",
+      "id": "apt1",
       "patientId": "p1",
       "doctorId": "d1",
       "date": "2026-09-05",
@@ -41,11 +151,41 @@
       "reason": "Persistent headaches and fatigue",
       "status": "confirmed",
       "mode": "video"
+    },
+    {
+      "id": "apt2",
+      "patientId": "p1",
+      "doctorId": "d2",
+      "date": "2026-09-12",
+      "time": "14:00",
+      "reason": "Blood pressure review",
+      "status": "confirmed",
+      "mode": "video"
+    },
+    {
+      "id": "apt3",
+      "patientId": "p1",
+      "doctorId": "d1",
+      "date": "2026-08-20",
+      "time": "09:15",
+      "reason": "Annual wellness check",
+      "status": "completed",
+      "mode": "in-person"
+    },
+    {
+      "id": "apt4",
+      "patientId": "p2",
+      "doctorId": "d1",
+      "date": "2026-09-05",
+      "time": "15:00",
+      "reason": "Post-surgery follow-up",
+      "status": "pending",
+      "mode": "in-person"
     }
   ],
   "wardBookings": [
     {
-      "id": "w1",
+      "id": "wb1",
       "patientId": "p1",
       "ward": "General Ward",
       "roomType": "Private Room",
@@ -53,22 +193,46 @@
       "nights": 2,
       "status": "confirmed",
       "notes": "Arrival expected around 2:00 PM"
+    },
+    {
+      "id": "wb2",
+      "patientId": "p2",
+      "ward": "Medical Ward",
+      "roomType": "Shared Room",
+      "date": "2026-09-10",
+      "nights": 3,
+      "status": "pending",
+      "notes": "Needs ground-floor access if possible"
     }
   ],
   "messages": [
     {
       "id": "m1",
-      "roomId": "p1-d1",
+      "roomId": "d1-p1",
       "senderId": "d1",
       "text": "Hello Ama, I reviewed your appointment note. Please bring your recent lab results if available.",
       "timestamp": "2026-09-03T13:15:00.000Z"
     },
     {
       "id": "m2",
-      "roomId": "p1-d1",
+      "roomId": "d1-p1",
       "senderId": "p1",
       "text": "Thank you doctor. I will have them ready before our consultation.",
       "timestamp": "2026-09-03T13:18:00.000Z"
+    },
+    {
+      "id": "m3",
+      "roomId": "d2-p1",
+      "senderId": "d2",
+      "text": "Ama, your blood pressure log looks useful. We will review trends together on the 12th.",
+      "timestamp": "2026-09-02T09:40:00.000Z"
+    },
+    {
+      "id": "m4",
+      "roomId": "d1-p2",
+      "senderId": "p2",
+      "text": "Doctor, the swelling has reduced. Should I still keep the bandage on overnight?",
+      "timestamp": "2026-09-03T08:12:00.000Z"
     }
   ],
   "notifications": [
@@ -85,6 +249,51 @@
       "title": "Upcoming consultation",
       "body": "Ama Mensah is scheduled for Sep 5 at 10:30.",
       "read": false
+    },
+    {
+      "id": "n3",
+      "userId": "p1",
+      "title": "Ward reserved",
+      "body": "Your General Ward private room is confirmed for Sep 8.",
+      "read": false
+    },
+    {
+      "id": "n4",
+      "userId": "d1",
+      "title": "Ward request pending",
+      "body": "Kofi Asante requested a Medical Ward bed for Sep 10.",
+      "read": false
+    },
+    {
+      "id": "n5",
+      "userId": "adm1",
+      "title": "Pending admission",
+      "body": "Kofi Asante has a Medical Ward request waiting for review.",
+      "read": false
+    }
+  ],
+  "emails": [
+    {
+      "id": "e1",
+      "userId": "p1",
+      "to": "patient@carebridge.test",
+      "subject": "Your CareBridge consultation is scheduled",
+      "text": "Your video consultation with Dr. Kwame Owusu is set for 2026-09-05 at 10:30.",
+      "type": "appointment",
+      "status": "delivered",
+      "previewUrl": null,
+      "sentAt": "2026-09-03T12:00:00.000Z"
+    },
+    {
+      "id": "e2",
+      "userId": "p1",
+      "to": "patient@carebridge.test",
+      "subject": "Your ward reservation has been accepted",
+      "text": "Your General Ward private room is confirmed for 2026-09-08.",
+      "type": "ward",
+      "status": "delivered",
+      "previewUrl": null,
+      "sentAt": "2026-09-03T12:10:00.000Z"
     }
   ]
 }
