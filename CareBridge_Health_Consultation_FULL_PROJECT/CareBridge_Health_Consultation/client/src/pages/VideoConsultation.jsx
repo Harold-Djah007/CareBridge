@@ -20,6 +20,7 @@ export default function VideoConsultation() {
   const [mic, setMic] = useState(true);
   const [cam, setCam] = useState(true);
   const [sharing, setSharing] = useState(false);
+  const [status, setStatus] = useState("Ready to join");
   const [consent, setConsent] = useState(user.role !== "patient");
 
   useEffect(() => {

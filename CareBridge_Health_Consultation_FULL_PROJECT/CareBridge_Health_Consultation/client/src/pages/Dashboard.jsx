@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { CalendarDays, BedDouble, Video, ArrowRight, Mail, FolderOpen } from "lucide-react";
+import { CalendarDays, BedDouble, Video, ArrowRight, Mail, FolderOpen, Wallet, Pill } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../state";
 import { api } from "../api";
 import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate } from "../utils";
-import { CarePath, EcgRibbon, Heartbeat } from "../components/LiveMeter";
 
-function PatientHome({ user, appointments, wards, emails }) {
+const ghs = (n) => `GHS ${Number(n || 0).toLocaleString()}`;
+
+function PatientHome({ user, appointments, wards, emails, due }) {
   const next = appointments.find(isUpcoming);
   const admission = wards.find((w) => w.status !== "declined");
+  const dueTotal = due.reduce((s, i) => s + Number(i.amount || 0), 0);
+
   return (
     <>
       <div className="identity-strip">
@@ -20,11 +23,19 @@ function PatientHome({ user, appointments, wards, emails }) {
             <span>MRN <b>{user.mrn || "Pending"}</b></span>
             <span>DOB <b>{user.dob || "—"}</b></span>
             <span>Blood <b>{user.bloodType || "—"}</b></span>
-            <span>{user.insurance || user.city}</span>
+            <span>Cover <b>{user.insurance || "Self-pay"}</b></span>
           </div>
-          <Link className="secondary-btn" to="/profile" style={{ marginTop: 12 }}>My details</Link>
+          <div className="row-actions" style={{ marginTop: 12 }}>
+            <Link className="secondary-btn" to="/profile">My details</Link>
+            <Link className="ghost-btn" to="/billing/tariff">Hospital tariff</Link>
+          </div>
         </div>
-        <CarePath caption={next ? `Next: ${formatDate(next.date)} · ${formatTime(next.time)}` : admission ? `${admission.ward} · ${admission.status}` : "Book a visit when you are ready"} />
+        <div className="duty-card">
+          <span className="eyebrow">Account</span>
+          <strong>{due.length ? ghs(dueTotal) : "No amount due"}</strong>
+          <small>{due.length ? `${due.length} unpaid invoice${due.length === 1 ? "" : "s"}` : "Receipts are in Pay bills"}</small>
+          <Link className="primary-btn" to="/pay" style={{ marginTop: 12 }}>{due.length ? "Pay now" : "View receipts"}</Link>
+        </div>
       </div>
 
       <div className="dashboard-grid">
@@ -40,8 +51,8 @@ function PatientHome({ user, appointments, wards, emails }) {
                 <div className="avatar large">{next.doctor.avatar}</div>
                 <div className="grow">
                   <strong>{next.doctor.name}</strong>
-                  <span className="muted">{next.doctor.specialty} · {next.mode === "video" ? "Video from home" : "Ridge Campus clinic"}</span>
-                  <small className="muted">{next.reason}</small>
+                  <span className="muted">{next.doctor.specialty} · {next.mode === "video" ? "Video consultation" : "Ridge Campus clinic"}</span>
+                  <small className="muted">{next.reason}{next.fee ? ` · ${ghs(next.fee)}` : ""}</small>
                 </div>
                 <div className="row-actions">
                   <Link className="secondary-btn" to={`/messages?with=${next.doctorId}`}>Message</Link>
@@ -52,29 +63,31 @@ function PatientHome({ user, appointments, wards, emails }) {
               <ul className="prep-list">
                 <li>Ghana Card or other photo ID</li>
                 <li>NHIS or insurance card</li>
-                {next.reason?.toLowerCase().includes("lab") || next.reason?.toLowerCase().includes("blood") ? <li>Recent lab printouts</li> : <li>A list of medicines you take</li>}
+                <li>A list of medicines you take</li>
                 {user.allergies && <li>Allergy note: {user.allergies}</li>}
               </ul>
             </>
           ) : (
-            <p className="muted">When you book a doctor, the visit and a confirmation email will show here.</p>
+            <p className="muted">Book a consultant to schedule a visit. The fee is shown before you confirm and billed to your account.</p>
           )}
         </section>
         <section className="card">
-          <div className="card-head"><div><span className="eyebrow">At the hospital</span><h3>Admissions & notices</h3></div></div>
+          <div className="card-head"><div><span className="eyebrow">Hospital</span><h3>Admissions, pharmacy, notices</h3></div></div>
           {admission ? (
             <div className="appointment-feature">
               <BedDouble />
               <div className="grow">
                 <strong>{admission.ward}</strong>
-                <span className="muted">{admission.roomType} · arrive {admission.date}</span>
+                <span className="muted">{admission.roomType} · arrive {admission.date}{admission.fee ? ` · ${ghs(admission.fee)}` : ""}</span>
               </div>
               <span className={`status ${admission.status}`}>{admission.status}</span>
             </div>
-          ) : <p className="muted">No bed reserved yet. You can request one before you travel.</p>}
+          ) : <p className="muted">No bed reserved. Request a ward before you travel; the nightly rate is on the tariff.</p>}
           <div className="quick-actions" style={{ marginTop: 8 }}>
+            <Link to="/pharmacy"><Pill /><span><b>Pharmacy & labs</b><small>Priced items, then pay for a receipt</small></span><ArrowRight size={18} /></Link>
             <Link to="/wards"><BedDouble /><span><b>Request a bed</b><small>General, maternity, paediatric</small></span><ArrowRight size={18} /></Link>
             <Link to="/appointments"><CalendarDays /><span><b>Book a visit</b><small>Video or at Ridge Campus</small></span><ArrowRight size={18} /></Link>
+            <Link to="/pay"><Wallet /><span><b>Pay bills</b><small>MoMo, GCB, NHIS, or cash</small></span><ArrowRight size={18} /></Link>
             <Link to="/alerts"><Mail /><span><b>Notifications</b><small>{emails.length} notices on file</small></span><ArrowRight size={18} /></Link>
             <Link to="/records"><FolderOpen /><span><b>Clinical file</b><small>Notes, labs, medicines, bills</small></span><ArrowRight size={18} /></Link>
           </div>
@@ -90,18 +103,22 @@ function DoctorBoard({ user, appointments, wards }) {
     .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
   const nextId = today.find(isUpcoming)?.id;
   const pending = wards.filter((w) => w.status === "pending").length;
+  const remaining = today.filter(isUpcoming).length;
 
   return (
     <>
       <section className="welcome doctor-welcome">
-        <EcgRibbon />
         <div>
           <span className="eyebrow">{user.department || "Outpatient"} · {user.clinic || "Consulting room"}</span>
           <h1>{greeting(user.name.replace("Dr. ", "").split(" ")[0])}</h1>
-          <p>{longDate()} · {user.shift || "Day clinic"} · {today.filter(isUpcoming).length} patients remaining</p>
+          <p>{longDate()} · {user.shift || "Day clinic"} · {remaining} patient{remaining === 1 ? "" : "s"} remaining</p>
           {pending > 0 && <p style={{ marginTop: 10 }}>{pending} admission request{pending > 1 ? "s" : ""} waiting</p>}
         </div>
-        <Heartbeat />
+        <div className="duty-card">
+          <span className="eyebrow">On duty</span>
+          <strong>{user.specialty || "Consultant"}</strong>
+          <small>{user.employeeId} · {user.shift || "Day clinic"}</small>
+        </div>
       </section>
 
       <div className="clinic-board" style={{ marginTop: 16 }}>
@@ -111,7 +128,7 @@ function DoctorBoard({ user, appointments, wards }) {
             <div className="time">{formatTime(a.time)}<div className="muted" style={{ fontSize: 11 }}>{formatDate(a.date)}</div></div>
             <div>
               <strong>{a.patient?.name}</strong>
-              <div className="muted">{a.reason} · {a.mode === "video" ? "Teleconsult" : "Room visit"}</div>
+              <div className="muted">{a.reason} · {a.mode === "video" ? "Teleconsult" : "Room visit"}{a.fee ? ` · ${ghs(a.fee)}` : ""}</div>
             </div>
             <div className="row-actions">
               <span className={`status ${a.status}`}>{a.status}</span>
@@ -131,13 +148,17 @@ export default function Dashboard() {
   const [appointments, setAppointments] = useState([]);
   const [wards, setWards] = useState([]);
   const [emails, setEmails] = useState([]);
+  const [due, setDue] = useState([]);
 
   useEffect(() => {
     api(`/appointments?userId=${user.id}&role=${user.role}`).then(setAppointments);
     api(`/ward-bookings?userId=${user.id}&role=${user.role}`).then(setWards);
-    if (user.role === "patient") api(`/emails/${user.id}`).then(setEmails);
+    if (user.role === "patient") {
+      api(`/emails/${user.id}`).then(setEmails);
+      api(`/billing?userId=${user.id}&role=${user.role}`).then((rows) => setDue(rows.filter((i) => i.status === "due")));
+    }
   }, [user]);
 
   if (user.role === "doctor") return <DoctorBoard user={user} appointments={appointments} wards={wards} />;
-  return <PatientHome user={user} appointments={appointments} wards={wards} emails={emails} />;
+  return <PatientHome user={user} appointments={appointments} wards={wards} emails={emails} due={due} />;
 }

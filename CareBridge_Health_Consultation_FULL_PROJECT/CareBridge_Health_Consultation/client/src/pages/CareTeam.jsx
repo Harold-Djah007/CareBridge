@@ -3,7 +3,7 @@ import { Video, MessageCircle, CalendarPlus } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
-import { todayISO } from "../utils";
+import { todayISO, ghs, consultQuote } from "../utils";
 
 export default function CareTeam() {
   const { user } = useAuth();
@@ -13,16 +13,18 @@ export default function CareTeam() {
   const [people, setPeople] = useState([]);
   const [booking, setBooking] = useState(null);
   const [form, setForm] = useState({ date: todayISO(), time: "10:00", reason: "Consultation", mode: "video" });
+  const [rates, setRates] = useState(null);
 
   useEffect(() => {
     if (user.role === "patient") api("/doctors").then(setPeople);
     else api(`/contacts?userId=${user.id}&role=${user.role}`).then(setPeople);
+    api("/finance/rates").then(setRates);
   }, [user]);
 
   const book = async (e) => {
     e.preventDefault();
     await api("/appointments", { method: "POST", body: JSON.stringify({ ...form, doctorId: booking.id, patientId: user.id }) });
-    push("Consultation scheduled. Check Email alerts for the confirmation.");
+    push("Consultation scheduled and billed. Pay from Pay bills for a receipt.");
     setBooking(null);
     navigate("/appointments");
   };
@@ -43,7 +45,7 @@ export default function CareTeam() {
               <div className="avatar large">{p.avatar}</div>
               <div className="grow">
                 <h3>{p.name}</h3>
-                <span className="muted">{p.specialty || p.city || "Patient"}</span>
+                <span className="muted">{p.specialty || p.city || "Patient"}{user.role === "patient" && p.specialty && rates ? ` · from ${ghs(consultQuote(rates, p.specialty, "video"))}` : ""}</span>
               </div>
               {p.available === false && <span className="status pending">Away</span>}
             </div>
@@ -67,7 +69,7 @@ export default function CareTeam() {
         <div className="modal-backdrop" onMouseDown={() => setBooking(null)}>
           <form className="modal-card" onMouseDown={(e) => e.stopPropagation()} onSubmit={book}>
             <h2>Book {booking.name}</h2>
-            <p className="muted">{booking.specialty}. You will receive an email when this is scheduled.</p>
+            <p className="muted">{booking.specialty}. Fee {ghs(consultQuote(rates, booking.specialty, form.mode) || 0)} — billed when you confirm.</p>
             <div className="form-grid">
               <label>Date<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></label>
               <label>Time<input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} required /></label>

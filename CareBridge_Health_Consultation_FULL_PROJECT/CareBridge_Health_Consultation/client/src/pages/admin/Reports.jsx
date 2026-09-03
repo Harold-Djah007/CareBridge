@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../../api";
 import { prettyDate } from "../../utils";
 
@@ -6,10 +7,12 @@ export default function AdminReports() {
   const [stats, setStats] = useState(null);
   const [audit, setAudit] = useState([]);
   const [tab, setTab] = useState("reports");
+  const [payments, setPayments] = useState([]);
 
   useEffect(() => {
     api("/admin/reports").then(setStats);
     api("/admin/audit").then(setAudit);
+    api("/finance/payments").then(setPayments);
   }, []);
 
   if (!stats) return <p className="muted">Loading hospital reports…</p>;
@@ -25,6 +28,7 @@ export default function AdminReports() {
       </div>
       <div className="filters">
         <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Reports</button>
+        <button className={tab === "payments" ? "active" : ""} onClick={() => setTab("payments")}>Payments</button>
         <button className={tab === "audit" ? "active" : ""} onClick={() => setTab("audit")}>Audit log</button>
       </div>
       {tab === "reports" && (
@@ -39,6 +43,25 @@ export default function AdminReports() {
             <p className="muted">{stats.allergies} patients have an allergy flag. Open a chart from Staff directory or the bed board before you change a medicine.</p>
           </section>
         </>
+      )}
+      {tab === "payments" && (
+        <section className="card" style={{ overflow: "auto" }}>
+          <table className="table">
+            <thead><tr><th>When</th><th>Receipt</th><th>Method</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody>
+              {payments.length === 0 && <tr><td colSpan={5} className="muted">No posted payments yet.</td></tr>}
+              {payments.map((p) => (
+                <tr key={p.id}>
+                  <td>{prettyDate(p.confirmedAt || p.createdAt)}</td>
+                  <td><Link to={`/receipts/${p.id}`}>{p.receiptNo}</Link></td>
+                  <td>{p.method}{p.network ? ` · ${p.network}` : ""}</td>
+                  <td>GHS {Number(p.amount).toLocaleString()}</td>
+                  <td><span className={`status ${p.status === "paid" ? "confirmed" : "pending"}`}>{p.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
       )}
       {tab === "audit" && (
         <section className="card" style={{ overflow: "auto" }}>

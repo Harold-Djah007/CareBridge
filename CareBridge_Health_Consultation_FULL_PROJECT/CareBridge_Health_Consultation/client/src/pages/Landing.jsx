@@ -1,17 +1,16 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { HeartPulse, Video, MessageCircle, BedDouble, ShieldCheck, ArrowRight, Phone, Building2, Stethoscope, FolderOpen } from "lucide-react";
+import { HeartPulse, Video, MessageCircle, BedDouble, ShieldCheck, ArrowRight, Phone, Building2, Stethoscope, FolderOpen, Wallet } from "lucide-react";
 import { HOSPITAL } from "../utils";
-import { CarePath } from "../components/LiveMeter";
 
 export default function Landing() {
   return (
     <div className="landing">
       <nav className="public-nav">
-        <div className="brand"><div className="brand-mark live"><HeartPulse size={22} /></div><div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div></div>
+        <div className="brand"><div className="brand-mark"><HeartPulse size={22} /></div><div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div></div>
         <div className="links">
-          <a href="#services">Services</a>
-          <a href="#portal">Patient portal</a>
+          <a href="#services">Clinical services</a>
+          <Link to="/tariff">Tariff</Link>
           <Link to="/login">Patient sign-in</Link>
           <Link to="/login?role=doctor">Clinician</Link>
           <Link to="/login?role=admin">Operations</Link>
@@ -20,44 +19,45 @@ export default function Landing() {
       </nav>
       <section className="hero">
         <div>
-          <span className="eyebrow">{HOSPITAL.campus} · Open 24 hours</span>
-          <h1>Hospital care you can start from home, and finish on the ward.</h1>
-          <p className="lead">See a consultant on video, keep your messages in one record, and reserve a bed before you travel to Accra. Confirmations are sent to the email on your file.</p>
+          <span className="eyebrow">{HOSPITAL.campus} · Licensed private hospital</span>
+          <h1>Outpatient, teleconsult, pharmacy, and admissions on one clinical record.</h1>
+          <p className="lead">Patients book a consultant, pay published fees, and collect a receipt. Doctors work a clinic list and the chart. Operations run beds, staff, and accounts.</p>
           <div className="hero-actions">
-            <Link className="primary-btn" to="/login">Open patient portal <ArrowRight size={18} /></Link>
+            <Link className="primary-btn" to="/login">Patient portal <ArrowRight size={18} /></Link>
             <Link className="secondary-btn" to="/login?role=doctor">Clinician sign-in</Link>
             <Link className="secondary-btn" to="/login?role=admin">Hospital operations</Link>
           </div>
-          <p className="muted" style={{ display: "flex", gap: 8, alignItems: "center" }}><Phone size={16} /> Emergency {HOSPITAL.emergency}</p>
+          <p className="muted" style={{ display: "flex", gap: 8, alignItems: "center" }}><Phone size={16} /> Switchboard {HOSPITAL.phone} · Emergency {HOSPITAL.emergency}</p>
         </div>
         <aside className="hero-panel">
-          <CarePath caption="Start at home, finish on the ward" />
           <span className="eyebrow">Ridge Campus</span>
-          <h3>Outpatient & admissions</h3>
-          <p className="muted">General medicine, cardiology, paediatrics, orthopaedics, and inpatient wards on one site.</p>
+          <h3>How a visit is billed</h3>
+          <p className="muted">Consultant fees by specialty, ward rates by night, laboratory and pharmacy at published prices. Settlement: MTN / Telecel / AirtelTigo MoMo, GCB Ridge, NHIS, or cash.</p>
           <div className="appointment-feature" style={{ marginTop: 16 }}>
-            <Video />
-            <div className="grow"><b>Teleconsult clinics</b><span className="muted">Weekdays 08:00–18:00</span></div>
+            <Wallet />
+            <div className="grow"><b>GCB 1011130022847</b><span className="muted">CareBridge Medical Centre Ltd · Ridge</span></div>
           </div>
           <div className="appointment-feature" style={{ marginTop: 10 }}>
-            <BedDouble />
-            <div className="grow"><b>Bed reservation</b><span className="muted">Request a ward before arrival</span></div>
+            <Video />
+            <div className="grow"><b>MoMo merchant CB-RIDGE-001</b><span className="muted">MTN 0245550100 · Telecel 0205550100 · AT 0275550100</span></div>
           </div>
+          <Link className="ghost-btn" to="/tariff" style={{ marginTop: 12 }}>Open full tariff</Link>
         </aside>
       </section>
       <section id="services" className="feature-grid">
-        <div className="feature-card"><Video /><h3>Consultant video visits</h3><p className="muted">Join from a private room after telehealth consent. Camera, microphone, and screen share are part of the consult.</p></div>
-        <div className="feature-card"><FolderOpen /><h3>One clinical file</h3><p className="muted">Problems, vitals, labs, SOAP notes, prescriptions, invoices, and pre-visit forms stay on your record.</p></div>
-        <div className="feature-card"><BedDouble /><h3>Arrive to a reserved bed</h3><p className="muted">Request general, medical, maternity, or paediatric accommodation. Admissions confirm by email.</p></div>
-        <div className="feature-card"><Stethoscope /><h3>Clinician workspace</h3><p className="muted">Doctors work a live clinic board, file notes, issue medicines, and call from the consult room.</p></div>
-        <div className="feature-card"><Building2 /><h3>Hospital operations</h3><p className="muted">Administrators run beds, staff, the clinic diary, revenue, patient notices, and an audit trail.</p></div>
-        <div className="feature-card"><MessageCircle /><h3>Messages on your record</h3><p className="muted">Write to your doctor before and after a visit. You also receive an email when they reply.</p></div>
+        <div className="feature-card"><Video /><h3>Consultant visits</h3><p className="muted">Video or campus. Cardiology, paediatrics, orthopaedics, and general medicine — each with a listed fee.</p></div>
+        <div className="feature-card"><FolderOpen /><h3>Clinical file</h3><p className="muted">Problems, vitals, labs, visit notes, prescriptions, invoices, and receipts stay on the same record.</p></div>
+        <div className="feature-card"><BedDouble /><h3>Admissions</h3><p className="muted">Request a ward and room type. Accounts invoice the nightly rate when the bed is accepted.</p></div>
+        <div className="feature-card"><Stethoscope /><h3>Clinician workspace</h3><p className="muted">Clinic list, chart, prescriptions, teleconsult room, and admission queue — without a separate toy theme.</p></div>
+        <div className="feature-card"><Building2 /><h3>Hospital operations</h3><p className="muted">Beds, staff directory, clinic diary, revenue, patient notices, and an audit trail.</p></div>
+        <div className="feature-card"><MessageCircle /><h3>Messages on the record</h3><p className="muted">Write to the assigned doctor. Confirmations and receipts are emailed to the address on file.</p></div>
       </section>
       <footer className="landing-foot">
         <span>{HOSPITAL.name}</span>
+        <Link to="/tariff">Tariff</Link>
         <Link to="/help">How it works</Link>
         <Link to="/privacy">Privacy</Link>
-        <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}><ShieldCheck size={16} /> Patient records are access-controlled</span>
+        <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}><ShieldCheck size={16} /> Access-controlled records</span>
         <Link to="/login?role=admin">Hospital operations</Link>
       </footer>
     </div>

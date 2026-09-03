@@ -26,7 +26,11 @@ export default function Help() {
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Hospital operations</h3>
-        <p className="muted">Administrators sign in with a staff account. The command centre covers beds, the clinic diary, staff directory, outbound notices, revenue, and the audit log.</p>
+        <p className="muted">Administrators sign in with a staff account. Operations covers beds, the clinic diary, staff directory, outbound notices, patient billing, revenue, and the audit log.</p>
+      </section>
+      <section className="card" style={{ marginBottom: 14 }}>
+        <h3>Paying for care</h3>
+        <p className="muted">Every consult, admission, lab, medicine, and service has a published fee on the <Link to="/tariff">hospital tariff</Link>. Patients pay by MTN / Telecel / AirtelTigo mobile money to merchant CB-RIDGE-001, GCB transfer to 1011130022847 (CareBridge Medical Centre Ltd, Ridge), NHIS using the number on the file, or cash at the Ridge cashier. Accounts issue a numbered receipt for claims.</p>
       </section>
       <section className="card">
         <h3>Emergency</h3>

@@ -7,7 +7,7 @@ import { useAuth, useToast } from "../state";
 export default function Register() {
   const { login } = useAuth();
   const { push } = useToast();
-  const [form, setForm] = useState({ name: "", email: "", password: "", phone: "", city: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", phone: "", city: "", insurance: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -33,7 +33,7 @@ export default function Register() {
         <Link to="/" className="brand large"><div className="brand-mark"><HeartPulse size={24} /></div><div><b>CareBridge</b><span>Health</span></div></Link>
         <div>
           <h1>Create your patient portal.</h1>
-          <p className="muted">Book visits, chat with doctors, reserve a ward, and receive email alerts when care is confirmed.</p>
+          <p className="muted">Book visits, pay published fees by MoMo, GCB, NHIS or cash, collect receipts, and reserve a ward.</p>
         </div>
       </section>
       <section className="login-panel">
@@ -46,6 +46,7 @@ export default function Register() {
             <label>Phone<input value={form.phone} onChange={(e) => set("phone", e.target.value)} /></label>
             <label>City<input value={form.city} onChange={(e) => set("city", e.target.value)} /></label>
           </div>
+          <label>NHIS / insurance number<input value={form.insurance} onChange={(e) => set("insurance", e.target.value)} placeholder="Leave blank for self-pay" /></label>
           {error && <div className="error-box">{error}</div>}
           <button className="primary-btn full" disabled={loading}>{loading ? "Creating..." : <>Create account <ArrowRight size={18} /></>}</button>
           <p className="muted">Already registered? <Link to="/login"><b>Sign in</b></Link></p>

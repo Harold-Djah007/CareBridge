@@ -3,7 +3,7 @@ import { CalendarDays, Clock, XCircle, Plus, Stethoscope, Video, MessageCircle }
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
-import { formatDate, formatTime, isUpcoming, todayISO } from "../utils";
+import { formatDate, formatTime, isUpcoming, todayISO, ghs, consultQuote } from "../utils";
 
 export default function Appointments() {
   const { user } = useAuth();
@@ -14,6 +14,7 @@ export default function Appointments() {
   const [tab, setTab] = useState("upcoming");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ doctorId: "d1", patientId: user.role === "patient" ? user.id : "p1", date: todayISO(), time: "09:00", reason: "", mode: "video" });
+  const [rates, setRates] = useState(null);
 
   const load = () => api(`/appointments?userId=${user.id}&role=${user.role}`).then(setAppointments);
   useEffect(() => {
@@ -23,6 +24,7 @@ export default function Appointments() {
       if (d[0]) setForm((f) => ({ ...f, doctorId: d[0].id }));
     });
     if (user.role !== "patient") api("/patients").then(setPatients);
+    api("/finance/rates").then(setRates);
   }, []);
 
   const submit = async (e) => {
@@ -30,7 +32,7 @@ export default function Appointments() {
     await api("/appointments", { method: "POST", body: JSON.stringify({ ...form, patientId: user.role === "patient" ? user.id : form.patientId }) });
     setOpen(false);
     setForm((f) => ({ ...f, reason: "" }));
-    push(user.role === "patient" ? "Consultation booked. An email alert is on the way." : "Appointment created.");
+    push(user.role === "patient" ? "Consultation booked and billed. Pay from Pay bills to receive a receipt." : "Appointment created and billed to the patient account.");
     load();
   };
 
@@ -47,6 +49,8 @@ export default function Appointments() {
   }, [appointments, tab]);
 
   const otherId = (a) => (user.role === "doctor" ? a.patientId : a.doctorId);
+  const selectedDoctor = doctors.find((d) => d.id === form.doctorId);
+  const quote = consultQuote(rates, selectedDoctor?.specialty, form.mode);
 
   return (
     <div>
@@ -54,7 +58,7 @@ export default function Appointments() {
         <div>
           <span className="eyebrow">{user.role === "doctor" ? "Outpatient diary" : "Visits"}</span>
           <h1>{user.role === "patient" ? "Your appointments" : "Clinic schedule"}</h1>
-          <p>{user.role === "patient" ? "Book a video or campus visit. We send a confirmation to your email." : "Today’s list, plus upcoming and completed encounters."}</p>
+          <p>{user.role === "patient" ? "Book a video or campus visit. The consultant fee is billed to your account and payable by MoMo, GCB, NHIS, or cash." : "Today’s list, plus upcoming and completed encounters."}</p>
         </div>
         <button className="primary-btn" onClick={() => setOpen(true)}><Plus size={18} /> {user.role === "patient" ? "Request a visit" : "Add slot"}</button>
       </div>
@@ -72,7 +76,7 @@ export default function Appointments() {
               <div className="time">{formatTime(a.time)}<div className="muted" style={{ fontSize: 11 }}>{formatDate(a.date)}</div></div>
               <div>
                 <strong>{a.patient?.name}</strong>
-                <div className="muted">{a.reason} · {a.mode === "video" ? "Teleconsult" : "Face to face"}</div>
+                <div className="muted">{a.reason} · {a.mode === "video" ? "Teleconsult" : "Face to face"}{a.fee ? ` · ${ghs(a.fee)}` : ""}</div>
               </div>
               <div className="row-actions">
                 <span className={`status ${a.status}`}>{a.status}</span>
@@ -94,10 +98,13 @@ export default function Appointments() {
               <div className="grow">
                 <strong>{user.role === "patient" ? a.doctor.name : a.patient.name}</strong>
                 <span className="muted">{a.reason}</span>
-                <small className="muted"><Clock size={14} /> {formatDate(a.date)} · {formatTime(a.time)} · {a.mode === "video" ? "Video" : "In person"}</small>
+                <small className="muted"><Clock size={14} /> {formatDate(a.date)} · {formatTime(a.time)} · {a.mode === "video" ? "Video" : "In person"}{a.fee ? ` · ${ghs(a.fee)}` : ""}</small>
               </div>
               <span className={`status ${a.status}`}>{a.status}</span>
               <div className="row-actions">
+                {user.role === "patient" && a.invoiceStatus === "due" && a.invoiceId && (
+                  <Link className="ghost-btn" to={`/pay?invoice=${a.invoiceId}`}>Pay</Link>
+                )}
                 <Link className="soft-icon" title="Message" to={`/messages?with=${otherId(a)}`}><MessageCircle size={18} /></Link>
                 {a.mode === "video" && a.status !== "cancelled" && user.role !== "admin" && (
                   <Link className="soft-icon success" title="Join video" to={`/video?with=${otherId(a)}`}><Video size={18} /></Link>
@@ -116,7 +123,7 @@ export default function Appointments() {
           <form className="modal-card" onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
             <div className="modal-icon"><Stethoscope /></div>
             <h2>Book a consultation</h2>
-            <p className="muted">The patient receives an email as soon as this is scheduled.</p>
+            <p className="muted">A confirmation email is sent. The fee below is billed to the patient account.</p>
             {user.role !== "patient" && (
               <label>Patient
                 <select value={form.patientId} onChange={(e) => setForm({ ...form, patientId: e.target.value })}>
@@ -140,6 +147,7 @@ export default function Appointments() {
               </select>
             </label>
             <label>Reason for visit<textarea rows="3" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="Briefly describe what you need help with" /></label>
+            {quote != null && <p><b>Fee due: {ghs(quote)}</b><span className="muted"> — {form.mode === "video" ? "video consult" : "campus visit (includes GHS 80 clinic charge)"}</span></p>}
             <div className="modal-actions">
               <button type="button" className="secondary-btn" onClick={() => setOpen(false)}>Cancel</button>
               <button className="primary-btn">Confirm appointment</button>

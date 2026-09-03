@@ -17,7 +17,7 @@ export default function AdminUsers() {
   const [form, setForm] = useState(blank);
 
   const load = () => api("/admin/users").then(setUsers);
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
 
   const visible = useMemo(
     () => users.filter((u) => `${u.name} ${u.email} ${u.role}`.toLowerCase().includes(query.toLowerCase())),

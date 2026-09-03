@@ -23,7 +23,12 @@ import AdminUsers from "./pages/admin/Users";
 import AdminSchedule from "./pages/admin/Schedule";
 import AdminHospital from "./pages/admin/Hospital";
 import AdminReports from "./pages/admin/Reports";
+import Pay from "./pages/Pay";
+import Pharmacy from "./pages/Pharmacy";
+import Receipt from "./pages/Receipt";
+import Tariff from "./pages/Tariff";
 import AppShell from "./components/AppShell";
+import ErrorBoundary from "./ErrorBoundary";
 
 function RoleRoute({ roles, children }) {
   const { user } = useAuth();
@@ -41,6 +46,7 @@ function AppRoutes() {
         <Route path="/register" element={user ? <Navigate to={homeFor(user)} /> : <Register />} />
         <Route path="/help" element={<Help />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/tariff" element={user ? <Navigate to="/billing/tariff" replace /> : <Tariff />} />
         <Route element={user ? <AppShell /> : <Navigate to="/login" />}>
           <Route path="/home" element={<RoleRoute roles={["patient", "doctor"]}><Dashboard /></RoleRoute>} />
           <Route path="/care" element={<RoleRoute roles={["patient", "doctor"]}><CareTeam /></RoleRoute>} />
@@ -52,6 +58,10 @@ function AppRoutes() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/records" element={<RoleRoute roles={["patient", "doctor", "admin"]}><ClinicalRecord /></RoleRoute>} />
           <Route path="/records/:patientId" element={<RoleRoute roles={["doctor", "admin"]}><ClinicalRecord /></RoleRoute>} />
+          <Route path="/pay" element={<RoleRoute roles={["patient", "admin"]}><Pay /></RoleRoute>} />
+          <Route path="/pharmacy" element={<RoleRoute roles={["patient"]}><Pharmacy /></RoleRoute>} />
+          <Route path="/receipts/:id" element={<RoleRoute roles={["patient", "doctor", "admin"]}><Receipt /></RoleRoute>} />
+          <Route path="/billing/tariff" element={<Tariff />} />
           <Route path="/admin" element={<RoleRoute roles={["admin"]}><AdminOverview /></RoleRoute>} />
           <Route path="/admin/users" element={<RoleRoute roles={["admin"]}><AdminUsers /></RoleRoute>} />
           <Route path="/admin/appointments" element={<RoleRoute roles={["admin"]}><AdminSchedule /></RoleRoute>} />
@@ -66,11 +76,13 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <AppRoutes />
-      </ToastProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ToastProvider>
+          <AppRoutes />
+        </ToastProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

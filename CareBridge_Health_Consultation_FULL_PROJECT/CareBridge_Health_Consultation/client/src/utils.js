@@ -57,3 +57,18 @@ export const greeting = (name) => {
 
 export const longDate = () =>
   new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+export const ghs = (n) => `GHS ${Number(n || 0).toLocaleString()}`;
+
+export function consultQuote(rates, specialty, mode) {
+  if (!rates) return null;
+  const base = rates.consults?.[specialty] || 380;
+  return mode === "video" ? base : base + Number(rates.campusSurcharge || 0);
+}
+
+export function wardQuote(rates, ward, roomType, nights = 1) {
+  if (!rates) return null;
+  const base = rates.wards?.[ward] || 650;
+  const room = rates.rooms?.[roomType] || 0;
+  return (base + room) * Math.max(1, Number(nights || 1));
+}

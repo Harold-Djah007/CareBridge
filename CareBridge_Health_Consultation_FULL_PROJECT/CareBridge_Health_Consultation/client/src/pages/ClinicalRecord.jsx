@@ -37,7 +37,7 @@ export default function ClinicalRecord() {
     if (!patientId) return;
     api(`/chart/${patientId}`).then(setChart).catch((e) => push(e.message, "error"));
   };
-  useEffect(load, [patientId]);
+  useEffect(() => { load(); }, [patientId]);
 
   const clinician = user.role === "doctor" || user.role === "admin";
 
@@ -66,11 +66,7 @@ export default function ClinicalRecord() {
     push("Refill requested from Ridge Campus pharmacy.");
     load();
   };
-  const pay = async (id) => {
-    await api(`/billing/${id}/pay`, { method: "PATCH", body: JSON.stringify({ actorId: user.id, method: "Mobile money" }) });
-    push("Payment recorded.");
-    load();
-  };
+  const pay = (id) => navigate(`/pay?invoice=${id}`);
   const submitIntake = async (e) => {
     e.preventDefault();
     await api("/intakes", { method: "POST", body: JSON.stringify({ ...intake, patientId: user.id }) });
@@ -235,6 +231,9 @@ export default function ClinicalRecord() {
               <b>{money(i.amount, i.currency)}</b>
               <span className={`status ${i.status === "paid" ? "confirmed" : "pending"}`}>{i.status}</span>
               {user.role === "patient" && i.status === "due" && <button className="primary-btn" onClick={() => pay(i.id)}>Pay now</button>}
+              {i.status === "paid" && (i.receiptNo || i.paymentId) && (
+                <button className="ghost-btn" onClick={() => navigate(`/receipts/${i.paymentId || i.receiptNo}`)}>Receipt</button>
+              )}
             </div>
           ))}
           {chart.invoices.length === 0 && <p className="muted">No invoices on this file.</p>}

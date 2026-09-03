@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { BedDouble, Plus, Users, CalendarDays, CheckCircle2, XCircle } from "lucide-react";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
-import { todayISO } from "../utils";
+import { todayISO, ghs, wardQuote } from "../utils";
 import { OccupancyBars } from "../components/LiveMeter";
 
 export default function WardBooking() {
@@ -12,6 +13,7 @@ export default function WardBooking() {
   const [bookings, setBookings] = useState([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ward: "General Ward", roomType: "Private Room", date: todayISO(), nights: 1, notes: "" });
+  const [rates, setRates] = useState(null);
 
   const load = () => api(`/ward-bookings?userId=${user.id}&role=${user.role}`).then(setBookings);
   useEffect(() => {
@@ -19,6 +21,7 @@ export default function WardBooking() {
       setWards(list);
       if (list[0]) setForm((f) => ({ ...f, ward: list[0].name }));
     });
+    api("/finance/rates").then(setRates);
     load();
   }, []);
 
@@ -43,7 +46,7 @@ export default function WardBooking() {
         <div>
           <span className="eyebrow">{user.role === "patient" ? "Admissions" : "Bed requests"}</span>
           <h1>{user.role === "patient" ? "Reserve a bed before you arrive" : "Admission queue"}</h1>
-          <p>{user.role === "patient" ? "Tell the hospital which ward you need. You will get an email when a bed is accepted." : "Accept or decline incoming requests. Occupancy updates automatically."}</p>
+          <p>{user.role === "patient" ? "Nightly ward rates plus room supplement are billed when admissions accept the bed. Pay by MoMo, GCB, NHIS, or cash." : "Accept or decline incoming requests. Occupancy updates automatically."}</p>
         </div>
         {user.role === "patient" && <button className="primary-btn" onClick={() => setOpen(true)}><Plus size={18} /> Reserve a ward</button>}
       </div>
@@ -65,6 +68,7 @@ export default function WardBooking() {
               <div className="ward-icon"><BedDouble /></div>
               <h3>{w.name}</h3>
               <p className="muted">{w.description}</p>
+              {rates?.wards?.[w.name] != null && <p><b>{ghs(rates.wards[w.name])}</b> <span className="muted">per night</span></p>}
               <div className="capacity"><span style={{ width: `${Math.min(100, (w.available / (w.capacity || 1)) * 100)}%` }} /></div>
               <div className="ward-foot">
                 <span className="muted" style={{ display: "flex", gap: 6, alignItems: "center" }}><Users size={16} />{w.available} of {w.capacity} beds free</span>
@@ -84,9 +88,12 @@ export default function WardBooking() {
             <div className="grow">
               <strong>{user.role === "patient" ? b.ward : b.patient?.name}</strong>
               <span className="muted">{user.role === "patient" ? b.roomType : `${b.ward} · ${b.roomType}`}</span>
-              <small className="muted">{b.date} · {b.nights} night{b.nights > 1 ? "s" : ""}{b.notes ? ` · ${b.notes}` : ""}</small>
+              <small className="muted">{b.date} · {b.nights} night{b.nights > 1 ? "s" : ""}{b.fee ? ` · ${ghs(b.fee)}` : ""}{b.notes ? ` · ${b.notes}` : ""}</small>
             </div>
             <span className={`status ${b.status}`}>{b.status}</span>
+            {user.role === "patient" && b.invoiceStatus === "due" && b.invoiceId && (
+              <Link className="ghost-btn" to={`/pay?invoice=${b.invoiceId}`}>Pay</Link>
+            )}
             {user.role !== "patient" && b.status === "pending" && (
               <div className="row-actions">
                 <button className="soft-icon success" title="Accept" onClick={() => update(b.id, "confirmed")}><CheckCircle2 size={18} /></button>
@@ -120,6 +127,9 @@ export default function WardBooking() {
               <label>Nights<input type="number" min="1" max="30" value={form.nights} onChange={(e) => setForm({ ...form, nights: e.target.value })} /></label>
             </div>
             <label>Notes<textarea rows="3" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Anything the hospital should prepare for?" /></label>
+            {wardQuote(rates, form.ward, form.roomType, form.nights) != null && (
+              <p><b>Estimated fee: {ghs(wardQuote(rates, form.ward, form.roomType, form.nights))}</b><span className="muted"> — billed when the bed is accepted</span></p>
+            )}
             <div className="modal-actions">
               <button type="button" className="secondary-btn" onClick={() => setOpen(false)}>Cancel</button>
               <button className="primary-btn">Send reservation</button>

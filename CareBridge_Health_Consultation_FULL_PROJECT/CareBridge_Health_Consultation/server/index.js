@@ -7,6 +7,7 @@ import http from "http";
 import { Server } from "socket.io";
 import { deliverEmail, renderEmail, shouldEmail } from "./email.js";
 import { audit, ensureClinical, mountClinical } from "./clinical.js";
+import { addInvoice, consultFee, mountFinance, wardFee } from "./finance.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +17,7 @@ const readDb = () => {
   const db = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
   db.emails = db.emails || [];
   db.wards = db.wards || [];
+  db.payments = db.payments || [];
   return ensureClinical(db);
 };
 const writeDb = (db) => fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
@@ -75,16 +77,28 @@ const emailPatient = async (db, userId, { type, subject, heading, intro, details
   return record;
 };
 
-const enrichAppointment = (db, a) => ({
-  ...a,
-  patient: safeUser(db.users.find((u) => u.id === a.patientId) || {}),
-  doctor: safeUser(db.users.find((u) => u.id === a.doctorId) || {}),
-});
+const enrichAppointment = (db, a) => {
+  const invoice = (db.invoices || []).find((i) => i.appointmentId === a.id);
+  return {
+    ...a,
+    patient: safeUser(db.users.find((u) => u.id === a.patientId) || {}),
+    doctor: safeUser(db.users.find((u) => u.id === a.doctorId) || {}),
+    fee: invoice?.amount ?? consultFee(db, a),
+    invoiceId: invoice?.id,
+    invoiceStatus: invoice?.status,
+  };
+};
 
-const enrichBooking = (db, w) => ({
-  ...w,
-  patient: safeUser(db.users.find((u) => u.id === w.patientId) || {}),
-});
+const enrichBooking = (db, w) => {
+  const invoice = (db.invoices || []).find((i) => i.bookingId === w.id);
+  return {
+    ...w,
+    patient: safeUser(db.users.find((u) => u.id === w.patientId) || {}),
+    fee: invoice?.amount ?? wardFee(w),
+    invoiceId: invoice?.id,
+    invoiceStatus: invoice?.status,
+  };
+};
 
 const requireFields = (body, fields) => fields.filter((f) => !String(body[f] ?? "").trim());
 
@@ -122,6 +136,7 @@ app.post("/api/register", async (req, res) => {
     specialty: "",
     phone: req.body.phone || "",
     city: req.body.city || "",
+    insurance: req.body.insurance || "Self-pay",
     about: "New CareBridge patient.",
     status: "active",
     mrn: `CBM-${100000 + db.users.filter((u) => u.role === "patient").length + 1}`,
@@ -219,6 +234,14 @@ app.post("/api/appointments", async (req, res) => {
   };
   db.appointments.push(item);
   const doctor = db.users.find((u) => u.id === item.doctorId) || {};
+  const fee = consultFee(db, item);
+  addInvoice(db, {
+    patientId: item.patientId,
+    item: `${item.mode === "video" ? "Video" : "Campus"} consultation · ${doctor.specialty || "Clinic"} · ${item.date}`,
+    amount: fee,
+    category: "consult",
+    appointmentId: item.id,
+  });
   notify(db, item.doctorId, "New appointment", `A patient booked ${item.date} at ${item.time}.`);
   db.users.filter((u) => u.role === "admin").forEach((a) => {
     notify(db, a.id, "Appointment booked", `New visit scheduled for ${item.date} at ${item.time}.`);
@@ -235,6 +258,7 @@ app.post("/api/appointments", async (req, res) => {
       ["Time", item.time],
       ["Reason", item.reason],
       ["Status", item.status],
+      ["Fee", `GHS ${fee} (pay in Billing — NHIS, MoMo, bank or cash)`],
     ],
     closing: "Join from Video consultation in CareBridge, or message your doctor if you need to change the time.",
   });
@@ -327,6 +351,7 @@ app.post("/api/ward-bookings", async (req, res) => {
       ["Arrival", item.date],
       ["Nights", String(item.nights)],
       ["Status", "Pending"],
+      ["Estimated fee", `GHS ${wardFee(item)} (invoiced when the bed is accepted)`],
     ],
   });
   writeDb(db);
@@ -352,6 +377,14 @@ app.patch("/api/ward-bookings/:id", async (req, res) => {
     if (accepted) {
       const ward = (db.wards || []).find((w) => w.name === item.ward);
       if (ward && ward.available > 0) ward.available -= 1;
+      const fee = wardFee(item);
+      addInvoice(db, {
+        patientId: item.patientId,
+        item: `${item.ward} · ${item.roomType} × ${item.nights} night(s)`,
+        amount: fee,
+        category: "ward",
+        bookingId: item.id,
+      });
     }
     if (prev === "confirmed" && req.body.status === "declined") {
       const ward = (db.wards || []).find((w) => w.name === item.ward);
@@ -370,6 +403,7 @@ app.patch("/api/ward-bookings/:id", async (req, res) => {
         ["Arrival", item.date],
         ["Nights", String(item.nights)],
         ["Status", req.body.status],
+        ...(accepted ? [["Admission fee", `GHS ${wardFee(item)} — pay by NHIS, MoMo, GCB, or cash`]] : []),
       ],
       closing: accepted
         ? "Bring your ID and any recent lab results. Message your doctor if your arrival time changes."
@@ -450,6 +484,7 @@ app.get("/api/admin/overview", (_, res) => {
 });
 
 mountClinical(app, { readDb, writeDb, safeUser, notify, emailPatient });
+mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient });
 
 app.get("/api/admin/users", (_, res) => {
   const db = readDb();

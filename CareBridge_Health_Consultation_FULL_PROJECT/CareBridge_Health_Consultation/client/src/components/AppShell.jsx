@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   CalendarDays, LayoutDashboard, MessageCircle, BedDouble, Video, LogOut, HeartPulse,
   Bell, Users, Mail, UserRound, Stethoscope, ClipboardList, Building2, Search, Inbox,
-  FolderOpen, ScrollText,
+  FolderOpen, ScrollText, Pill, Wallet,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
@@ -18,14 +18,16 @@ const NAV = {
       items: [
         { to: "/home", icon: LayoutDashboard, label: "Home", end: true, primary: true },
         { to: "/appointments", icon: CalendarDays, label: "Appointments", primary: true },
-        { to: "/messages", icon: MessageCircle, label: "Messages", primary: true, badge: "messages" },
-        { to: "/wards", icon: BedDouble, label: "Admissions", primary: true, badge: "wards" },
+        { to: "/messages", icon: MessageCircle, label: "Messages", badge: "messages" },
+        { to: "/wards", icon: BedDouble, label: "Admissions", badge: "wards" },
+        { to: "/pharmacy", icon: Pill, label: "Pharmacy & labs", primary: true },
       ],
     },
     {
-      group: "Records",
+      group: "Accounts",
       items: [
         { to: "/records", icon: FolderOpen, label: "Clinical file", primary: true },
+        { to: "/pay", icon: Wallet, label: "Pay bills", primary: true },
         { to: "/care", icon: Stethoscope, label: "My doctors" },
         { to: "/alerts", icon: Inbox, label: "Notifications" },
         { to: "/profile", icon: UserRound, label: "My details" },
@@ -56,11 +58,12 @@ const NAV = {
     {
       group: "Operations",
       items: [
-        { to: "/admin", icon: LayoutDashboard, label: "Command centre", end: true, primary: true },
+        { to: "/admin", icon: LayoutDashboard, label: "Operations", end: true, primary: true },
         { to: "/admin/users", icon: Users, label: "Staff directory", primary: true },
         { to: "/admin/hospital", icon: Building2, label: "Bed board", primary: true, badge: "wards" },
         { to: "/admin/appointments", icon: CalendarDays, label: "Clinic diary", primary: true },
         { to: "/admin/reports", icon: ScrollText, label: "Reports & audit", primary: true },
+        { to: "/pay", icon: Wallet, label: "Patient billing" },
       ],
     },
     {
@@ -150,7 +153,7 @@ export default function AppShell() {
     <div className={`app-layout role-${user.role}`} data-role={user.role}>
       <aside className={`sidebar sidebar-${user.role}`}>
         <div className="brand">
-          <div className="brand-mark live"><HeartPulse size={22} /></div>
+          <div className="brand-mark"><HeartPulse size={22} /></div>
           <div>
             <b>{HOSPITAL.short}</b>
             <span>{user.role === "patient" ? "Patient portal" : user.role === "doctor" ? "Clinical" : "Operations"}</span>

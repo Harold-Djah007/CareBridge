@@ -14,7 +14,7 @@ export default function AdminHospital() {
     api("/wards").then(setWards);
     api("/ward-bookings").then(setBookings);
   };
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
 
   const decide = async (id, status) => {
     await api(`/ward-bookings/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });

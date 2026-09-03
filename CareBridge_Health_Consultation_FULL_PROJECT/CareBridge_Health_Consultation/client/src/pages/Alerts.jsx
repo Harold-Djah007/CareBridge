@@ -16,7 +16,7 @@ export default function Alerts() {
     const path = user.role === "admin" ? "/admin/emails" : `/emails/${user.id}`;
     api(path).then(setEmails);
   };
-  useEffect(load, [user.id, user.role]);
+  useEffect(() => { load(); }, [user.id, user.role]);
 
   const test = async () => {
     await api("/emails/test", { method: "POST", body: JSON.stringify({ userId: user.id }) });
