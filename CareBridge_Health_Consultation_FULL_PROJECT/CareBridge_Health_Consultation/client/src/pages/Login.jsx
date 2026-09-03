@@ -43,7 +43,7 @@ export default function Login() {
   return (
     <div className={`login-page ${isStaff ? "staff-login" : ""}`}>
       <section className="login-hero">
-        <Link to="/" className="brand large"><div className="brand-mark"><HeartPulse size={24} /></div><div><b>{HOSPITAL.short}</b><span>{HOSPITAL.campus}</span></div></Link>
+        <Link to="/" className="brand large"><div className="brand-mark live"><HeartPulse size={24} /></div><div><b>{HOSPITAL.short}</b><span>{HOSPITAL.campus}</span></div></Link>
         <div>
           <div className="status confirmed" style={{ display: "inline-flex", gap: 6, marginBottom: 16 }}><ShieldCheck size={14} /> {isStaff ? (opsMode ? "Hospital operations" : "Staff access") : "Patient portal"}</div>
           <h1>{isStaff ? (opsMode ? "Operations sign-in." : "Clinical and operations sign-in.") : "Your hospital record, in your hands."}</h1>

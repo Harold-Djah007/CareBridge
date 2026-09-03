@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../state";
 import { api } from "../api";
 import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate } from "../utils";
+import { CarePath, EcgRibbon, Heartbeat } from "../components/LiveMeter";
 
 const ghs = (n) => `GHS ${Number(n || 0).toLocaleString()}`;
 
@@ -28,14 +29,10 @@ function PatientHome({ user, appointments, wards, emails, due }) {
           <div className="row-actions" style={{ marginTop: 12 }}>
             <Link className="secondary-btn" to="/profile">My details</Link>
             <Link className="ghost-btn" to="/billing/tariff">Hospital tariff</Link>
+            <Link className="ghost-btn" to="/pay">{due.length ? `${ghs(dueTotal)} due` : "Receipts"}</Link>
           </div>
         </div>
-        <div className="duty-card">
-          <span className="eyebrow">Account</span>
-          <strong>{due.length ? ghs(dueTotal) : "No amount due"}</strong>
-          <small>{due.length ? `${due.length} unpaid invoice${due.length === 1 ? "" : "s"}` : "Receipts are in Pay bills"}</small>
-          <Link className="primary-btn" to="/pay" style={{ marginTop: 12 }}>{due.length ? "Pay now" : "View receipts"}</Link>
-        </div>
+        <CarePath caption={next ? `Next: ${formatDate(next.date)} · ${formatTime(next.time)}` : admission ? `${admission.ward} · ${admission.status}` : "Book a visit when you are ready"} />
       </div>
 
       <div className="dashboard-grid">
@@ -108,17 +105,14 @@ function DoctorBoard({ user, appointments, wards }) {
   return (
     <>
       <section className="welcome doctor-welcome">
+        <EcgRibbon />
         <div>
           <span className="eyebrow">{user.department || "Outpatient"} · {user.clinic || "Consulting room"}</span>
           <h1>{greeting(user.name.replace("Dr. ", "").split(" ")[0])}</h1>
           <p>{longDate()} · {user.shift || "Day clinic"} · {remaining} patient{remaining === 1 ? "" : "s"} remaining</p>
           {pending > 0 && <p style={{ marginTop: 10 }}>{pending} admission request{pending > 1 ? "s" : ""} waiting</p>}
         </div>
-        <div className="duty-card">
-          <span className="eyebrow">On duty</span>
-          <strong>{user.specialty || "Consultant"}</strong>
-          <small>{user.employeeId} · {user.shift || "Day clinic"}</small>
-        </div>
+        <Heartbeat />
       </section>
 
       <div className="clinic-board" style={{ marginTop: 16 }}>

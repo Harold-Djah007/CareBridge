@@ -2,12 +2,13 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { HeartPulse, Video, MessageCircle, BedDouble, ShieldCheck, ArrowRight, Phone, Building2, Stethoscope, FolderOpen, Wallet } from "lucide-react";
 import { HOSPITAL } from "../utils";
+import { CarePath } from "../components/LiveMeter";
 
 export default function Landing() {
   return (
     <div className="landing">
       <nav className="public-nav">
-        <div className="brand"><div className="brand-mark"><HeartPulse size={22} /></div><div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div></div>
+        <div className="brand"><div className="brand-mark live"><HeartPulse size={22} /></div><div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div></div>
         <div className="links">
           <a href="#services">Clinical services</a>
           <Link to="/tariff">Tariff</Link>
@@ -30,6 +31,7 @@ export default function Landing() {
           <p className="muted" style={{ display: "flex", gap: 8, alignItems: "center" }}><Phone size={16} /> Switchboard {HOSPITAL.phone} · Emergency {HOSPITAL.emergency}</p>
         </div>
         <aside className="hero-panel">
+          <CarePath caption="Home → visit → consult → ward" />
           <span className="eyebrow">Ridge Campus</span>
           <h3>How a visit is billed</h3>
           <p className="muted">Consultant fees by specialty, ward rates by night, laboratory and pharmacy at published prices. Settlement: MTN / Telecel / AirtelTigo MoMo, GCB Ridge, NHIS, or cash.</p>

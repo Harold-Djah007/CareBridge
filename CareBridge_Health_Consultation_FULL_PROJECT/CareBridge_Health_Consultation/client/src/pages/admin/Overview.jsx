@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api";
 import { HOSPITAL } from "../../utils";
-import { OccupancyBars } from "../../components/LiveMeter";
+import { OccupancyBars, OpsRadar } from "../../components/LiveMeter";
 
 export default function AdminOverview() {
   const [stats, setStats] = useState(null);
@@ -33,6 +33,7 @@ export default function AdminOverview() {
           <h1>Operations</h1>
           <p>Beds, clinic load, and outbound notices. Billing and receipts sit under Patient billing.</p>
         </div>
+        <OpsRadar occupancy={occupancy} pending={stats.pendingWards} beds={stats.bedsAvailable} />
       </div>
       <div className="kpi-row">
         <div className="kpi"><span>Registered patients</span><strong>{stats.patients}</strong><small>{stats.doctors} consultants on staff</small></div>
