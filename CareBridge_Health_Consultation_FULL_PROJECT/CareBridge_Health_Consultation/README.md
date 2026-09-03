@@ -33,6 +33,20 @@ Patients can turn categories on or off in **Profile**.
 - Node.js 20+
 - npm
 
+## Get the latest portal (pay, settings, support, hidden toolbar)
+
+If Pay still says “Select a bill to settle” and the sidebar has no **Help & support**, you are on the old `main` copy. Stop `npm run dev` (`Ctrl+C`), then from the **CareBridge** git folder:
+
+```bash
+git fetch origin
+git checkout cursor/carebridge-professional-ui-aa13
+git pull origin cursor/carebridge-professional-ui-aa13
+cd CareBridge_Health_Consultation_FULL_PROJECT/CareBridge_Health_Consultation
+npm run dev
+```
+
+You should then see **Help & support** and **Settings** at the bottom of the sidebar, **Open a new bill** on Pay, and a **Show toolbar** button instead of a full top bar.
+
 ## Run
 From the project root:
 

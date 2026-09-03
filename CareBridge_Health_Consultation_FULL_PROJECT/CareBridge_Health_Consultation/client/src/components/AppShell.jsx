@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   CalendarDays, LayoutDashboard, MessageCircle, BedDouble, Video, LogOut, HeartPulse,
   Bell, Users, Mail, UserRound, Stethoscope, ClipboardList, Building2, Search, Inbox,
-  FolderOpen, ScrollText, Pill, Wallet, Settings, LifeBuoy, HelpCircle,
+  FolderOpen, ScrollText, Pill, Wallet, Settings, LifeBuoy, HelpCircle, PanelTop, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
@@ -11,6 +11,7 @@ import { api, socketUrl } from "../api";
 import { HOSPITAL, isUpcoming, longDate } from "../utils";
 import { LiveClock } from "./LiveMeter";
 import PageAtmosphere from "./PageAtmosphere";
+import { useTopbar } from "../chrome";
 
 const NAV = {
   patient: [
@@ -157,6 +158,7 @@ export default function AppShell() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [badges, setBadges] = useState({ visits: 0, wards: 0, messages: 0, tickets: 0 });
+  const [topbarOn, setTopbarOn] = useTopbar();
 
   const groups = NAV[user.role] || NAV.patient;
   const mobileItems = groups.flatMap((g) => g.items).filter((i) => i.primary).slice(0, 5);
@@ -262,49 +264,77 @@ export default function AppShell() {
           <button className="icon-btn" title="Sign out" onClick={() => { logout(); navigate("/login"); }}><LogOut size={18} /></button>
         </div>
       </aside>
-      <main className="main">
-        <header className="topbar">
-          <div className="topbar-copy">
-            <span className="eyebrow">{topMeta}</span>
-            <small className="muted">{user.role === "doctor" ? `On duty · ${user.shift || "Day clinic"}` : user.role === "patient" ? `File ${user.mrn || ""}` : user.employeeId}</small>
-          </div>
-          <nav className="topbar-nav" aria-label="Hospital shortcuts">
-            <Link className="topbar-link" to={user.role === "admin" ? "/admin" : "/home"}>Home</Link>
-            {user.role === "patient" && <Link className="topbar-link" to="/pay">Pay</Link>}
-            <Link className="topbar-link" to="/support"><LifeBuoy size={15} /> Support</Link>
-            <Link className="topbar-link" to="/settings"><Settings size={15} /> Settings</Link>
-            <Link className="topbar-link" to="/guide"><HelpCircle size={15} /> Guide</Link>
-          </nav>
-          <form className="top-search" onSubmit={onSearch}>
-            <Search size={16} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} />
-          </form>
-          <div className="topbar-actions">
+      <main className={`main ${topbarOn ? "has-topbar" : "topbar-hidden"}`}>
+        {!topbarOn && (
+          <div className="chrome-strip">
+            <button type="button" className="toolbar-toggle" onClick={() => setTopbarOn(true)}>
+              <PanelTop size={16} />
+              <span>Show toolbar</span>
+              <ChevronDown size={14} />
+            </button>
             <LiveClock />
             <button className="icon-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications">
-              <Bell size={19} />{unread > 0 && <i className="dot" />}
+              <Bell size={18} />{unread > 0 && <i className="dot" />}
             </button>
             <button className="avatar small" title="Settings" onClick={() => navigate("/settings")}>{user.avatar}</button>
           </div>
-          {open && (
-            <div className="notice">
-              <div className="card-head"><b>Notifications</b><button className="ghost-btn" onClick={markRead}>Mark read</button></div>
-              {notes.length === 0 && <p className="muted">No new hospital notices.</p>}
-              {notes.slice(0, 8).map((n) => (
-                <div key={n.id} className={`notice-item ${n.read ? "" : "unread"}`}><b>{n.title}</b><span>{n.body}</span></div>
-              ))}
-              <div className="notice-actions">
-                {(user.role === "patient" || user.role === "admin") && (
-                  <button className="secondary-btn" onClick={() => { setOpen(false); navigate("/alerts"); }}>
-                    {user.role === "admin" ? "Notice log" : "Notifications"}
-                  </button>
-                )}
-                <button className="secondary-btn" onClick={() => { setOpen(false); navigate("/support"); }}>Support desk</button>
-                <button className="ghost-btn" onClick={() => { setOpen(false); navigate("/settings"); }}>Settings</button>
-              </div>
+        )}
+        {topbarOn && (
+          <header className="topbar">
+            <div className="topbar-copy">
+              <span className="eyebrow">{topMeta}</span>
+              <small className="muted">{user.role === "doctor" ? `On duty · ${user.shift || "Day clinic"}` : user.role === "patient" ? `File ${user.mrn || ""}` : user.employeeId}</small>
             </div>
-          )}
-        </header>
+            <nav className="topbar-nav" aria-label="Hospital shortcuts">
+              <Link className="topbar-link" to={user.role === "admin" ? "/admin" : "/home"}>Home</Link>
+              {user.role === "patient" && <Link className="topbar-link" to="/pay">Pay</Link>}
+              <Link className="topbar-link" to="/support"><LifeBuoy size={15} /> Support</Link>
+              <Link className="topbar-link" to="/settings"><Settings size={15} /> Settings</Link>
+              <Link className="topbar-link" to="/guide"><HelpCircle size={15} /> Guide</Link>
+            </nav>
+            <form className="top-search" onSubmit={onSearch}>
+              <Search size={16} />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} />
+            </form>
+            <div className="topbar-actions">
+              <LiveClock />
+              <button className="icon-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications">
+                <Bell size={19} />{unread > 0 && <i className="dot" />}
+              </button>
+              <button className="avatar small" title="Settings" onClick={() => navigate("/settings")}>{user.avatar}</button>
+              <button type="button" className="ghost-btn toolbar-hide" onClick={() => setTopbarOn(false)}>
+                Hide <ChevronUp size={14} />
+              </button>
+            </div>
+            {open && (
+              <div className="notice">
+                <div className="card-head"><b>Notifications</b><button className="ghost-btn" onClick={markRead}>Mark read</button></div>
+                {notes.length === 0 && <p className="muted">No new hospital notices.</p>}
+                {notes.slice(0, 8).map((n) => (
+                  <div key={n.id} className={`notice-item ${n.read ? "" : "unread"}`}><b>{n.title}</b><span>{n.body}</span></div>
+                ))}
+                <div className="notice-actions">
+                  {(user.role === "patient" || user.role === "admin") && (
+                    <button className="secondary-btn" onClick={() => { setOpen(false); navigate("/alerts"); }}>
+                      {user.role === "admin" ? "Notice log" : "Notifications"}
+                    </button>
+                  )}
+                  <button className="secondary-btn" onClick={() => { setOpen(false); navigate("/support"); }}>Support desk</button>
+                  <button className="ghost-btn" onClick={() => { setOpen(false); navigate("/settings"); }}>Settings</button>
+                </div>
+              </div>
+            )}
+          </header>
+        )}
+        {open && !topbarOn && (
+          <div className="notice notice-float">
+            <div className="card-head"><b>Notifications</b><button className="ghost-btn" onClick={markRead}>Mark read</button></div>
+            {notes.length === 0 && <p className="muted">No new hospital notices.</p>}
+            {notes.slice(0, 8).map((n) => (
+              <div key={n.id} className={`notice-item ${n.read ? "" : "unread"}`}><b>{n.title}</b><span>{n.body}</span></div>
+            ))}
+          </div>
+        )}
         <div className="page-stage">
           <PageAtmosphere />
           <div className="page-wrap"><Outlet /></div>

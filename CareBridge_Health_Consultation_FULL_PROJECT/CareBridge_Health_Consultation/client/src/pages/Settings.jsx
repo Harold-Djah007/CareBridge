@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogOut, Shield, Wallet, Bell, UserRound } from "lucide-react";
+import { LogOut, Shield, Wallet, Bell, UserRound, PanelTop } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
+import { useTopbar } from "../chrome";
 
 export default function Settings() {
   const { user, updateUser, logout } = useAuth();
@@ -36,6 +37,7 @@ export default function Settings() {
     },
   });
   const [busy, setBusy] = useState("");
+  const [topbarOn, setTopbarOn] = useTopbar();
 
   const patch = async (body, ok) => {
     const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -188,6 +190,20 @@ export default function Settings() {
           <button className="primary-btn" disabled={busy === "pay"}>{busy === "pay" ? "Saving…" : "Save payment defaults"}</button>
         </form>
       )}
+
+      <section className="card settings-card">
+        <div className="card-head">
+          <div><span className="eyebrow">Display</span><h3><PanelTop size={16} /> Toolbar</h3></div>
+        </div>
+        <p className="muted">The top bar stays hidden until you open it. This switch is stored on this browser and takes effect immediately.</p>
+        <label className="check-row">
+          <input type="checkbox" checked={topbarOn} onChange={(e) => setTopbarOn(e.target.checked)} />
+          Show the top toolbar (search, shortcuts, clock)
+        </label>
+        <button type="button" className="secondary-btn" onClick={() => setTopbarOn(!topbarOn)}>
+          {topbarOn ? "Hide toolbar now" : "Show toolbar now"}
+        </button>
+      </section>
 
       <form className="card settings-card" onSubmit={saveAlerts}>
         <div className="card-head">
