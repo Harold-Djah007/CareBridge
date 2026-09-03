@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { HeartPulse, Video, MessageCircle, BedDouble, ShieldCheck, ArrowRight, Phone } from "lucide-react";
+import { HeartPulse, Video, MessageCircle, BedDouble, ShieldCheck, ArrowRight, Phone, Building2, Stethoscope, FolderOpen } from "lucide-react";
 import { HOSPITAL } from "../utils";
 import { CarePath } from "../components/LiveMeter";
 
@@ -13,7 +13,8 @@ export default function Landing() {
           <a href="#services">Services</a>
           <a href="#portal">Patient portal</a>
           <Link to="/login">Patient sign-in</Link>
-          <Link to="/login?role=doctor">Staff</Link>
+          <Link to="/login?role=doctor">Clinician</Link>
+          <Link to="/login?role=admin">Operations</Link>
           <Link className="primary-btn" to="/register">Register</Link>
         </div>
       </nav>
@@ -24,7 +25,8 @@ export default function Landing() {
           <p className="lead">See a consultant on video, keep your messages in one record, and reserve a bed before you travel to Accra. Confirmations are sent to the email on your file.</p>
           <div className="hero-actions">
             <Link className="primary-btn" to="/login">Open patient portal <ArrowRight size={18} /></Link>
-            <Link className="secondary-btn" to="/login?role=doctor">Staff sign-in</Link>
+            <Link className="secondary-btn" to="/login?role=doctor">Clinician sign-in</Link>
+            <Link className="secondary-btn" to="/login?role=admin">Hospital operations</Link>
           </div>
           <p className="muted" style={{ display: "flex", gap: 8, alignItems: "center" }}><Phone size={16} /> Emergency {HOSPITAL.emergency}</p>
         </div>
@@ -44,12 +46,17 @@ export default function Landing() {
         </aside>
       </section>
       <section id="services" className="feature-grid">
-        <div className="feature-card"><Video /><h3>Consultant video visits</h3><p className="muted">Join from a private room. Camera, microphone, and screen share are part of the consult.</p></div>
-        <div className="feature-card"><MessageCircle /><h3>Messages on your record</h3><p className="muted">Write to your doctor before and after a visit. You also receive an email when they reply.</p></div>
+        <div className="feature-card"><Video /><h3>Consultant video visits</h3><p className="muted">Join from a private room after telehealth consent. Camera, microphone, and screen share are part of the consult.</p></div>
+        <div className="feature-card"><FolderOpen /><h3>One clinical file</h3><p className="muted">Problems, vitals, labs, SOAP notes, prescriptions, invoices, and pre-visit forms stay on your record.</p></div>
         <div className="feature-card"><BedDouble /><h3>Arrive to a reserved bed</h3><p className="muted">Request general, medical, maternity, or paediatric accommodation. Admissions confirm by email.</p></div>
+        <div className="feature-card"><Stethoscope /><h3>Clinician workspace</h3><p className="muted">Doctors work a live clinic board, file notes, issue medicines, and call from the consult room.</p></div>
+        <div className="feature-card"><Building2 /><h3>Hospital operations</h3><p className="muted">Administrators run beds, staff, the clinic diary, revenue, patient notices, and an audit trail.</p></div>
+        <div className="feature-card"><MessageCircle /><h3>Messages on your record</h3><p className="muted">Write to your doctor before and after a visit. You also receive an email when they reply.</p></div>
       </section>
       <footer className="landing-foot">
         <span>{HOSPITAL.name}</span>
+        <Link to="/help">How it works</Link>
+        <Link to="/privacy">Privacy</Link>
         <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}><ShieldCheck size={16} /> Patient records are access-controlled</span>
         <Link to="/login?role=admin">Hospital operations</Link>
       </footer>

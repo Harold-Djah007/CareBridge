@@ -12,6 +12,10 @@ export default function Profile() {
     city: user.city || "",
     about: user.about || "",
     specialty: user.specialty || "",
+    emergencyContact: user.emergencyContact || "",
+    allergies: user.allergies || "",
+    insurance: user.insurance || "",
+    bloodType: user.bloodType || "",
     emailAlerts: user.emailAlerts !== false,
     alertPrefs: {
       appointments: user.alertPrefs?.appointments !== false,
@@ -66,8 +70,17 @@ export default function Profile() {
             {user.role !== "patient" && <small className="muted">{user.employeeId} · {user.department || user.specialty}</small>}
           </div>
         </div>
-        {user.role === "patient" && user.emergencyContact && (
-          <p className="muted">Emergency contact: {user.emergencyContact}{user.allergies ? ` · Allergies: ${user.allergies}` : ""}</p>
+        {user.role === "patient" && (
+          <>
+            <div className="form-grid">
+              <label>Emergency contact<input value={form.emergencyContact || ""} onChange={(e) => set("emergencyContact", e.target.value)} /></label>
+              <label>Allergies<input value={form.allergies || ""} onChange={(e) => set("allergies", e.target.value)} /></label>
+            </div>
+            <div className="form-grid">
+              <label>Insurance / NHIS<input value={form.insurance || ""} onChange={(e) => set("insurance", e.target.value)} /></label>
+              <label>Blood type<input value={form.bloodType || ""} onChange={(e) => set("bloodType", e.target.value)} /></label>
+            </div>
+          </>
         )}
         <label>Full name<input value={form.name} onChange={(e) => set("name", e.target.value)} required /></label>
         <div className="form-grid">

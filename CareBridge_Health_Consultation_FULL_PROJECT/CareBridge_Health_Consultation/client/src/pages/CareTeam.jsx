@@ -53,7 +53,10 @@ export default function CareTeam() {
               {user.role === "patient" ? (
                 <button className="primary-btn" onClick={() => setBooking(p)}><CalendarPlus size={16} /> Book</button>
               ) : (
-                <Link className="primary-btn" to={`/video?with=${p.id}`}><Video size={16} /> Video</Link>
+                <>
+                  <Link className="secondary-btn" to={`/records/${p.id}`}>Chart</Link>
+                  <Link className="primary-btn" to={`/video?with=${p.id}`}><Video size={16} /> Video</Link>
+                </>
               )}
             </div>
           </article>

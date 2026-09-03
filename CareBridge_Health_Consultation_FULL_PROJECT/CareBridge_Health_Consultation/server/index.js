@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import http from "http";
 import { Server } from "socket.io";
 import { deliverEmail, renderEmail, shouldEmail } from "./email.js";
+import { audit, ensureClinical, mountClinical } from "./clinical.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +16,7 @@ const readDb = () => {
   const db = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
   db.emails = db.emails || [];
   db.wards = db.wards || [];
-  return db;
+  return ensureClinical(db);
 };
 const writeDb = (db) => fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
 
@@ -99,6 +100,8 @@ app.post("/api/login", (req, res) => {
   if (user.status === "inactive") {
     return res.status(403).json({ message: "This account has been deactivated. Contact administration." });
   }
+  audit(db, { actorId: user.id, action: "login", entity: "user", entityId: user.id, detail: `${user.role} signed in` });
+  writeDb(db);
   res.json({ user: safeUser(user) });
 });
 
@@ -121,6 +124,8 @@ app.post("/api/register", async (req, res) => {
     city: req.body.city || "",
     about: "New CareBridge patient.",
     status: "active",
+    mrn: `CBM-${100000 + db.users.filter((u) => u.role === "patient").length + 1}`,
+    allergies: "None recorded",
     emailAlerts: true,
     alertPrefs: { appointments: true, wards: true, messages: true, account: true },
   };
@@ -147,7 +152,7 @@ app.patch("/api/users/:id", (req, res) => {
   const db = readDb();
   const user = db.users.find((u) => u.id === req.params.id);
   if (!user) return res.status(404).json({ message: "User not found" });
-  const allowed = ["name", "phone", "city", "about", "specialty", "available", "years", "emailAlerts", "alertPrefs"];
+  const allowed = ["name", "phone", "city", "about", "specialty", "available", "years", "emailAlerts", "alertPrefs", "emergencyContact", "allergies", "insurance", "bloodType", "dob"];
   allowed.forEach((key) => {
     if (req.body[key] !== undefined) user[key] = req.body[key];
   });
@@ -443,6 +448,8 @@ app.get("/api/admin/overview", (_, res) => {
     bedsAvailable: (db.wards || []).reduce((sum, w) => sum + Number(w.available || 0), 0),
   });
 });
+
+mountClinical(app, { readDb, writeDb, safeUser, notify, emailPatient });
 
 app.get("/api/admin/users", (_, res) => {
   const db = readDb();

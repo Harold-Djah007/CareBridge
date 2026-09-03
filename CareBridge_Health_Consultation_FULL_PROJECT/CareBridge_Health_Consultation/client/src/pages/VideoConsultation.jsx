@@ -20,7 +20,7 @@ export default function VideoConsultation() {
   const [mic, setMic] = useState(true);
   const [cam, setCam] = useState(true);
   const [sharing, setSharing] = useState(false);
-  const [status, setStatus] = useState("Ready to join");
+  const [consent, setConsent] = useState(user.role !== "patient");
 
   useEffect(() => {
     api(`/contacts?userId=${user.id}&role=${user.role}`).then((list) => {
@@ -137,7 +137,19 @@ export default function VideoConsultation() {
               <div className="video-icon" style={{ margin: "0 auto 16px", width: 70, height: 70, borderRadius: 22, display: "grid", placeItems: "center", background: "rgba(255,255,255,.1)" }}><Video size={36} /></div>
               <h2>Your consultation room is ready</h2>
               <p>Allow camera and microphone access when prompted.</p>
-              <button className="primary-btn" onClick={join}><Video size={18} /> Join consultation</button>
+              {user.role === "patient" && (
+                <label className="check-row" style={{ justifyContent: "center", margin: "12px 0", color: "#fff" }}>
+                  <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+                  I consent to a telehealth consult (privacy notice applies)
+                </label>
+              )}
+              <button className="primary-btn" onClick={async () => {
+                if (user.role === "patient") {
+                  if (!consent) { push("Please confirm telehealth consent first.", "error"); return; }
+                  await api("/consents", { method: "POST", body: JSON.stringify({ patientId: user.id, type: "telehealth" }) });
+                }
+                join();
+              }}><Video size={18} /> Join consultation</button>
             </div>
           )}
           <video ref={localRef} autoPlay muted playsInline className={joined ? "local-video" : "local-video"} style={{ display: joined ? "block" : "none" }} />

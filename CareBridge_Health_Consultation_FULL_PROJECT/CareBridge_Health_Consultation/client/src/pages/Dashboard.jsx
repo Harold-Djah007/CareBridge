@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CalendarDays, BedDouble, Video, ArrowRight, Mail } from "lucide-react";
+import { CalendarDays, BedDouble, Video, ArrowRight, Mail, FolderOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../state";
 import { api } from "../api";
@@ -76,6 +76,7 @@ function PatientHome({ user, appointments, wards, emails }) {
             <Link to="/wards"><BedDouble /><span><b>Request a bed</b><small>General, maternity, paediatric</small></span><ArrowRight size={18} /></Link>
             <Link to="/appointments"><CalendarDays /><span><b>Book a visit</b><small>Video or at Ridge Campus</small></span><ArrowRight size={18} /></Link>
             <Link to="/alerts"><Mail /><span><b>Notifications</b><small>{emails.length} notices on file</small></span><ArrowRight size={18} /></Link>
+            <Link to="/records"><FolderOpen /><span><b>Clinical file</b><small>Notes, labs, medicines, bills</small></span><ArrowRight size={18} /></Link>
           </div>
         </section>
       </div>
@@ -114,7 +115,8 @@ function DoctorBoard({ user, appointments, wards }) {
             </div>
             <div className="row-actions">
               <span className={`status ${a.status}`}>{a.status}</span>
-              <Link className="ghost-btn" to={`/messages?with=${a.patientId}`}>Chart note</Link>
+              <Link className="ghost-btn" to={`/records/${a.patientId}`}>Chart</Link>
+              <Link className="ghost-btn" to={`/messages?with=${a.patientId}`}>Note</Link>
               {a.mode === "video" && a.status !== "cancelled" && <Link className="primary-btn" to={`/video?with=${a.patientId}`}><Video size={16} /> Call</Link>}
             </div>
           </div>

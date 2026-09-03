@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   CalendarDays, LayoutDashboard, MessageCircle, BedDouble, Video, LogOut, HeartPulse,
   Bell, Users, Mail, UserRound, Stethoscope, ClipboardList, Building2, Search, Inbox,
+  FolderOpen, ScrollText,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
@@ -24,7 +25,8 @@ const NAV = {
     {
       group: "Records",
       items: [
-        { to: "/care", icon: Stethoscope, label: "My doctors", primary: true },
+        { to: "/records", icon: FolderOpen, label: "Clinical file", primary: true },
+        { to: "/care", icon: Stethoscope, label: "My doctors" },
         { to: "/alerts", icon: Inbox, label: "Notifications" },
         { to: "/profile", icon: UserRound, label: "My details" },
       ],
@@ -44,6 +46,7 @@ const NAV = {
       group: "Caseload",
       items: [
         { to: "/care", icon: Users, label: "Patients", primary: true },
+        { to: "/records", icon: FolderOpen, label: "Open chart", primary: true },
         { to: "/wards", icon: BedDouble, label: "Admissions", primary: true, badge: "wards" },
         { to: "/profile", icon: UserRound, label: "Credentials" },
       ],
@@ -57,6 +60,7 @@ const NAV = {
         { to: "/admin/users", icon: Users, label: "Staff directory", primary: true },
         { to: "/admin/hospital", icon: Building2, label: "Bed board", primary: true, badge: "wards" },
         { to: "/admin/appointments", icon: CalendarDays, label: "Clinic diary", primary: true },
+        { to: "/admin/reports", icon: ScrollText, label: "Reports & audit", primary: true },
       ],
     },
     {
