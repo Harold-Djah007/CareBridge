@@ -22,25 +22,15 @@ export default function Login() {
   const [password, setPassword] = useState(params.get("role") === "admin" ? STAFF.admin.password : "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const isStaff = portal === "staff";
 
   const submit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const r = await api("/login", { method: "POST", body: JSON.stringify({ email, password }) });
-      const role = r.user.role;
-      if (!isStaff && role !== "patient") {
-        throw new Error("This tab is for patients only. Doctors use Clinician. Administrators use Operations.");
-      }
-      if (isStaff && !opsMode && role !== "doctor") {
-        throw new Error(role === "admin"
-          ? "Administrators sign in on the Operations tab."
-          : "This tab is for doctors. Patient accounts use the Patient tab.");
-      }
-      if (isStaff && opsMode && role !== "admin") {
-        throw new Error("Operations is for hospital administrators only. Doctors use the Clinician tab.");
-      }
+      const expectedRole = !isStaff ? "patient" : opsMode ? "admin" : "doctor";
+      const r = await api("/login", { method: "POST", body: JSON.stringify({ email, password, expectedRole }) });
       login(r.user);
       push(`Signed in to ${HOSPITAL.short}`);
     } catch (err) {
@@ -49,8 +39,6 @@ export default function Login() {
       setLoading(false);
     }
   };
-
-  const isStaff = portal === "staff";
 
   return (
     <div className={`login-page ${isStaff ? "staff-login" : ""}`}>

@@ -114,6 +114,14 @@ app.post("/api/login", (req, res) => {
   if (user.status === "inactive") {
     return res.status(403).json({ message: "This account has been deactivated. Contact administration." });
   }
+  if (req.body.expectedRole && req.body.expectedRole !== user.role) {
+    const hint = {
+      patient: "Use the Patient tab.",
+      doctor: "Use the Clinician tab.",
+      admin: "Use the Operations tab.",
+    }[user.role] || "Choose the matching portal.";
+    return res.status(403).json({ message: `This account is a ${user.role}. ${hint}` });
+  }
   audit(db, { actorId: user.id, action: "login", entity: "user", entityId: user.id, detail: `${user.role} signed in` });
   writeDb(db);
   res.json({ user: safeUser(user) });
