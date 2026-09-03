@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../state";
 import { api } from "../api";
 import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate } from "../utils";
-import { EcgRibbon, Heartbeat } from "../components/LiveMeter";
+import { CarePath, EcgRibbon, Heartbeat } from "../components/LiveMeter";
 
 function PatientHome({ user, appointments, wards, emails }) {
   const next = appointments.find(isUpcoming);
@@ -24,7 +24,7 @@ function PatientHome({ user, appointments, wards, emails }) {
           </div>
           <Link className="secondary-btn" to="/profile" style={{ marginTop: 12 }}>My details</Link>
         </div>
-        <Heartbeat variant="patient" />
+        <CarePath caption={next ? `Next: ${formatDate(next.date)} · ${formatTime(next.time)}` : admission ? `${admission.ward} · ${admission.status}` : "Book a visit when you are ready"} />
       </div>
 
       <div className="dashboard-grid">
@@ -93,14 +93,14 @@ function DoctorBoard({ user, appointments, wards }) {
   return (
     <>
       <section className="welcome doctor-welcome">
-        <EcgRibbon variant="doctor" />
+        <EcgRibbon />
         <div>
           <span className="eyebrow">{user.department || "Outpatient"} · {user.clinic || "Consulting room"}</span>
           <h1>{greeting(user.name.replace("Dr. ", "").split(" ")[0])}</h1>
           <p>{longDate()} · {user.shift || "Day clinic"} · {today.filter(isUpcoming).length} patients remaining</p>
           {pending > 0 && <p style={{ marginTop: 10 }}>{pending} admission request{pending > 1 ? "s" : ""} waiting</p>}
         </div>
-        <Heartbeat variant="doctor" />
+        <Heartbeat />
       </section>
 
       <div className="clinic-board" style={{ marginTop: 16 }}>
