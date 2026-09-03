@@ -3,7 +3,7 @@ import { MessageCircle, Send, Paperclip, Search } from "lucide-react";
 import { io } from "socket.io-client";
 import { useSearchParams } from "react-router-dom";
 import { api, socketUrl } from "../api";
-import { useAuth, useToast } from "../main";
+import { useAuth, useToast } from "../state";
 import { roomIdFor } from "../utils";
 
 export default function Messages() {

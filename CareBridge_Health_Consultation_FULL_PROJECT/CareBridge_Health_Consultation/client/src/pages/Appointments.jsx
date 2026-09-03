@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Clock, CheckCircle2, XCircle, Plus, Stethoscope, Video, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
-import { useAuth, useToast } from "../main";
+import { useAuth, useToast } from "../state";
 import { formatDate, formatTime, isUpcoming, todayISO } from "../utils";
 
 export default function Appointments() {

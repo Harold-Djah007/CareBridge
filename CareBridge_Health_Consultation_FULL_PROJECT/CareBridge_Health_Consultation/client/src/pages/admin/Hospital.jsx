@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { api } from "../../api";
-import { useToast } from "../../main";
+import { useToast } from "../../state";
 
 export default function AdminHospital() {
   const { push } = useToast();

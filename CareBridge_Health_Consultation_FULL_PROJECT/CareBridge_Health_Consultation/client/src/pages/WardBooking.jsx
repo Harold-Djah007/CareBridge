@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { BedDouble, Plus, Users, CalendarDays, CheckCircle2, XCircle } from "lucide-react";
 import { api } from "../api";
-import { useAuth, useToast } from "../main";
+import { useAuth, useToast } from "../state";
 import { todayISO } from "../utils";
 
 export default function WardBooking() {

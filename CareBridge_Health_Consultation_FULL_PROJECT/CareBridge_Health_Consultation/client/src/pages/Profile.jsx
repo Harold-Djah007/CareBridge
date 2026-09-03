@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Mail } from "lucide-react";
 import { api } from "../api";
-import { useAuth, useToast } from "../main";
+import { useAuth, useToast } from "../state";
 
 export default function Profile() {
   const { user, updateUser } = useAuth();

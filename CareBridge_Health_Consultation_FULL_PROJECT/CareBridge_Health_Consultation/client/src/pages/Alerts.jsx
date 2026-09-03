@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Mail, CalendarDays, BedDouble, MessageCircle, UserRound } from "lucide-react";
 import { api } from "../api";
-import { useAuth, useToast } from "../main";
+import { useAuth, useToast } from "../state";
 import { prettyDate } from "../utils";
 
 const icons = { appointment: CalendarDays, ward: BedDouble, message: MessageCircle, account: UserRound, test: Mail };

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { CalendarDays, MessageCircle, BedDouble, Clock3, Video, ArrowRight, Activity, UsersRound, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../main";
+import { useAuth } from "../state";
 import { api } from "../api";
 import StatCard from "../components/StatCard";
 import { firstName, formatDate, formatTime, isUpcoming } from "../utils";

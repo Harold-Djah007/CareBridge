@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { HeartPulse, ArrowRight } from "lucide-react";
 import { api } from "../api";
-import { useAuth, useToast } from "../main";
+import { useAuth, useToast } from "../state";
 
 export default function Register() {
   const { login } = useAuth();

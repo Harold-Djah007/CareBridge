@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { CalendarDays, LayoutDashboard, MessageCircle, BedDouble, Video, LogOut, HeartPulse, Bell, Users, Mail, Shield, UserRound } from "lucide-react";
 import { io } from "socket.io-client";
-import { useAuth, useToast } from "../main";
+import { useAuth, useToast } from "../state";
 import { api, socketUrl } from "../api";
 import { roleLabel } from "../utils";
 

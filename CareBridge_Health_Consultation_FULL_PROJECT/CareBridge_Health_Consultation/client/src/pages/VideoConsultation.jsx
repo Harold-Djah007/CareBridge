@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Video, VideoOff, Mic, MicOff, PhoneOff, MonitorUp, ShieldCheck } from "lucide-react";
 import { io } from "socket.io-client";
 import { useSearchParams } from "react-router-dom";
-import { useAuth, useToast } from "../main";
+import { useAuth, useToast } from "../state";
 import { api, socketUrl } from "../api";
 import { roomIdFor } from "../utils";
 

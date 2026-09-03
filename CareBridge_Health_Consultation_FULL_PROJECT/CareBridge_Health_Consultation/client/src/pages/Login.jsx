@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { HeartPulse, ShieldCheck, Video, MessageCircle, BedDouble, ArrowRight, Stethoscope } from "lucide-react";
 import { api } from "../api";
-import { useAuth, useToast } from "../main";
+import { useAuth, useToast } from "../state";
 
 const demos = {
   patient: { email: "patient@carebridge.test", password: "patient123", label: "Patient" },

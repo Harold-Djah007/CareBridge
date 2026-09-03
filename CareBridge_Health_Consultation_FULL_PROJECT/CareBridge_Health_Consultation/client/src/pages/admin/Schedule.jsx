@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../../api";
-import { useToast } from "../../main";
+import { useToast } from "../../state";
 import { formatDate, formatTime } from "../../utils";
 
-export default function AdminAppointments() {
-  const { push } = useToast();
+export default function AdminSchedule() {
+  const toast = useToast();
   const [rows, setRows] = useState([]);
 
-  const load = () => api("/appointments").then(setRows);
-  useEffect(load, []);
+  const load = () => api("/appointments").then(setRows).catch(() => setRows([]));
+  useEffect(() => { load(); }, []);
 
   const update = async (id, status) => {
     await api(`/appointments/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
-    push(`Appointment ${status}. Patient emailed.`);
+    toast?.push(`Appointment ${status}. Patient emailed.`);
     load();
   };
 
