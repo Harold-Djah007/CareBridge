@@ -72,7 +72,7 @@ export default function PrescriptionPrint() {
           <button type="button" className="secondary-btn" onClick={printRx}><Printer size={16} /> Print / save PDF</button>
           {user.role === "patient" && (
             <>
-              <Link className="primary-btn" to={`/pharmacy?rx=${rx.id}`}>
+              <Link className="primary-btn" to={`/pay?rx=${rx.id}`}>
                 <ShoppingBag size={16} /> Buy on site
               </Link>
               <button type="button" className="ghost-btn" disabled={!!busy} onClick={() => fulfill("hospital")}>

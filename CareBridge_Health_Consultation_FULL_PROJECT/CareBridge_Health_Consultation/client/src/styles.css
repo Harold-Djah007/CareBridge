@@ -971,8 +971,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .role-nurse .page-atmosphere .atm-orb.o1 { background: #8ed4a8; }
 
 /* Pharmacy */
-.pharmacy-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
-.pharmacy-basket { position: sticky; top: 76px; }
+.pharmacy-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); gap: 16px; align-items: start; }
+.pharmacy-basket { position: sticky; top: 16px; max-height: calc(100vh - 24px); overflow: auto; }
+.pharmacy-basket .check-row { align-items: flex-start; }
+.pharmacy-basket .check-row span { font-weight: 600; font-size: 13px; line-height: 1.35; }
+.pharmacy-basket .pay-form { margin-top: 8px; }
 .pharm-cat { margin-bottom: 14px; }
 .pharm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
 .pharm-card {
@@ -1016,7 +1019,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .pharm-cats button b { font-size: 14px; }
 .pharm-cats button small { color: var(--muted); font-weight: 600; }
 .pharm-cats button.on { border-color: var(--teal); background: var(--teal-soft); box-shadow: 0 0 0 3px rgba(21, 94, 117, 0.12); }
-.pharmacy-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.pharmacy-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); gap: 16px; align-items: start; }
+.pharmacy-basket { max-height: calc(100vh - 24px); overflow: auto; }
+.shop-spend-bar {
+  display: none;
+}
 .pharm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 .pharm-card {
   border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff;
@@ -1099,7 +1106,25 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 @media (max-width: 800px) {
   .pharm-cats, .fulfill-pick, .rx-meta, .rx-sign, .pharmacy-layout, .pharm-grid { grid-template-columns: 1fr; }
   .duty-toggle, .duty-pill { min-width: 0; width: 100%; }
-  .pharmacy-basket { position: static; }
+  .pharmacy-basket { position: static; max-height: none; }
+  .shop-spend-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    position: sticky;
+    bottom: 72px;
+    z-index: 6;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-top: 12px;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+    color: inherit;
+    text-decoration: none;
+    font-weight: 700;
+  }
 }
 
 @media print {

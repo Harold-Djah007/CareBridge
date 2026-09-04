@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   CalendarDays, LayoutDashboard, MessageCircle, BedDouble, Video, LogOut, HeartPulse,
   Bell, Users, Mail, UserRound, Stethoscope, ClipboardList, Building2, Search, Inbox,
-  FolderOpen, ScrollText, Pill, Wallet, Settings, LifeBuoy, HelpCircle, PanelTop, ChevronDown, ChevronUp, FolderKanban,
+  FolderOpen, ScrollText, Pill, Wallet, ShoppingBag, Settings, LifeBuoy, HelpCircle, PanelTop, ChevronDown, ChevronUp, FolderKanban,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
@@ -23,7 +23,7 @@ const NAV = {
         { to: "/appointments", icon: CalendarDays, label: "Appointments", primary: true },
         { to: "/messages", icon: MessageCircle, label: "Messages", badge: "messages" },
         { to: "/wards", icon: BedDouble, label: "Admissions", badge: "wards" },
-        { to: "/pharmacy", icon: Pill, label: "Pharmacy & labs", primary: true },
+        { to: "/pay", icon: ShoppingBag, label: "Shop & pay", primary: true },
         { to: "/prescriptions", icon: ClipboardList, label: "Prescriptions", primary: true },
       ],
     },
@@ -31,7 +31,6 @@ const NAV = {
       group: "Accounts",
       items: [
         { to: "/records", icon: FolderOpen, label: "Clinical file", primary: true },
-        { to: "/pay", icon: Wallet, label: "Pay bills", primary: true },
         { to: "/care", icon: Stethoscope, label: "Find a doctor" },
         { to: "/alerts", icon: Inbox, label: "Notifications" },
         { to: "/profile", icon: UserRound, label: "My details" },
@@ -298,7 +297,7 @@ export default function AppShell() {
             </div>
             <nav className="topbar-nav" aria-label="Hospital shortcuts">
               <Link className="topbar-link" to={user.role === "admin" ? "/admin" : "/home"}>Home</Link>
-              {user.role === "patient" && <Link className="topbar-link" to="/pay">Pay</Link>}
+              {user.role === "patient" && <Link className="topbar-link" to="/pay">Shop & pay</Link>}
               {user.role === "nurse" && <Link className="topbar-link" to="/pharmacy-stock">Stock</Link>}
               <Link className="topbar-link" to="/support"><LifeBuoy size={15} /> Support</Link>
               <Link className="topbar-link" to="/settings"><Settings size={15} /> Settings</Link>

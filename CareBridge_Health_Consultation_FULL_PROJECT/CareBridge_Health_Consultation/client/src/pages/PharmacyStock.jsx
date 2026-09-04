@@ -65,7 +65,7 @@ export default function PharmacyStock() {
         <div>
           <span className="eyebrow">Ridge pharmacy</span>
           <h1>Medicine cupboard</h1>
-          <p>Quantities and prices here are what patients see in Pharmacy. Out-of-stock lines cannot be added to a basket.</p>
+          <p>Quantities and prices here are what patients see in Shop & pay. Out-of-stock lines cannot be added to a basket.</p>
         </div>
         <button className="primary-btn" type="button" onClick={() => setOpen(true)}><Plus size={16} /> Add SKU</button>
       </div>

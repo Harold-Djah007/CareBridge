@@ -142,7 +142,7 @@ export default function Tariff() {
           <p>Published fees in Ghana cedis. Pay by MTN / Telecel / AirtelTigo MoMo, GCB bank transfer, NHIS, or cash at the Ridge cashier. A numbered receipt is issued for every settled bill.</p>
           {rates.updatedAt && <p className="muted">Last updated {prettyDate(rates.updatedAt)}{rates.updatedBy ? ` by ${rates.updatedBy}` : ""}.</p>}
         </div>
-        {user?.role === "patient" && <Link className="primary-btn" to="/pay">Pay a bill</Link>}
+        {user?.role === "patient" && <Link className="primary-btn" to="/pay">Shop & pay</Link>}
         {canEdit && <button className="primary-btn" type="submit" form="tariff-form" disabled={busy}>{busy ? "Saving…" : "Publish tariff"}</button>}
       </div>
 

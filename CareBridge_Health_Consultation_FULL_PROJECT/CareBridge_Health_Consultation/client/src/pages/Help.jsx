@@ -23,7 +23,7 @@ export default function Help() {
       </div>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Patients</h3>
-        <p className="muted">Register, complete a pre-visit form, book a video or campus visit, message your doctor, read labs and visit notes, print prescriptions, buy medicines on site or collect at Ridge pharmacy, pay invoices, and reserve a ward before you travel. Confirmations go to the email on your file.</p>
+        <p className="muted">Register, complete a pre-visit form, book a video or campus visit, message your doctor, read labs and visit notes, print prescriptions, and use Shop & pay for unpaid bills, medicines, and labs in one basket — or collect medicines at Ridge pharmacy. Reserve a ward before you travel. Confirmations go to the email on your file.</p>
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Doctors</h3>
@@ -31,7 +31,7 @@ export default function Help() {
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Pharmacy nurses</h3>
-        <p className="muted">Sign in on the Nurse tab. The queue lists hospital pickup orders — mark them ready, then collected. Stock quantities and prices you edit appear immediately on the patient pharmacy. Demo: nurse@carebridge.test / nurse123.</p>
+        <p className="muted">Sign in on the Nurse tab. The queue lists hospital pickup orders — mark them ready, then collected. Stock quantities and prices you edit appear immediately in the patient shop. Demo: nurse@carebridge.test / nurse123.</p>
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Hospital operations</h3>

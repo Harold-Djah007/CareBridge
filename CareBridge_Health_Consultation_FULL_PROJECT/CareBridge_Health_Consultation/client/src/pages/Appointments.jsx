@@ -46,7 +46,7 @@ export default function Appointments() {
     await api("/appointments", { method: "POST", body: JSON.stringify({ ...form, patientId: user.role === "patient" ? user.id : form.patientId }) });
     setOpen(false);
     setForm({ doctorId: "", patientId: user.role === "patient" ? user.id : "", date: todayISO(), time: "09:00", reason: "", mode: "video" });
-    push(user.role === "patient" ? "Consultation booked and billed. Pay from Pay bills to receive a receipt." : "Appointment created and billed to the patient account.");
+    push(user.role === "patient" ? "Consultation booked and billed. Pay from Shop & pay to receive a receipt." : "Appointment created and billed to the patient account.");
     load();
   };
 

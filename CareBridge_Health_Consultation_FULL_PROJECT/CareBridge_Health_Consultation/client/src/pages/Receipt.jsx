@@ -28,7 +28,7 @@ export default function Receipt() {
           <p>{HOSPITAL.name} · {HOSPITAL.campus}, {HOSPITAL.city}</p>
         </div>
         <div className="row-actions">
-          <Link className="ghost-btn" to="/pay">Back to billing</Link>
+          <Link className="ghost-btn" to="/pay">Back to shop</Link>
           <button className="secondary-btn" type="button" onClick={() => window.print()}>Print / save PDF</button>
         </div>
       </div>

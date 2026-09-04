@@ -33,7 +33,7 @@ export default function Prescriptions() {
     const items = itemsForOrder(rx);
     if (!items.length) {
       push("Those medicines are not on the Ridge shelf. Open Pharmacy to pick equivalents.", "error");
-      navigate("/pharmacy");
+      navigate("/pay?tab=pharmacy");
       return;
     }
     setBusy(`${rx.id}-${mode}`);
@@ -71,7 +71,7 @@ export default function Prescriptions() {
             ? "Prescriptions you have issued. Patients can print them, buy on CareBridge, or collect at Ridge pharmacy."
             : "Print or save a copy, buy the medicines on CareBridge, or collect them at Ridge Campus pharmacy."}</p>
         </div>
-        {user.role === "patient" && <Link className="secondary-btn" to="/pharmacy">Open pharmacy</Link>}
+        {user.role === "patient" && <Link className="secondary-btn" to="/pay?tab=pharmacy">Open shop</Link>}
       </div>
 
       {rows.length === 0 && (
@@ -102,7 +102,7 @@ export default function Prescriptions() {
             <Link className="secondary-btn" to={`/prescriptions/${rx.id}`}><Printer size={16} /> Print / save PDF</Link>
             {user.role === "patient" && (
               <>
-                <Link className="primary-btn" to={`/pharmacy?rx=${rx.id}`}>
+                <Link className="primary-btn" to={`/pay?rx=${rx.id}`}>
                   <ShoppingBag size={16} /> Buy on site
                 </Link>
                 <button type="button" className="ghost-btn" disabled={busy.startsWith(rx.id)} onClick={() => fulfill(rx, "hospital")}>

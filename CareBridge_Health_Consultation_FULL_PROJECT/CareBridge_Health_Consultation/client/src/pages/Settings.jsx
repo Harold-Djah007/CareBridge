@@ -85,7 +85,7 @@ export default function Settings() {
     e.preventDefault();
     setBusy("pay");
     try {
-      await patch({ paymentPrefs: pay, insurance: pay.nhisNumber || user.insurance }, "Payment defaults saved. Pay bills will use these next.");
+      await patch({ paymentPrefs: pay, insurance: pay.nhisNumber || user.insurance }, "Payment defaults saved. Shop & pay will use these next.");
     } catch (err) {
       push(err.message, "error");
     } finally {
@@ -183,7 +183,7 @@ export default function Settings() {
           <div className="card-head">
             <div><span className="eyebrow">Accounts</span><h3><Wallet size={16} /> How you pay hospital bills</h3></div>
           </div>
-          <p className="muted">Pay bills opens with these defaults. You can still pick another method on each invoice.</p>
+          <p className="muted">Shop & pay opens with these defaults. You can still pick another method at checkout.</p>
           <label>Preferred method
             <select value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}>
               <option value="momo">Mobile money</option>

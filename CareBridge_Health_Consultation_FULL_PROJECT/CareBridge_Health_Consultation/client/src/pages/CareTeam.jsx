@@ -75,7 +75,7 @@ export default function CareTeam() {
       return;
     }
     await api("/appointments", { method: "POST", body: JSON.stringify({ ...form, doctorId: booking.id, patientId: user.id }) });
-    push("Consultation scheduled and billed. Pay from Pay bills for a receipt.");
+    push("Consultation scheduled and billed. Pay from Shop & pay for a receipt.");
     setBooking(null);
     navigate("/appointments");
   };

@@ -108,10 +108,9 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
           <div className="quick-actions" style={{ marginTop: 8 }}>
             <Link to="/care"><Stethoscope /><span><b>Find a doctor</b><small>Photos, specialty, available or busy</small></span><ArrowRight size={18} /></Link>
             <Link to="/prescriptions"><Pill /><span><b>Prescriptions</b><small>Print, buy on site, or collect at Ridge</small></span><ArrowRight size={18} /></Link>
-            <Link to="/pharmacy"><Pill /><span><b>Pharmacy & labs</b><small>Live stock by category — in or out</small></span><ArrowRight size={18} /></Link>
+            <Link to="/pay"><Wallet /><span><b>Shop & pay</b><small>Bills, medicines, labs — one basket</small></span><ArrowRight size={18} /></Link>
             <Link to="/wards"><BedDouble /><span><b>Request a bed</b><small>General, maternity, paediatric</small></span><ArrowRight size={18} /></Link>
             <Link to="/appointments"><CalendarDays /><span><b>Book a visit</b><small>Video or at Ridge Campus</small></span><ArrowRight size={18} /></Link>
-            <Link to="/pay"><Wallet /><span><b>Pay bills</b><small>MoMo, GCB, NHIS, or cash</small></span><ArrowRight size={18} /></Link>
             <Link to="/alerts"><Mail /><span><b>Notifications</b><small>{emails.length} notices on file</small></span><ArrowRight size={18} /></Link>
             <Link to="/records"><FolderOpen /><span><b>Clinical file</b><small>Notes, labs, medicines, bills</small></span><ArrowRight size={18} /></Link>
           </div>
