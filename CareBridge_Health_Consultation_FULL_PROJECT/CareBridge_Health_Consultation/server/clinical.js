@@ -178,41 +178,87 @@ export function mountClinical(app, ctx) {
     res.status(201).json(row);
   });
 
+  const enrichRx = (db, rx) => {
+    const items = Array.isArray(rx.items) && rx.items.length
+      ? rx.items
+      : [{ stockId: "", drug: rx.drug, sig: rx.sig || "", qty: rx.qty || "" }];
+    return {
+      ...rx,
+      items,
+      doctor: safeUser(db.users.find((u) => u.id === rx.doctorId) || {}),
+      patient: safeUser(db.users.find((u) => u.id === rx.patientId) || {}),
+    };
+  };
+
+  app.get("/api/prescriptions", (req, res) => {
+    const db = readDb();
+    const { userId, role } = req.query;
+    let rows = db.prescriptions || [];
+    if (role === "patient") rows = rows.filter((r) => r.patientId === userId);
+    if (role === "doctor") rows = rows.filter((r) => r.doctorId === userId);
+    res.json(rows.slice().reverse().map((r) => enrichRx(db, r)));
+  });
+
+  app.get("/api/prescriptions/:id", (req, res) => {
+    const db = readDb();
+    const rx = (db.prescriptions || []).find((r) => r.id === req.params.id);
+    if (!rx) return res.status(404).json({ message: "Prescription not found" });
+    res.json(enrichRx(db, rx));
+  });
+
   app.post("/api/prescriptions", async (req, res) => {
     const db = readDb();
+    const items = Array.isArray(req.body.items) && req.body.items.length
+      ? req.body.items.map((row) => ({
+          stockId: row.stockId || row.id || "",
+          drug: String(row.drug || row.name || "").trim(),
+          sig: String(row.sig || "").trim(),
+          qty: String(row.qty || "").trim() || "1",
+        })).filter((row) => row.drug)
+      : req.body.drug
+        ? [{ stockId: req.body.stockId || "", drug: String(req.body.drug).trim(), sig: String(req.body.sig || "").trim(), qty: String(req.body.qty || "").trim() }]
+        : [];
+    if (!items.length) return res.status(400).json({ message: "Add at least one medicine." });
     const rx = {
       id: nid("rx"),
       patientId: req.body.patientId,
       doctorId: req.body.doctorId,
-      drug: req.body.drug,
-      sig: req.body.sig || "",
-      qty: req.body.qty || "",
+      drug: items.map((i) => i.drug).join(", "),
+      sig: items.map((i) => i.sig).filter(Boolean).join("; "),
+      qty: items.map((i) => i.qty).filter(Boolean).join(", "),
+      items,
+      notes: String(req.body.notes || "").trim(),
+      source: req.body.source || "chart",
       refills: Number(req.body.refills || 0),
       status: "active",
       date: new Date().toISOString().slice(0, 10),
+      issuedAt: new Date().toISOString(),
       pharmacy: "Ridge Campus pharmacy",
     };
     db.prescriptions.push(rx);
-    db.medications.push({
-      id: nid("med"),
-      patientId: rx.patientId,
-      name: rx.drug,
-      sig: rx.sig,
-      status: "active",
-      started: rx.date,
-      prescriber: (db.users.find((u) => u.id === rx.doctorId) || {}).name,
+    items.forEach((line) => {
+      db.medications.push({
+        id: nid("med"),
+        patientId: rx.patientId,
+        name: line.drug,
+        sig: line.sig,
+        status: "active",
+        started: rx.date,
+        prescriber: (db.users.find((u) => u.id === rx.doctorId) || {}).name,
+      });
     });
+    const doctor = db.users.find((u) => u.id === rx.doctorId) || {};
     audit(db, { actorId: rx.doctorId, action: "rx.create", entity: "prescription", entityId: rx.id, detail: rx.drug });
-    notify(db, rx.patientId, "New prescription", `${rx.drug} is ready at Ridge Campus pharmacy.`);
+    notify(db, rx.patientId, "New prescription", `${doctor.name || "Your doctor"} issued a prescription. Print it or buy from Pharmacy.`);
     await emailPatient(db, rx.patientId, {
       type: "account",
       subject: "A prescription was added to your file",
       heading: "New prescription",
-      intro: "Your clinician issued a prescription. Collect from Ridge Campus pharmacy or request a refill in CareBridge.",
-      details: [["Medicine", rx.drug], ["Directions", rx.sig], ["Quantity", rx.qty]],
+      intro: `${doctor.name || "Your clinician"} issued a prescription after your consult. Open Prescriptions to print or save it, or buy the medicines on CareBridge / collect at Ridge pharmacy.`,
+      details: items.map((i) => [i.drug, `${i.sig || "As directed"} · ${i.qty}`]),
     });
     writeDb(db);
-    res.status(201).json(rx);
+    res.status(201).json(enrichRx(db, rx));
   });
 
   app.patch("/api/prescriptions/:id", async (req, res) => {

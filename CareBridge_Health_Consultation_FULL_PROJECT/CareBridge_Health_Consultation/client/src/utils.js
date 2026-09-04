@@ -31,16 +31,29 @@ export const isUpcoming = (item) => {
 
 export const homeFor = (user) => {
   if (!user) return "/login";
-  return user.role === "admin" ? "/admin" : "/home";
+  if (user.role === "admin") return "/admin";
+  if (user.role === "nurse") return "/home";
+  return "/home";
 };
 
 export const roleLabel = (role) => ({
   patient: "Patient",
   doctor: "Doctor",
+  nurse: "Nurse",
   admin: "Administrator",
 }[role] || role);
 
-export const BUILD = "2026.09.04-cart";
+export const BUILD = "2026.09.04-rx";
+
+export function rxOrderQty(line, product) {
+  const raw = String(line?.qty || "1");
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  if (/tablet|capsule|sachet|strip|ml|roll|inhaler/i.test(raw) && n > 12) return 1;
+  const available = Number(product?.qty || 0);
+  if (available > 0) return Math.min(n, available);
+  return n;
+}
 
 export const HOSPITAL = {
   name: "CareBridge Medical Centre",

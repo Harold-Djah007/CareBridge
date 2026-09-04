@@ -30,6 +30,7 @@ export default function CareTeam() {
     socket.on("doctor-status", (p) => {
       setPeople((list) => list.map((d) => (d.id === p.id ? { ...d, available: p.available, photo: p.photo || d.photo } : d)));
     });
+    socket.on("tariff-updated", setRates);
     return () => socket.disconnect();
   }, [user]);
 

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Pill, FlaskConical, FileText, Activity, Receipt, ClipboardList, AlertTriangle } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { prettyDate } from "../utils";
+import RxPad from "../components/RxPad";
 
 const TABS = [
   ["overview", "Overview"],
@@ -30,7 +31,6 @@ export default function ClinicalRecord() {
   const [chart, setChart] = useState(null);
   const [note, setNote] = useState({ subjective: "", objective: "", assessment: "", plan: "" });
   const [vital, setVital] = useState({ bp: "120/80", hr: 72, temp: 36.6, spo2: 98, weight: 70 });
-  const [rx, setRx] = useState({ drug: "", sig: "", qty: "30 tablets", refills: 1 });
   const [intake, setIntake] = useState({ symptoms: "", pain: 3, medsTaken: "", redFlags: false });
 
   const load = () => {
@@ -52,13 +52,6 @@ export default function ClinicalRecord() {
     e.preventDefault();
     await api("/vitals", { method: "POST", body: JSON.stringify({ ...vital, patientId, actorId: user.id, recordedBy: user.name }) });
     push("Vitals recorded.");
-    load();
-  };
-  const saveRx = async (e) => {
-    e.preventDefault();
-    await api("/prescriptions", { method: "POST", body: JSON.stringify({ ...rx, patientId, doctorId: user.id }) });
-    setRx({ drug: "", sig: "", qty: "30 tablets", refills: 1 });
-    push("Prescription issued. Patient will be emailed.");
     load();
   };
   const refill = async (id) => {
@@ -204,20 +197,14 @@ export default function ClinicalRecord() {
               <div className="stat-icon"><Pill size={16} /></div>
               <div className="grow"><strong>{r.drug}</strong><span className="muted">{r.sig} · {r.qty} · {r.refills} refills · {r.pharmacy}</span></div>
               <span className={`status ${r.status}`}>{r.status}</span>
+              <Link className="ghost-btn" to={`/prescriptions/${r.id}`}>Print</Link>
               {user.role === "patient" && r.status === "active" && <button className="secondary-btn" onClick={() => refill(r.id)}>Request refill</button>}
             </div>
           ))}
-          {clinician && (
-            <form className="card top-gap" onSubmit={saveRx} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <h3>Issue prescription</h3>
-              <label>Medicine<input value={rx.drug} onChange={(e) => setRx({ ...rx, drug: e.target.value })} required /></label>
-              <label>Directions<input value={rx.sig} onChange={(e) => setRx({ ...rx, sig: e.target.value })} required /></label>
-              <div className="form-grid">
-                <label>Quantity<input value={rx.qty} onChange={(e) => setRx({ ...rx, qty: e.target.value })} /></label>
-                <label>Refills<input type="number" value={rx.refills} onChange={(e) => setRx({ ...rx, refills: e.target.value })} /></label>
-              </div>
-              <div className="modal-actions"><button className="primary-btn">Send to pharmacy</button></div>
-            </form>
+          {user.role === "doctor" && (
+            <div className="top-gap">
+              <RxPad patient={chart.patient} source="chart" onIssued={load} />
+            </div>
           )}
         </div>
       )}

@@ -5,6 +5,7 @@ import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { useTopbar } from "../chrome";
 import PhotoPicker from "../components/PhotoPicker";
+import DutyToggle from "../components/DutyToggle";
 
 export default function Settings() {
   const { user, updateUser, logout } = useAuth();
@@ -139,24 +140,26 @@ export default function Settings() {
           <label>Phone<input value={account.phone} onChange={(e) => setAccount({ ...account, phone: e.target.value })} /></label>
           <label>City<input value={account.city} onChange={(e) => setAccount({ ...account, city: e.target.value })} /></label>
         </div>
-        {(user.role === "doctor" || user.role === "admin") && (
+        {(user.role === "doctor" || user.role === "admin" || user.role === "nurse") && (
           <label>Title / specialty<input value={account.specialty} onChange={(e) => setAccount({ ...account, specialty: e.target.value })} /></label>
         )}
         {user.role === "doctor" && (
-          <label className="check-row avail-row">
-            <input type="checkbox" checked={account.available} onChange={async (e) => {
-              const available = e.target.checked;
-              setAccount({ ...account, available });
-              try {
-                const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ available }) });
-                updateUser({ ...user, ...next });
-                push(available ? "Patients now see you as available." : "Patients now see you as busy.");
-              } catch (err) {
-                push(err.message, "error");
-              }
-            }} />
-            Show me as available. When this is off, patients see Busy and cannot book a new visit.
-          </label>
+          <div className="avail-row">
+            <span className="eyebrow">Duty</span>
+            <DutyToggle
+              available={account.available}
+              onChange={async (available) => {
+                setAccount({ ...account, available });
+                try {
+                  const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ available }) });
+                  updateUser({ ...user, ...next });
+                  push(available ? "Patients now see you as available." : "Patients now see you as busy.");
+                } catch (err) {
+                  push(err.message, "error");
+                }
+              }}
+            />
+          </div>
         )}
         <label>About<textarea rows="3" value={account.about} onChange={(e) => setAccount({ ...account, about: e.target.value })} /></label>
         <p className="muted">Clinical details (allergies, NHIS on the file, emergency contact) stay on <Link to="/profile"><b>My details</b></Link>.</p>

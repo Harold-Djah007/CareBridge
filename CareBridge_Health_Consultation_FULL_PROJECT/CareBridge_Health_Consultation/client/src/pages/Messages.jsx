@@ -7,6 +7,7 @@ import { useAuth, useToast } from "../state";
 import { roomIdFor } from "../utils";
 import Avatar from "../components/Avatar";
 import Presence from "../components/Presence";
+import RxPad from "../components/RxPad";
 
 const prettyTime = (iso) => {
   if (!iso) return "";
@@ -60,7 +61,7 @@ export default function Messages() {
   useEffect(() => {
     if (!roomId || !socketRef.current) return;
     socketRef.current.emit("join-room", roomId);
-    api(`/messages/${roomId}`).then(setMessages);
+    api(`/messages/${roomId}?userId=${user.id}`).then(setMessages);
     const handler = (m) => {
       if (m.roomId === roomId) setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
       setContacts((list) => list.map((c) => {
@@ -130,7 +131,8 @@ export default function Messages() {
                 <b>{c.name}</b>
                 <small>{c.lastMessage?.text || c.specialty || c.role || "Tap to write"}</small>
               </span>
-              {c.lastMessage?.timestamp && <em className="chat-time">{prettyTime(c.lastMessage.timestamp)}</em>}
+                {c.unread > 0 && <em className="nav-badge">{c.unread}</em>}
+                {c.lastMessage?.timestamp && <em className="chat-time">{prettyTime(c.lastMessage.timestamp)}</em>}
             </button>
           ))}
           {visible.length === 0 && (
@@ -154,6 +156,12 @@ export default function Messages() {
                 {user.role === "patient" && (
                   <div className="row-actions">
                     <Link className="ghost-btn" to={`/appointments`}><CalendarDays size={16} /> Book</Link>
+                    <Link className="secondary-btn" to={`/video?with=${selected.id}`}><Video size={16} /> Video</Link>
+                  </div>
+                )}
+                {user.role === "doctor" && selected.role === "patient" && (
+                  <div className="row-actions">
+                    <Link className="ghost-btn" to={`/records/${selected.id}`}>Chart</Link>
                     <Link className="secondary-btn" to={`/video?with=${selected.id}`}><Video size={16} /> Video</Link>
                   </div>
                 )}
@@ -189,6 +197,15 @@ export default function Messages() {
           )}
         </section>
       </div>
+      {user.role === "doctor" && selected && selected.role !== "doctor" && (
+        <div className="card top-gap">
+          <RxPad
+            patient={selected}
+            source="messages"
+            onIssued={(rx) => sendText(`Issued a prescription: ${rx.drug}. Open Prescriptions to print, buy on site, or collect at Ridge pharmacy.`)}
+          />
+        </div>
+      )}
     </div>
   );
 }

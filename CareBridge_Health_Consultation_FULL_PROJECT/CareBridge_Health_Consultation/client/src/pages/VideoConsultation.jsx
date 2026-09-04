@@ -6,6 +6,7 @@ import { useAuth, useToast } from "../state";
 import { api, socketUrl } from "../api";
 import { roomIdFor } from "../utils";
 import Avatar from "../components/Avatar";
+import RxPad from "../components/RxPad";
 
 export default function VideoConsultation() {
   const { user } = useAuth();
@@ -187,6 +188,14 @@ export default function VideoConsultation() {
           <div className="call-info"><span>With</span><b>{peer?.name || "Choose a doctor"}</b></div>
           <div className="call-info"><span>Room</span><b>{roomId ? roomId.toUpperCase() : "Not assigned"}</b></div>
           <div className="call-info"><span>Helpful tip</span><p className="muted">Use headphones in a quiet room. Screen share is available after you join.</p></div>
+          {user.role === "doctor" && peer?.role !== "doctor" && (
+            <RxPad
+              patient={peer}
+              source="video"
+              compact
+              onIssued={() => push("Prescription issued. The patient can print or collect it.")}
+            />
+          )}
         </aside>
       </div>
     </div>

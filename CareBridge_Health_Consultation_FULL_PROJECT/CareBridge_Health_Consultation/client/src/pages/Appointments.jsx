@@ -28,6 +28,7 @@ export default function Appointments() {
     socket.on("doctor-status", (p) => {
       setDoctors((list) => list.map((d) => (d.id === p.id ? { ...d, available: p.available, photo: p.photo || d.photo } : d)));
     });
+    socket.on("tariff-updated", setRates);
     return () => socket.disconnect();
   }, []);
 

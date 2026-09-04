@@ -57,7 +57,7 @@ export default function AdminUsers() {
         <div>
           <span className="eyebrow">Directory</span>
           <h1>People</h1>
-          <p>Create patients, doctors, and administrators. Deactivating blocks sign-in.</p>
+          <p>Create patients, doctors, pharmacy nurses, and administrators. Deactivating blocks sign-in.</p>
         </div>
         <button className="primary-btn" onClick={() => { setEditing(null); setForm(blank); setOpen(true); }}><Plus size={16} /> Add person</button>
       </div>
@@ -100,6 +100,7 @@ export default function AdminUsers() {
               <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                 <option value="patient">Patient</option>
                 <option value="doctor">Doctor</option>
+                <option value="nurse">Nurse</option>
                 <option value="admin">Admin</option>
               </select>
             </label>

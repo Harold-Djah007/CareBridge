@@ -6,7 +6,7 @@ const ECG = "M0 40 L24 40 L32 40 L38 18 L44 62 L52 40 L72 40 L80 40 L86 28 L92 4
 
 function sceneFor(pathname, role) {
   if (pathname.startsWith("/pay") || pathname.startsWith("/receipts") || pathname.includes("tariff")) return "billing";
-  if (pathname.startsWith("/pharmacy")) return "pharmacy";
+  if (pathname.startsWith("/pharmacy") || pathname.startsWith("/prescriptions") || (pathname === "/home" && role === "nurse")) return "pharmacy";
   if (pathname.startsWith("/video")) return "consult";
   if (pathname.startsWith("/appointments") || pathname.startsWith("/admin/appointments")) return "schedule";
   if (pathname.startsWith("/messages")) return "messages";

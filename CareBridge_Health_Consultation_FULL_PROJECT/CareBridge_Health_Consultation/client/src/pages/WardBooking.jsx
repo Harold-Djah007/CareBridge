@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { BedDouble, Plus, Users, CalendarDays, CheckCircle2, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { io } from "socket.io-client";
+import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { todayISO, ghs, wardQuote } from "../utils";
 import { OccupancyBars } from "../components/LiveMeter";
@@ -23,6 +24,9 @@ export default function WardBooking() {
     });
     api("/finance/rates").then(setRates);
     load();
+    const socket = io(socketUrl, { autoConnect: true });
+    socket.on("tariff-updated", setRates);
+    return () => socket.disconnect();
   }, []);
 
   const submit = async (e) => {

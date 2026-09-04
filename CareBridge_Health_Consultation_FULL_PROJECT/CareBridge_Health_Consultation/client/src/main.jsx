@@ -27,6 +27,9 @@ import AdminCases from "./pages/admin/Cases";
 import AdminCaseDetail from "./pages/admin/CaseDetail";
 import Pay from "./pages/Pay";
 import Pharmacy from "./pages/Pharmacy";
+import PharmacyStock from "./pages/PharmacyStock";
+import Prescriptions from "./pages/Prescriptions";
+import PrescriptionPrint from "./pages/PrescriptionPrint";
 import Receipt from "./pages/Receipt";
 import Tariff from "./pages/Tariff";
 import Settings from "./pages/Settings";
@@ -52,7 +55,7 @@ function AppRoutes() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/tariff" element={user ? <Navigate to="/billing/tariff" replace /> : <Tariff />} />
         <Route element={user ? <AppShell /> : <Navigate to="/login" />}>
-          <Route path="/home" element={<RoleRoute roles={["patient", "doctor"]}><Dashboard /></RoleRoute>} />
+          <Route path="/home" element={<RoleRoute roles={["patient", "doctor", "nurse"]}><Dashboard /></RoleRoute>} />
           <Route path="/care" element={<RoleRoute roles={["patient", "doctor"]}><CareTeam /></RoleRoute>} />
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/messages" element={<Messages />} />
@@ -67,6 +70,9 @@ function AppRoutes() {
           <Route path="/records/:patientId" element={<RoleRoute roles={["doctor", "admin"]}><ClinicalRecord /></RoleRoute>} />
           <Route path="/pay" element={<RoleRoute roles={["patient", "admin"]}><Pay /></RoleRoute>} />
           <Route path="/pharmacy" element={<RoleRoute roles={["patient"]}><Pharmacy /></RoleRoute>} />
+          <Route path="/pharmacy-stock" element={<RoleRoute roles={["nurse", "admin"]}><PharmacyStock /></RoleRoute>} />
+          <Route path="/prescriptions" element={<RoleRoute roles={["patient", "doctor"]}><Prescriptions /></RoleRoute>} />
+          <Route path="/prescriptions/:id" element={<RoleRoute roles={["patient", "doctor", "admin"]}><PrescriptionPrint /></RoleRoute>} />
           <Route path="/receipts/:id" element={<RoleRoute roles={["patient", "doctor", "admin"]}><Receipt /></RoleRoute>} />
           <Route path="/billing/tariff" element={<Tariff />} />
           <Route path="/admin" element={<RoleRoute roles={["admin"]}><AdminOverview /></RoleRoute>} />

@@ -8,7 +8,7 @@ import {
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
 import { api, socketUrl } from "../api";
-import { HOSPITAL, isUpcoming, BUILD } from "../utils";
+import { HOSPITAL, BUILD } from "../utils";
 import { LiveClock } from "./LiveMeter";
 import PageAtmosphere from "./PageAtmosphere";
 import { useTopbar } from "../chrome";
@@ -24,6 +24,7 @@ const NAV = {
         { to: "/messages", icon: MessageCircle, label: "Messages", badge: "messages" },
         { to: "/wards", icon: BedDouble, label: "Admissions", badge: "wards" },
         { to: "/pharmacy", icon: Pill, label: "Pharmacy & labs", primary: true },
+        { to: "/prescriptions", icon: ClipboardList, label: "Prescriptions", primary: true },
       ],
     },
     {
@@ -52,6 +53,7 @@ const NAV = {
         { to: "/appointments", icon: CalendarDays, label: "My schedule", primary: true, badge: "visits" },
         { to: "/messages", icon: MessageCircle, label: "Inbox", primary: true, badge: "messages" },
         { to: "/video", icon: Video, label: "Consult room" },
+        { to: "/prescriptions", icon: Pill, label: "Prescriptions", primary: true },
       ],
     },
     {
@@ -67,6 +69,7 @@ const NAV = {
       group: "Hospital",
       items: [
         { to: "/support", icon: LifeBuoy, label: "Help & support", badge: "tickets" },
+        { to: "/billing/tariff", icon: ScrollText, label: "Tariff" },
         { to: "/settings", icon: Settings, label: "Settings" },
       ],
     },
@@ -82,15 +85,33 @@ const NAV = {
         { to: "/admin/reports", icon: ScrollText, label: "Reports & audit", primary: true },
         { to: "/admin/cases", icon: FolderKanban, label: "Case workflow", primary: true },
         { to: "/pay", icon: Wallet, label: "Patient billing" },
+        { to: "/billing/tariff", icon: ScrollText, label: "Hospital tariff", primary: true },
       ],
     },
     {
       group: "Communications",
       items: [
         { to: "/support", icon: LifeBuoy, label: "Support desk", primary: true, badge: "tickets" },
-        { to: "/messages", icon: MessageCircle, label: "Switchboard" },
+        { to: "/messages", icon: MessageCircle, label: "Switchboard", badge: "messages" },
         { to: "/alerts", icon: Mail, label: "Patient notices", primary: true },
         { to: "/settings", icon: Settings, label: "Settings" },
+        { to: "/profile", icon: UserRound, label: "My account" },
+      ],
+    },
+  ],
+  nurse: [
+    {
+      group: "Dispensary",
+      items: [
+        { to: "/home", icon: ClipboardList, label: "Queue", end: true, primary: true, badge: "queue" },
+        { to: "/pharmacy-stock", icon: Pill, label: "Stock", primary: true },
+        { to: "/messages", icon: MessageCircle, label: "Messages", primary: true, badge: "messages" },
+      ],
+    },
+    {
+      group: "Hospital",
+      items: [
+        { to: "/settings", icon: Settings, label: "Settings", primary: true },
         { to: "/profile", icon: UserRound, label: "My account" },
       ],
     },
@@ -159,68 +180,55 @@ export default function AppShell() {
   const [notes, setNotes] = useState([]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [badges, setBadges] = useState({ visits: 0, wards: 0, messages: 0, tickets: 0 });
+  const [badges, setBadges] = useState({ visits: 0, wards: 0, messages: 0, tickets: 0, queue: 0, notifications: 0 });
   const [topbarOn, setTopbarOn] = useTopbar();
 
   const groups = NAV[user.role] || NAV.patient;
   const mobileItems = groups.flatMap((g) => g.items).filter((i) => i.primary).slice(0, 5);
 
   const loadNotes = () => api(`/notifications/${user.id}`).then(setNotes).catch(() => {});
+  const loadBadges = () => api(`/badges?userId=${user.id}&role=${user.role}`).then(setBadges).catch(() => {});
 
   useEffect(() => {
     loadNotes();
-    api(`/appointments?userId=${user.id}&role=${user.role}`).then((rows) => {
-      setBadges((b) => ({ ...b, visits: rows.filter(isUpcoming).length }));
-    }).catch(() => {});
-    api(`/ward-bookings?userId=${user.id}&role=${user.role}`).then((rows) => {
-      setBadges((b) => ({ ...b, wards: rows.filter((w) => w.status === "pending").length }));
-    }).catch(() => {});
-    api(`/tickets?userId=${user.id}&role=${user.role}`).then((rows) => {
-      setBadges((b) => ({ ...b, tickets: rows.filter((t) => t.status !== "resolved").length }));
-    }).catch(() => {});
+    loadBadges();
     const socket = io(socketUrl, { autoConnect: true });
     socket.emit("join-user", user.id);
-    socket.on("notification", (n) => {
-      push(n.title);
-      loadNotes();
-      api(`/tickets?userId=${user.id}&role=${user.role}`).then((rows) => {
-        setBadges((b) => ({ ...b, tickets: rows.filter((t) => t.status !== "resolved").length }));
-      }).catch(() => {});
-    });
-    socket.on("email-alert", (n) => { push(`Notice sent: ${n.subject}`); loadNotes(); });
+    const refresh = () => { loadNotes(); loadBadges(); };
+    socket.on("notification", (n) => { push(n.title); refresh(); });
+    socket.on("email-alert", (n) => { push(`Notice sent: ${n.subject}`); refresh(); });
+    socket.on("chat-message", refresh);
+    socket.on("pharmacy-order", refresh);
     return () => socket.disconnect();
-  }, [user.id]);
+  }, [user.id, user.role]);
 
-  useEffect(() => { setOpen(false); }, [location.pathname]);
+  useEffect(() => { setOpen(false); loadBadges(); }, [location.pathname]);
 
-  const unread = notes.filter((n) => !n.read).length;
+  const unread = Number(badges.notifications || notes.filter((n) => !n.read).length);
   const markRead = async () => {
     await api(`/notifications/${user.id}/read`, { method: "PATCH" });
     loadNotes();
+    loadBadges();
   };
 
   const topMeta = useMemo(() => {
     if (user.role === "doctor") return `${user.department || "Outpatient"} · ${user.clinic || HOSPITAL.campus}`;
     if (user.role === "admin") return `Hospital operations · ${HOSPITAL.campus}`;
+    if (user.role === "nurse") return `Pharmacy nursing · ${HOSPITAL.campus}`;
     return `${HOSPITAL.campus} · Patient portal`;
   }, [user]);
 
-  const searchPlaceholder = user.role === "admin" ? "Search staff or patients" : user.role === "doctor" ? "Search patients" : "Find a doctor";
+  const searchPlaceholder = user.role === "admin" ? "Search staff or patients" : user.role === "doctor" ? "Search patients" : user.role === "nurse" ? "Search pickup patients" : "Find a doctor";
 
   const onSearch = (e) => {
     e.preventDefault();
     const q = query.trim();
     if (user.role === "admin") navigate(q ? `/admin/users?q=${encodeURIComponent(q)}` : "/admin/users");
+    else if (user.role === "nurse") navigate("/home");
     else navigate(q ? `/care?q=${encodeURIComponent(q)}` : "/care");
   };
 
-  const badgeFor = (key) => {
-    if (key === "messages") return unread || 0;
-    if (key === "visits") return badges.visits;
-    if (key === "wards") return badges.wards;
-    if (key === "tickets") return badges.tickets;
-    return 0;
-  };
+  const badgeFor = (key) => Number(badges[key] || 0);
 
   const renderLink = (item) => {
     const Icon = item.icon;
@@ -241,7 +249,7 @@ export default function AppShell() {
           <div className="brand-mark live"><HeartPulse size={22} /></div>
           <div>
             <b>{HOSPITAL.short}</b>
-            <span>{user.role === "patient" ? "Patient portal" : user.role === "doctor" ? "Clinical" : "Operations"}</span>
+            <span>{user.role === "patient" ? "Patient portal" : user.role === "doctor" ? "Clinical" : user.role === "nurse" ? "Pharmacy" : "Operations"}</span>
           </div>
         </div>
         <div className="sidebar-campus">
@@ -275,8 +283,9 @@ export default function AppShell() {
               <ChevronDown size={14} />
             </button>
             <LiveClock />
-            <button className="icon-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications">
-              <Bell size={18} />{unread > 0 && <i className="dot" />}
+            <button className="icon-btn bell-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications" aria-label={unread ? `${unread} unread notices` : "Notifications"}>
+              <Bell size={18} />
+              {unread > 0 && <em className="bell-count">{unread > 99 ? "99+" : unread}</em>}
             </button>
             <button type="button" className="avatar-btn" title="Settings" onClick={() => navigate("/settings")}><Avatar person={user} className="small" /></button>
           </div>
@@ -285,11 +294,12 @@ export default function AppShell() {
           <header className="topbar">
             <div className="topbar-copy">
               <span className="eyebrow">{topMeta}</span>
-              <small className="muted">{user.role === "doctor" ? `On duty · ${user.shift || "Day clinic"}` : user.role === "patient" ? `File ${user.mrn || ""}` : user.employeeId}</small>
+              <small className="muted">{user.role === "doctor" ? `On duty · ${user.shift || "Day clinic"}` : user.role === "nurse" ? `Dispensary · ${user.shift || "Day"}` : user.role === "patient" ? `File ${user.mrn || ""}` : user.employeeId}</small>
             </div>
             <nav className="topbar-nav" aria-label="Hospital shortcuts">
               <Link className="topbar-link" to={user.role === "admin" ? "/admin" : "/home"}>Home</Link>
               {user.role === "patient" && <Link className="topbar-link" to="/pay">Pay</Link>}
+              {user.role === "nurse" && <Link className="topbar-link" to="/pharmacy-stock">Stock</Link>}
               <Link className="topbar-link" to="/support"><LifeBuoy size={15} /> Support</Link>
               <Link className="topbar-link" to="/settings"><Settings size={15} /> Settings</Link>
               <Link className="topbar-link" to="/guide"><HelpCircle size={15} /> Guide</Link>
@@ -300,8 +310,9 @@ export default function AppShell() {
             </form>
             <div className="topbar-actions">
               <LiveClock />
-              <button className="icon-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications">
-                <Bell size={19} />{unread > 0 && <i className="dot" />}
+              <button className="icon-btn bell-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications" aria-label={unread ? `${unread} unread notices` : "Notifications"}>
+                <Bell size={19} />
+                {unread > 0 && <em className="bell-count">{unread > 99 ? "99+" : unread}</em>}
               </button>
               <button type="button" className="avatar-btn" title="Settings" onClick={() => navigate("/settings")}><Avatar person={user} className="small" /></button>
               <button type="button" className="ghost-btn toolbar-hide" onClick={() => setTopbarOn(false)}>

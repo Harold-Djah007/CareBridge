@@ -23,15 +23,19 @@ export default function Help() {
       </div>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Patients</h3>
-        <p className="muted">Register, complete a pre-visit form, book a video or campus visit, message your doctor, read labs and visit notes, request medicine refills, pay invoices, and reserve a ward before you travel. Confirmations go to the email on your file.</p>
+        <p className="muted">Register, complete a pre-visit form, book a video or campus visit, message your doctor, read labs and visit notes, print prescriptions, buy medicines on site or collect at Ridge pharmacy, pay invoices, and reserve a ward before you travel. Confirmations go to the email on your file.</p>
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Doctors</h3>
-        <p className="muted">Use the clinic board, open a chart, file SOAP notes and vitals, issue prescriptions, start a teleconsult, and accept admissions. Allergy flags sit at the top of the record.</p>
+        <p className="muted">Use the clinic board, toggle Available/Busy, open a chart, file SOAP notes and vitals, issue prescriptions from Messages or the video room, start a teleconsult, and accept admissions. Allergy flags sit at the top of the record.</p>
+      </section>
+      <section className="card" style={{ marginBottom: 14 }}>
+        <h3>Pharmacy nurses</h3>
+        <p className="muted">Sign in on the Nurse tab. The queue lists hospital pickup orders — mark them ready, then collected. Stock quantities and prices you edit appear immediately on the patient pharmacy. Demo: nurse@carebridge.test / nurse123.</p>
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Hospital operations</h3>
-        <p className="muted">Administrators sign in with a staff account. Operations covers beds, the clinic diary, staff directory, outbound notices, patient billing, revenue, and the audit log.</p>
+        <p className="muted">Administrators sign in with a staff account. Operations covers beds, the clinic diary, staff directory, outbound notices, patient billing, the live hospital tariff, revenue, and the audit log. Doctors and operations can edit published fees.</p>
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Paying for care</h3>

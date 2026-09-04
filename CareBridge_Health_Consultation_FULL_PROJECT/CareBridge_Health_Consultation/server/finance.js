@@ -1,4 +1,5 @@
 import { audit } from "./clinical.js";
+import { markPharmacyPaid, publicStock } from "./pharmacy.js";
 
 export const ACCOUNTS = {
   bank: {
@@ -75,17 +76,76 @@ export const PHARMACY = [
   { id: "ph8", sku: "VIT-D-30", name: "Vitamin D3 1000 IU", pack: "30 tablets", price: 55, nhis: false },
 ];
 
+export function defaultTariff() {
+  return {
+    currency: "GHS",
+    consults: { ...CONSULT_RATES },
+    campusSurcharge: CAMPUS_SURCHARGE,
+    consultNote: "Consultant fee follows specialty. A campus visit adds the campus surcharge for clinic overhead. Video is the listed specialist fee.",
+    wards: { ...WARD_RATES },
+    rooms: { ...ROOM_SURCHARGE },
+    wardNote: "Nightly ward rate plus room supplement, multiplied by nights. Invoiced when admissions accept the bed.",
+    labs: LABS.map((row) => ({ ...row })),
+    services: SERVICES.map((row) => ({ ...row })),
+  };
+}
+
+export function ensureTariff(db) {
+  let dirty = false;
+  if (!db.tariff) {
+    db.tariff = defaultTariff();
+    dirty = true;
+  } else {
+    const seed = defaultTariff();
+    db.tariff.consults = { ...seed.consults, ...(db.tariff.consults || {}) };
+    db.tariff.wards = { ...seed.wards, ...(db.tariff.wards || {}) };
+    db.tariff.rooms = { ...seed.rooms, ...(db.tariff.rooms || {}) };
+    if (db.tariff.campusSurcharge === undefined) db.tariff.campusSurcharge = seed.campusSurcharge;
+    if (!Array.isArray(db.tariff.labs) || !db.tariff.labs.length) db.tariff.labs = seed.labs;
+    if (!Array.isArray(db.tariff.services) || !db.tariff.services.length) db.tariff.services = seed.services;
+    if (!db.tariff.consultNote) db.tariff.consultNote = seed.consultNote;
+    if (!db.tariff.wardNote) db.tariff.wardNote = seed.wardNote;
+  }
+  return dirty;
+}
+
+export function tariffOf(db) {
+  ensureTariff(db);
+  return db.tariff;
+}
+
+export function ratesPayload(db) {
+  const t = tariffOf(db);
+  return {
+    currency: t.currency || "GHS",
+    consults: t.consults,
+    campusSurcharge: Number(t.campusSurcharge || 0),
+    consultNote: t.consultNote,
+    wards: t.wards,
+    rooms: t.rooms,
+    wardNote: t.wardNote,
+    labs: t.labs,
+    services: t.services,
+    pharmacy: (db.pharmacyStock || PHARMACY).map(publicStock),
+    accounts: ACCOUNTS,
+    updatedAt: t.updatedAt || null,
+    updatedBy: t.updatedBy || null,
+  };
+}
+
 export function consultFee(db, { doctorId, mode }) {
+  const t = tariffOf(db);
   const doctor = db.users.find((u) => u.id === doctorId) || {};
-  const specialty = CONSULT_RATES[doctor.specialty] || 380;
-  const modeFee = mode === "video" ? 0 : CAMPUS_SURCHARGE;
+  const specialty = t.consults[doctor.specialty] || 380;
+  const modeFee = mode === "video" ? 0 : Number(t.campusSurcharge || 0);
   return specialty + modeFee;
 }
 
-export function wardFee({ ward, roomType, nights }) {
-  const base = WARD_RATES[ward] || 650;
-  const room = ROOM_SURCHARGE[roomType] || 0;
-  return (base + room) * Math.max(1, Number(nights || 1));
+export function wardFee(row, db) {
+  const t = db ? tariffOf(db) : { wards: WARD_RATES, rooms: ROOM_SURCHARGE };
+  const base = t.wards[row.ward] || 650;
+  const room = t.rooms[row.roomType] || 0;
+  return (base + room) * Math.max(1, Number(row.nights || 1));
 }
 
 const receiptNo = () => {
@@ -132,23 +192,77 @@ function receiptPayload(db, payment, invoice) {
   return { payment, invoice: invoices[0] || invoice, invoices, lines, patient: safe, hospital: ACCOUNTS };
 }
 
-export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient }) {
+export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient, io }) {
   app.get("/api/finance/accounts", (_, res) => res.json(ACCOUNTS));
-  app.get("/api/finance/pharmacy", (_, res) => res.json(PHARMACY));
-  app.get("/api/finance/labs", (_, res) => res.json(LABS));
-  app.get("/api/finance/rates", (_, res) => res.json({
-    currency: "GHS",
-    consults: CONSULT_RATES,
-    campusSurcharge: CAMPUS_SURCHARGE,
-    consultNote: "Consultant fee follows specialty. A campus visit adds GHS 80 for clinic overhead. Video is the listed specialist fee.",
-    wards: WARD_RATES,
-    rooms: ROOM_SURCHARGE,
-    wardNote: "Nightly ward rate plus room supplement, multiplied by nights. Invoiced when admissions accept the bed.",
-    labs: LABS,
-    pharmacy: PHARMACY,
-    services: SERVICES,
-    accounts: ACCOUNTS,
-  }));
+  app.get("/api/finance/pharmacy", (_, res) => {
+    const db = readDb();
+    res.json((db.pharmacyStock || PHARMACY).map(publicStock));
+  });
+  app.get("/api/finance/labs", (_, res) => {
+    const db = readDb();
+    res.json(tariffOf(db).labs);
+  });
+  app.get("/api/finance/rates", (_, res) => {
+    const db = readDb();
+    res.json(ratesPayload(db));
+  });
+
+  app.patch("/api/finance/rates", (req, res) => {
+    const db = readDb();
+    const actor = db.users.find((u) => u.id === req.body.actorId);
+    if (!actor || !["doctor", "admin"].includes(actor.role)) {
+      return res.status(403).json({ message: "Only consultants and operations can change the hospital tariff." });
+    }
+    const t = tariffOf(db);
+    const numMap = (obj) => {
+      const next = {};
+      Object.entries(obj || {}).forEach(([k, v]) => {
+        const key = String(k).trim();
+        if (!key) return;
+        next[key] = Math.max(0, Number(v) || 0);
+      });
+      return next;
+    };
+    if (req.body.consults) t.consults = { ...t.consults, ...numMap(req.body.consults) };
+    if (req.body.wards) t.wards = { ...t.wards, ...numMap(req.body.wards) };
+    if (req.body.rooms) t.rooms = { ...t.rooms, ...numMap(req.body.rooms) };
+    if (req.body.campusSurcharge !== undefined) t.campusSurcharge = Math.max(0, Number(req.body.campusSurcharge) || 0);
+    if (req.body.consultNote !== undefined) t.consultNote = String(req.body.consultNote);
+    if (req.body.wardNote !== undefined) t.wardNote = String(req.body.wardNote);
+    if (Array.isArray(req.body.labs)) {
+      t.labs = req.body.labs.map((row, i) => ({
+        id: row.id || `lab${Date.now()}${i}`,
+        name: String(row.name || "").trim() || "Laboratory test",
+        specimen: String(row.specimen || "Specimen"),
+        price: Math.max(0, Number(row.price) || 0),
+        nhis: Boolean(row.nhis),
+      }));
+    }
+    if (Array.isArray(req.body.services)) {
+      t.services = req.body.services.map((row, i) => ({
+        id: row.id || `svc${Date.now()}${i}`,
+        name: String(row.name || "").trim() || "Hospital service",
+        price: Math.max(0, Number(row.price) || 0),
+        nhis: Boolean(row.nhis),
+      }));
+    }
+    if (Array.isArray(req.body.pharmacy)) {
+      req.body.pharmacy.forEach((row) => {
+        const stock = (db.pharmacyStock || []).find((p) => p.id === row.id);
+        if (!stock) return;
+        if (row.price !== undefined) stock.price = Math.max(0, Number(row.price) || 0);
+        if (row.nhis !== undefined) stock.nhis = Boolean(row.nhis);
+      });
+    }
+    t.updatedAt = new Date().toISOString();
+    t.updatedBy = actor.name;
+    audit(db, { actorId: actor.id, action: "tariff.update", entity: "tariff", entityId: "hospital", detail: actor.name });
+    writeDb(db);
+    const payload = ratesPayload(db);
+    io?.emit("tariff-updated", payload);
+    io?.emit("pharmacy-stock", payload.pharmacy);
+    res.json(payload);
+  });
 
   app.get("/api/finance/payments", (req, res) => {
     const db = readDb();
@@ -158,11 +272,29 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     res.json(rows.slice().reverse());
   });
 
-  const placeOrder = (catalog, kind) => async (req, res) => {
+  const placeOrder = (kind) => async (req, res) => {
     const { patientId, items = [], actorId } = req.body;
     const db = readDb();
+    const t = tariffOf(db);
+    const catalog = kind === "lab" ? t.labs : (db.pharmacyStock || PHARMACY);
+    if (kind === "pharmacy") {
+      for (const row of items) {
+        const product = catalog.find((p) => p.id === row.id);
+        const qty = Math.max(1, Number(row.qty || 1));
+        if (!product) return res.status(400).json({ message: "Unknown medicine." });
+        if (Number(product.qty || 0) < qty) {
+          return res.status(400).json({ message: `${product.name} is ${Number(product.qty || 0) === 0 ? "out of stock" : `short — only ${product.qty} left`}.` });
+        }
+      }
+    }
     const { lines, amount } = orderFromCatalog(catalog, items, kind);
     if (!lines.length) return res.status(400).json({ message: "Choose at least one item." });
+    if (kind === "pharmacy") {
+      lines.forEach((line) => {
+        const product = db.pharmacyStock.find((p) => p.id === line.id);
+        if (product) product.qty = Number(product.qty || 0) - line.qty;
+      });
+    }
     const invoice = addInvoice(db, {
       patientId,
       item: `${kind === "lab" ? "Laboratory" : "Pharmacy"} · ${lines.map((l) => `${l.name} ×${l.qty}`).join(", ")}`,
@@ -173,17 +305,18 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     audit(db, { actorId, action: `${kind}.order`, entity: "invoice", entityId: invoice.id, detail: invoice.item });
     notify(db, patientId, kind === "lab" ? "Lab request" : "Pharmacy order", `GHS ${amount} is due. Pay to proceed.`);
     writeDb(db);
+    if (kind === "pharmacy") io?.emit("pharmacy-stock", (db.pharmacyStock || []).map(publicStock));
     res.status(201).json(invoice);
   };
 
-  app.post("/api/finance/pharmacy/order", placeOrder(PHARMACY, "pharmacy"));
-  app.post("/api/finance/labs/order", placeOrder(LABS, "lab"));
+  app.post("/api/finance/pharmacy/order", placeOrder("pharmacy"));
+  app.post("/api/finance/labs/order", placeOrder("lab"));
 
   app.post("/api/finance/services/order", async (req, res) => {
     const { patientId, serviceId, actorId } = req.body;
-    const service = SERVICES.find((s) => s.id === serviceId);
-    if (!service) return res.status(404).json({ message: "Service not on the tariff." });
     const db = readDb();
+    const service = tariffOf(db).services.find((s) => s.id === serviceId);
+    if (!service) return res.status(404).json({ message: "Service not on the tariff." });
     const invoice = addInvoice(db, {
       patientId,
       item: service.name,
@@ -215,7 +348,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
       if (inv && !invoices.some((x) => x.id === inv.id)) invoices.push(inv);
     }
     for (const svc of req.body.services || []) {
-      const service = SERVICES.find((s) => s.id === svc.id);
+      const service = tariffOf(db).services.find((s) => s.id === svc.id);
       if (!service) continue;
       const qty = Math.max(1, Number(svc.qty || 1));
       invoices.push(addInvoice(db, {
@@ -271,6 +404,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
         inv.receiptNo = payment.receiptNo;
         inv.paymentId = payment.id;
       });
+      markPharmacyPaid(db, invoices);
     }
     audit(db, { actorId: req.body.actorId, action: "payment.start", entity: "payment", entityId: payment.id, detail: `${method} GHS ${amount}` });
     writeDb(db);
@@ -300,6 +434,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
       row.paymentId = payment.id;
       row.method = methodLabel;
     });
+    markPharmacyPaid(db, invoices);
     audit(db, { actorId: req.body.actorId, action: "payment.confirm", entity: "payment", entityId: payment.id, detail: payment.receiptNo });
     notify(db, payment.patientId, "Payment received", `Receipt ${payment.receiptNo} · GHS ${payment.amount}`);
     await emailPatient(db, payment.patientId, {

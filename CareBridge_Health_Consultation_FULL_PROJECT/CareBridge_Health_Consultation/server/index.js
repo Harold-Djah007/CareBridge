@@ -7,9 +7,10 @@ import http from "http";
 import { Server } from "socket.io";
 import { deliverEmail, renderEmail, shouldEmail } from "./email.js";
 import { audit, ensureClinical, mountClinical } from "./clinical.js";
-import { addInvoice, consultFee, mountFinance, wardFee } from "./finance.js";
+import { addInvoice, consultFee, ensureTariff, mountFinance, wardFee } from "./finance.js";
 import { mountSupport } from "./support.js";
 import { mountCases } from "./cases.js";
+import { ensurePharmacy, mountPharmacy } from "./pharmacy.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,7 +22,11 @@ const readDb = () => {
   db.wards = db.wards || [];
   db.payments = db.payments || [];
   db.tickets = db.tickets || [];
-  return ensureClinical(db);
+  db.messageReads = db.messageReads || {};
+  ensureClinical(db);
+  const dirty = ensurePharmacy(db) | ensureTariff(db);
+  if (dirty) fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
+  return db;
 };
 const writeDb = (db) => fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
 
@@ -70,10 +75,40 @@ const withThread = (db, person, userId) => {
   const roomId = roomOf(userId, person.id);
   const thread = (db.messages || []).filter((m) => m.roomId === roomId);
   const last = thread[thread.length - 1] || null;
+  const lastRead = db.messageReads?.[userId]?.[roomId];
+  const unread = thread.filter((m) => m.senderId !== userId && (!lastRead || String(m.timestamp) > String(lastRead))).length;
   return {
     ...safeUser(person),
     lastMessage: last ? { text: last.text, timestamp: last.timestamp, senderId: last.senderId } : null,
+    unread,
   };
+};
+
+const isUpcomingAppt = (item) => {
+  if (!item?.date) return false;
+  if (["cancelled", "declined", "completed"].includes(item.status)) return false;
+  return `${item.date}T${item.time || "23:59"}` >= new Date().toISOString().slice(0, 16);
+};
+
+const unreadMessages = (db, userId) => {
+  const reads = db.messageReads?.[userId] || {};
+  return (db.messages || []).filter((m) => {
+    const parts = String(m.roomId || "").split("-");
+    if (!parts.includes(userId)) return false;
+    if (m.senderId === userId) return false;
+    const last = reads[m.roomId];
+    return !last || String(m.timestamp) > String(last);
+  }).length;
+};
+
+const markRoomRead = (db, userId, roomId) => {
+  if (!userId || !roomId) return false;
+  db.messageReads = db.messageReads || {};
+  db.messageReads[userId] = db.messageReads[userId] || {};
+  const stamp = new Date().toISOString();
+  if (db.messageReads[userId][roomId] === stamp) return false;
+  db.messageReads[userId][roomId] = stamp;
+  return true;
 };
 
 const notify = (db, userId, title, body) => {
@@ -125,7 +160,7 @@ const enrichBooking = (db, w) => {
   return {
     ...w,
     patient: safeUser(db.users.find((u) => u.id === w.patientId) || {}),
-    fee: invoice?.amount ?? wardFee(w),
+    fee: invoice?.amount ?? wardFee(w, db),
     invoiceId: invoice?.id,
     invoiceStatus: invoice?.status,
   };
@@ -149,6 +184,7 @@ app.post("/api/login", (req, res) => {
     const hint = {
       patient: "Use the Patient tab.",
       doctor: "Use the Clinician tab.",
+      nurse: "Use the Nurse tab.",
       admin: "Use the Operations tab.",
     }[user.role] || "Choose the matching portal.";
     return res.status(403).json({ message: `This account is a ${user.role}. ${hint}` });
@@ -278,6 +314,15 @@ app.get("/api/contacts", (req, res) => {
   }
   if (role === "admin") {
     return res.json(db.users.filter((u) => u.id !== userId && u.status !== "inactive").map((u) => withThread(db, u, userId)));
+  }
+  if (role === "nurse") {
+    const ids = new Set();
+    (db.pharmacyOrders || []).forEach((o) => ids.add(o.patientId));
+    (db.messages || []).forEach((m) => {
+      String(m.roomId || "").split("-").forEach((p) => { if (p !== userId) ids.add(p); });
+    });
+    const patients = db.users.filter((u) => u.role === "patient" && ids.has(u.id) && u.status !== "inactive").map((u) => withThread(db, u, userId));
+    return res.json(patients.length ? patients : db.users.filter((u) => u.role === "patient" && u.status !== "inactive").map((u) => withThread(db, u, userId)));
   }
   const ids = new Set();
   db.appointments.filter((a) => a.doctorId === userId).forEach((a) => ids.add(a.patientId));
@@ -436,7 +481,7 @@ app.post("/api/ward-bookings", async (req, res) => {
       ["Arrival", item.date],
       ["Nights", String(item.nights)],
       ["Status", "Pending"],
-      ["Estimated fee", `GHS ${wardFee(item)} (invoiced when the bed is accepted)`],
+      ["Estimated fee", `GHS ${wardFee(item, db)} (invoiced when the bed is accepted)`],
     ],
   });
   writeDb(db);
@@ -462,7 +507,7 @@ app.patch("/api/ward-bookings/:id", async (req, res) => {
     if (accepted) {
       const ward = (db.wards || []).find((w) => w.name === item.ward);
       if (ward && ward.available > 0) ward.available -= 1;
-      const fee = wardFee(item);
+      const fee = wardFee(item, db);
       addInvoice(db, {
         patientId: item.patientId,
         item: `${item.ward} · ${item.roomType} × ${item.nights} night(s)`,
@@ -488,7 +533,7 @@ app.patch("/api/ward-bookings/:id", async (req, res) => {
         ["Arrival", item.date],
         ["Nights", String(item.nights)],
         ["Status", req.body.status],
-        ...(accepted ? [["Admission fee", `GHS ${wardFee(item)} — pay by NHIS, MoMo, GCB, or cash`]] : []),
+        ...(accepted ? [["Admission fee", `GHS ${wardFee(item, db)} — pay by NHIS, MoMo, GCB, or cash`]] : []),
       ],
       closing: accepted
         ? "Bring your ID and any recent lab results. Message your doctor if your arrival time changes."
@@ -501,7 +546,37 @@ app.patch("/api/ward-bookings/:id", async (req, res) => {
 
 app.get("/api/messages/:roomId", (req, res) => {
   const db = readDb();
+  const userId = req.query.userId;
+  if (userId && markRoomRead(db, userId, req.params.roomId)) writeDb(db);
   res.json(db.messages.filter((m) => m.roomId === req.params.roomId));
+});
+
+app.get("/api/badges", (req, res) => {
+  const db = readDb();
+  const { userId, role } = req.query;
+  const appointments = (db.appointments || []).filter((a) => {
+    if (role === "patient") return a.patientId === userId;
+    if (role === "doctor") return a.doctorId === userId;
+    return true;
+  });
+  const wards = (db.wardBookings || []).filter((w) => {
+    if (role === "patient") return w.patientId === userId;
+    if (role === "doctor") return true;
+    return true;
+  });
+  const tickets = (db.tickets || []).filter((t) => {
+    if (role === "admin") return true;
+    return t.userId === userId;
+  });
+  const queue = (db.pharmacyOrders || []).filter((o) => o.fulfill === "hospital" && o.status === "queued");
+  res.json({
+    messages: unreadMessages(db, userId),
+    visits: appointments.filter(isUpcomingAppt).length,
+    wards: wards.filter((w) => w.status === "pending").length,
+    tickets: tickets.filter((t) => t.status !== "resolved").length,
+    queue: queue.length,
+    notifications: (db.notifications || []).filter((n) => n.userId === userId && !n.read).length,
+  });
 });
 
 app.get("/api/notifications/:userId", (req, res) => {
@@ -558,6 +633,7 @@ app.get("/api/admin/overview", (_, res) => {
   res.json({
     patients: db.users.filter((u) => u.role === "patient").length,
     doctors: db.users.filter((u) => u.role === "doctor").length,
+    nurses: db.users.filter((u) => u.role === "nurse").length,
     admins: db.users.filter((u) => u.role === "admin").length,
     appointments: db.appointments.length,
     pendingAppointments: db.appointments.filter((a) => a.status === "pending").length,
@@ -571,7 +647,8 @@ app.get("/api/admin/overview", (_, res) => {
 });
 
 mountClinical(app, { readDb, writeDb, safeUser, notify, emailPatient });
-mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient });
+mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient, io });
+mountPharmacy(app, { readDb, writeDb, safeUser, notify, emailPatient, io, addInvoice });
 mountSupport(app, { readDb, writeDb, safeUser, notify, emailPatient });
 mountCases(app, { readDb, writeDb, safeUser });
 
@@ -584,8 +661,8 @@ app.post("/api/admin/users", (req, res) => {
   const missing = requireFields(req.body, ["name", "email", "password", "role"]);
   if (missing.length) return res.status(400).json({ message: "Name, email, password, and role are required." });
   const role = req.body.role;
-  if (!["patient", "doctor", "admin"].includes(role)) {
-    return res.status(400).json({ message: "Role must be patient, doctor, or admin." });
+  if (!["patient", "doctor", "nurse", "admin"].includes(role)) {
+    return res.status(400).json({ message: "Role must be patient, doctor, nurse, or admin." });
   }
   const db = readDb();
   if (db.users.some((u) => u.email.toLowerCase() === String(req.body.email).toLowerCase())) {
@@ -607,6 +684,7 @@ app.post("/api/admin/users", (req, res) => {
     status: "active",
     available: role === "doctor" ? true : undefined,
     years: role === "doctor" ? Number(req.body.years || 1) : undefined,
+    department: role === "nurse" ? (req.body.department || "Ridge Campus pharmacy") : req.body.department,
     emailAlerts: true,
     alertPrefs: { appointments: true, wards: true, messages: true, account: true },
   };
@@ -660,6 +738,8 @@ io.on("connection", (socket) => {
     }
     writeDb(db);
     io.to(message.roomId).emit("chat-message", record);
+    if (recipientId) io.to(recipientId).emit("chat-message", record);
+    if (message.senderId) io.to(message.senderId).emit("chat-message", record);
   });
 
   socket.on("webrtc-offer", ({ roomId, offer }) => socket.to(roomId).emit("webrtc-offer", { offer }));

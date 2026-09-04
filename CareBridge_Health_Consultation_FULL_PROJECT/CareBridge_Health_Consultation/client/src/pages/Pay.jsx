@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ShoppingCart, Plus, Minus, Trash2 } from "lucide-react";
-import { api } from "../api";
+import { io } from "socket.io-client";
+import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 
 const METHODS = [
@@ -54,6 +55,9 @@ export default function Pay() {
     api("/finance/accounts").then(setAccounts);
     api("/finance/rates").then((r) => setServices(r.services || []));
     if (user.role === "admin") api("/patients").then(setPatients);
+    const socket = io(socketUrl, { autoConnect: true });
+    socket.on("tariff-updated", (r) => setServices(r.services || []));
+    return () => socket.disconnect();
   }, [user.id, user.role]);
 
   useEffect(() => {
