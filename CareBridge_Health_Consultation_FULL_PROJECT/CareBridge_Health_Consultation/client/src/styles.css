@@ -1065,6 +1065,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .fulfill-pick button.on { border-color: var(--teal); background: var(--teal-soft); }
 .stock-input { width: 88px; padding: 8px 10px; }
 .stock-input.wide { width: 120px; }
+.stock-table td input, .stock-table td select { min-width: 88px; }
+.stock-table td:first-child input { min-width: 140px; font-weight: 700; }
 .stock-table input, .stock-table select {
   width: 100%; min-width: 0; padding: 8px 10px;
 }
@@ -1087,9 +1089,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
   border: 0; background: transparent; cursor: pointer; border-radius: 999px;
   padding: 7px 8px; font-weight: 800; font-size: 11px; color: var(--muted); white-space: nowrap;
 }
-.shelf-toggle.in button.active { background: #166534; color: #fff; }
-.shelf-toggle.out button.active { background: #991b1b; color: #fff; }
+.shelf-toggle.on button.active, .shelf-toggle.in button.active { background: #166534; color: #fff; }
+.shelf-toggle.off button.active, .shelf-toggle.out button.active { background: #991b1b; color: #fff; }
 .shelf-toggle button:disabled { opacity: 0.6; cursor: wait; }
+.restock-cell { display: flex; align-items: center; gap: 6px; }
+.restock-cell .stock-input { width: 64px; }
 .add-shelf { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; font-weight: 600; }
 
 /* Rx pad */

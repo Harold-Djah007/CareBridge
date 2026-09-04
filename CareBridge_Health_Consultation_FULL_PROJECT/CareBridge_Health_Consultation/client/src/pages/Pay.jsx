@@ -5,7 +5,7 @@ import { io } from "socket.io-client";
 import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { ghs } from "../utils";
-import { loadCart, saveCart, cartTotal, cartCount, invoiceLine, mergePrescription } from "../cart";
+import { loadCart, saveCart, cartTotal, cartCount, invoiceLine, mergePrescription, clampCartToStock } from "../cart";
 
 const METHODS = [
   { id: "momo", label: "Mobile money", hint: "MTN, Telecel Cash, or AirtelTigo Money to the hospital merchant wallets" },
@@ -65,18 +65,38 @@ export default function Pay() {
       if (r.labs) setLabs(r.labs);
     });
     if (!isAdmin) {
-      api("/pharmacy/stock").then(setStock).catch(() => api("/finance/pharmacy").then(setStock));
+      api("/pharmacy/stock").then((rows) => {
+        setStock(rows);
+        persist(clampCartToStock(loadCart(user.id), rows));
+      }).catch(() => api("/finance/pharmacy").then((rows) => {
+        setStock(rows);
+        persist(clampCartToStock(loadCart(user.id), rows));
+      }));
       api("/finance/labs").then(setLabs);
     }
     if (isAdmin) api("/patients").then(setPatients);
     const socket = io(socketUrl, { autoConnect: true });
-    socket.on("pharmacy-stock", setStock);
+    socket.on("pharmacy-stock", (rows) => {
+      setStock(rows);
+      persist(clampCartToStock(loadCart(user.id), rows));
+    });
     socket.on("tariff-updated", (rates) => {
       if (rates?.labs) setLabs(rates.labs);
       if (rates?.services) setServices(rates.services);
     });
     return () => socket.disconnect();
   }, [user.id, user.role, isAdmin]);
+
+  useEffect(() => {
+    const hydrate = () => setCart(loadCart(user.id));
+    const onVis = () => { if (document.visibilityState === "visible") hydrate(); };
+    window.addEventListener("pageshow", hydrate);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pageshow", hydrate);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [user.id]);
 
   useEffect(() => {
     const invoiceId = params.get("invoice");

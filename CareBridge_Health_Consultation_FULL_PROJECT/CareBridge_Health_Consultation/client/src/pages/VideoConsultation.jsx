@@ -28,9 +28,10 @@ export default function VideoConsultation() {
 
   useEffect(() => {
     api(`/contacts?userId=${user.id}&role=${user.role}`).then((list) => {
-      setContacts(list);
+      const usable = user.role === "doctor" ? list.filter((c) => c.role === "patient") : list;
+      setContacts(usable);
       const wanted = params.get("with");
-      setPeer(list.find((c) => c.id === wanted) || null);
+      setPeer(usable.find((c) => c.id === wanted) || null);
     });
     return () => stop();
   }, [user.id]);
@@ -188,7 +189,7 @@ export default function VideoConsultation() {
           <div className="call-info"><span>With</span><b>{peer?.name || "Choose a doctor"}</b></div>
           <div className="call-info"><span>Room</span><b>{roomId ? roomId.toUpperCase() : "Not assigned"}</b></div>
           <div className="call-info"><span>Helpful tip</span><p className="muted">Use headphones in a quiet room. Screen share is available after you join.</p></div>
-          {user.role === "doctor" && peer?.role !== "doctor" && (
+          {user.role === "doctor" && peer?.role === "patient" && (
             <RxPad
               patient={peer}
               source="video"

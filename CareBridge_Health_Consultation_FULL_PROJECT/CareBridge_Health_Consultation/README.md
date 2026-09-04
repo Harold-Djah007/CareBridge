@@ -1,6 +1,6 @@
 # CareBridge Health Consultation Platform
 
-A complete telehealth web app for **patients**, **doctors**, and **hospital administrators**.
+A complete telehealth web app for **patients**, **doctors**, **pharmacy nurses**, and **hospital administrators**.
 
 ## Included
 - Public landing page and working login / patient registration
@@ -14,6 +14,7 @@ A complete telehealth web app for **patients**, **doctors**, and **hospital admi
 ## Demo accounts
 - Patient: `patient@carebridge.test` / `patient123`
 - Doctor: `doctor@carebridge.test` / `doctor123`
+- Nurse: `nurse@carebridge.test` / `nurse123`
 - Admin: `admin@carebridge.test` / `admin123`
 
 ## Email alerts

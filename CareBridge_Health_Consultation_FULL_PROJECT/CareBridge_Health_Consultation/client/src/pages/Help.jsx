@@ -31,7 +31,7 @@ export default function Help() {
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Pharmacy nurses</h3>
-        <p className="muted">Sign in on the Nurse tab. The queue lists hospital pickup orders — mark them ready, then collected. Stock quantities and prices you edit appear immediately in the patient shop. Demo: nurse@carebridge.test / nurse123.</p>
+        <p className="muted">Sign in on the Nurse tab. The queue lists hospital pickup orders — mark them ready, then collected. On Stock you can toggle in/out of stock, edit name, category, pack, price and quantity, add or archive a SKU, and restock. Patients see those changes live. Nurses may message only doctors and administrators, not patients. Demo: nurse@carebridge.test / nurse123.</p>
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Hospital operations</h3>

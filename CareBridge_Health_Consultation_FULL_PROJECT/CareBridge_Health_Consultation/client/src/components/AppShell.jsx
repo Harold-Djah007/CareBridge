@@ -198,6 +198,7 @@ export default function AppShell() {
     socket.on("email-alert", (n) => { push(`Notice sent: ${n.subject}`); refresh(); });
     socket.on("chat-message", refresh);
     socket.on("pharmacy-order", refresh);
+    socket.on("pharmacy-stock", refresh);
     return () => socket.disconnect();
   }, [user.id, user.role]);
 

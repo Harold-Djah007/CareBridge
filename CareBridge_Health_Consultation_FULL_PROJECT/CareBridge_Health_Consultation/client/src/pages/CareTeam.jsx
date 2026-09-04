@@ -24,7 +24,7 @@ export default function CareTeam() {
 
   useEffect(() => {
     if (user.role === "patient") api("/doctors").then(setPeople);
-    else api(`/contacts?userId=${user.id}&role=${user.role}`).then(setPeople);
+    else api(`/contacts?userId=${user.id}&role=${user.role}`).then((list) => setPeople(list.filter((p) => p.role === "patient")));
     api("/finance/rates").then(setRates);
     const socket = io(socketUrl, { autoConnect: true });
     socket.on("doctor-status", (p) => {

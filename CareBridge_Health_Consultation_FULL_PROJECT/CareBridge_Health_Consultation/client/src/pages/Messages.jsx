@@ -81,6 +81,10 @@ export default function Messages() {
 
   const sendText = (value) => {
     if (!value.trim() || !selected) return;
+    if (user.role === "nurse" && selected.role === "patient") {
+      push("Nurses cannot message patients. Write to a doctor or administrator.", "error");
+      return;
+    }
     socketRef.current.emit("chat-message", { roomId, senderId: user.id, text: value.trim() });
     setText("");
   };
@@ -110,8 +114,8 @@ export default function Messages() {
     : user.role === "doctor"
       ? {
         title: "Clinical inbox",
-        heading: "Patient messages",
-        blurb: "Reply in the thread. Patients also get an email when you write.",
+        heading: "Patient and staff messages",
+        blurb: "Reply to patients, pharmacy nurses, and operations. Patients also get an email when you write.",
         emptyList: "No conversations",
         emptyListHint: "Open a patient chart or wait for a message.",
         emptyChat: "Select a conversation",

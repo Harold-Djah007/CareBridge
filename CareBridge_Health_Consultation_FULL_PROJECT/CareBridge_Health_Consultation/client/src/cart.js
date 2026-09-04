@@ -153,3 +153,21 @@ export function mergePrescription(cart, rx, stock) {
   });
   return { cart: next, skipped, added };
 }
+
+export function clampCartToStock(cart, stock) {
+  return (cart || []).map(normalizeLine).map((item) => {
+    if (item.kind !== "med") return item;
+    const product = (stock || []).find((s) => s.id === item.id);
+    if (!product || product.archived || product.inStock === false || Number(product.qty) <= 0) return null;
+    const cap = Number(product.qty || 0);
+    const qty = Math.min(Number(item.qty || 0), cap);
+    if (qty <= 0) return null;
+    return normalizeLine({
+      ...item,
+      qty,
+      max: cap,
+      price: Number(product.price ?? item.price ?? 0),
+      name: product.name || item.name,
+    });
+  }).filter(Boolean);
+}
