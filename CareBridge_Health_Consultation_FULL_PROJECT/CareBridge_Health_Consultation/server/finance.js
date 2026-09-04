@@ -1,5 +1,5 @@
 import { audit } from "./clinical.js";
-import { markPharmacyPaid, publicStock } from "./pharmacy.js";
+import { markPharmacyPaid, catalogStock, isSellable } from "./pharmacy.js";
 
 export const ACCOUNTS = {
   bank: {
@@ -126,7 +126,7 @@ export function ratesPayload(db) {
     wardNote: t.wardNote,
     labs: t.labs,
     services: t.services,
-    pharmacy: (db.pharmacyStock || PHARMACY).map(publicStock),
+    pharmacy: catalogStock(db.pharmacyStock || PHARMACY),
     accounts: ACCOUNTS,
     updatedAt: t.updatedAt || null,
     updatedBy: t.updatedBy || null,
@@ -196,7 +196,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
   app.get("/api/finance/accounts", (_, res) => res.json(ACCOUNTS));
   app.get("/api/finance/pharmacy", (_, res) => {
     const db = readDb();
-    res.json((db.pharmacyStock || PHARMACY).map(publicStock));
+    res.json(catalogStock(db.pharmacyStock || PHARMACY));
   });
   app.get("/api/finance/labs", (_, res) => {
     const db = readDb();
@@ -282,8 +282,8 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
         const product = catalog.find((p) => p.id === row.id);
         const qty = Math.max(1, Number(row.qty || 1));
         if (!product) return res.status(400).json({ message: "Unknown medicine." });
-        if (Number(product.qty || 0) < qty) {
-          return res.status(400).json({ message: `${product.name} is ${Number(product.qty || 0) === 0 ? "out of stock" : `short — only ${product.qty} left`}.` });
+        if (!isSellable(product) || Number(product.qty || 0) < qty) {
+          return res.status(400).json({ message: `${product.name} is ${!isSellable(product) || Number(product.qty || 0) === 0 ? "out of stock" : `short — only ${product.qty} left`}.` });
         }
       }
     }
@@ -305,7 +305,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     audit(db, { actorId, action: `${kind}.order`, entity: "invoice", entityId: invoice.id, detail: invoice.item });
     notify(db, patientId, kind === "lab" ? "Lab request" : "Pharmacy order", `GHS ${amount} is due. Pay to proceed.`);
     writeDb(db);
-    if (kind === "pharmacy") io?.emit("pharmacy-stock", (db.pharmacyStock || []).map(publicStock));
+    if (kind === "pharmacy") io?.emit("pharmacy-stock", catalogStock(db.pharmacyStock || PHARMACY));
     res.status(201).json(invoice);
   };
 

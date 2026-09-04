@@ -33,9 +33,12 @@ export default function Messages() {
 
   const loadContacts = (keepId) => {
     api(`/contacts?userId=${user.id}&role=${user.role}`).then((list) => {
-      setContacts(list);
+      const rows = user.role === "nurse"
+        ? (list || []).filter((c) => c.role === "doctor" || c.role === "admin")
+        : list;
+      setContacts(rows);
       const wanted = keepId || params.get("with");
-      setSelected((cur) => list.find((c) => c.id === (wanted || cur?.id)) || (wanted ? list.find((c) => c.id === wanted) : list[0]) || null);
+      setSelected((cur) => rows.find((c) => c.id === (wanted || cur?.id)) || (wanted ? rows.find((c) => c.id === wanted) : rows[0]) || null);
     });
   };
 
@@ -95,19 +98,49 @@ export default function Messages() {
     [contacts, query]
   );
 
-  const title = user.role === "patient" ? "Messages" : user.role === "doctor" ? "Clinical inbox" : "Switchboard";
+  const copy = user.role === "patient"
+    ? {
+      title: "Messages",
+      heading: "Chat with your doctors",
+      blurb: "Only doctors you add appear here. Tap Add a doctor to see who is available or busy, with their photo and specialty.",
+      emptyList: "No doctors in your chats yet",
+      emptyListHint: "Add a doctor from the hospital list. You will see who is available or busy.",
+      emptyChat: "Add a doctor to start chatting",
+    }
+    : user.role === "doctor"
+      ? {
+        title: "Clinical inbox",
+        heading: "Patient messages",
+        blurb: "Reply in the thread. Patients also get an email when you write.",
+        emptyList: "No conversations",
+        emptyListHint: "Open a patient chart or wait for a message.",
+        emptyChat: "Select a conversation",
+      }
+      : user.role === "nurse"
+        ? {
+          title: "Pharmacy inbox",
+          heading: "Consultants and operations",
+          blurb: "Write to consultants and operations.",
+          emptyList: "No consultants yet",
+          emptyListHint: "Doctors and operations staff appear here. Patients are not listed.",
+          emptyChat: "Select a consultant or operations contact",
+        }
+        : {
+          title: "Switchboard",
+          heading: "Hospital mail",
+          blurb: "Route messages across the hospital.",
+          emptyList: "No conversations",
+          emptyListHint: "Open a patient chart or wait for a message.",
+          emptyChat: "Select a conversation",
+        };
 
   return (
     <div>
       <div className="page-title">
         <div>
-          <span className="eyebrow">{title}</span>
-          <h1>{user.role === "patient" ? "Chat with your doctors" : user.role === "doctor" ? "Patient messages" : "Hospital mail"}</h1>
-          <p>{user.role === "patient"
-            ? "Only doctors you add appear here. Tap Add a doctor to see who is available or busy, with their photo and specialty."
-            : user.role === "doctor"
-              ? "Reply in the thread. Patients also get an email when you write."
-              : "Route messages across the hospital."}</p>
+          <span className="eyebrow">{copy.title}</span>
+          <h1>{copy.heading}</h1>
+          <p>{copy.blurb}</p>
         </div>
         {user.role === "patient" && (
           <Link className="primary-btn" to="/care?from=messages"><UserPlus size={16} /> Add a doctor</Link>
@@ -138,8 +171,8 @@ export default function Messages() {
           {visible.length === 0 && (
             <div className="empty compact">
               <MessageCircle size={28} />
-              <h3>{user.role === "patient" ? "No doctors in your chats yet" : "No conversations"}</h3>
-              <p>{user.role === "patient" ? "Add a doctor from the hospital list. You will see who is available or busy." : "Open a patient chart or wait for a message."}</p>
+              <h3>{copy.emptyList}</h3>
+              <p>{copy.emptyListHint}</p>
             </div>
           )}
         </aside>
@@ -191,13 +224,13 @@ export default function Messages() {
           ) : (
             <div className="empty">
               <MessageCircle />
-              <h3>{user.role === "patient" ? "Add a doctor to start chatting" : "Select a conversation"}</h3>
+              <h3>{copy.emptyChat}</h3>
               {user.role === "patient" && <Link className="primary-btn" to="/care?from=messages"><UserPlus size={16} /> View available doctors</Link>}
             </div>
           )}
         </section>
       </div>
-      {user.role === "doctor" && selected && selected.role !== "doctor" && (
+      {user.role === "doctor" && selected?.role === "patient" && (
         <div className="card top-gap">
           <RxPad
             patient={selected}

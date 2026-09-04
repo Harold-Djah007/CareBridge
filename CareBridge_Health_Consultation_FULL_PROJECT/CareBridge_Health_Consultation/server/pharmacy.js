@@ -58,8 +58,17 @@ export const SEED_NURSE = {
   alertPrefs: { appointments: true, wards: true, messages: true, account: true },
 };
 
+export function onShelf(row) {
+  return Boolean(row) && !row.archived && !row.hidden;
+}
+
+export function isSellable(row) {
+  return onShelf(row) && row.available !== false && Number(row.qty || 0) > 0;
+}
+
 export function publicStock(row) {
   const qty = Math.max(0, Number(row.qty || 0));
+  const available = onShelf(row) && row.available !== false;
   return {
     id: row.id,
     sku: row.sku || "",
@@ -70,8 +79,16 @@ export function publicStock(row) {
     nhis: Boolean(row.nhis),
     category: row.category || "Vitamins",
     qty,
-    inStock: qty > 0,
+    available,
+    inStock: available && qty > 0,
+    archived: Boolean(row.archived),
+    shelf: row.available !== false,
   };
+}
+
+export function catalogStock(rowsOrDb) {
+  const rows = Array.isArray(rowsOrDb) ? rowsOrDb : (rowsOrDb?.pharmacyStock || []);
+  return rows.filter(onShelf).map(publicStock);
 }
 
 export function ensurePharmacy(db) {
@@ -98,6 +115,14 @@ export function ensurePharmacy(db) {
         row.qty = SEED_STOCK.find((s) => s.id === row.id)?.qty ?? 12;
         dirty = true;
       }
+      if (row.available === undefined) {
+        row.available = Number(row.qty || 0) > 0;
+        dirty = true;
+      }
+      if (row.archived === undefined) {
+        row.archived = false;
+        dirty = true;
+      }
     });
   }
   const hasNurse = (db.users || []).some((u) => u.id === "n1" || u.role === "nurse" || String(u.email).toLowerCase() === SEED_NURSE.email);
@@ -122,11 +147,11 @@ function takeStock(db, items) {
   const lines = [];
   for (const row of items || []) {
     const product = db.pharmacyStock.find((p) => p.id === row.id || p.id === row.stockId);
-    if (!product) return { error: `Unknown medicine in the order.` };
+    if (!product || !onShelf(product)) return { error: `Unknown medicine in the order.` };
     const qty = Math.max(1, Number(row.qty || 1));
     const available = Number(product.qty || 0);
-    if (available < qty) {
-      return { error: `${product.name} is ${available === 0 ? "out of stock" : `short — only ${available} left`}.` };
+    if (product.available === false || available < qty) {
+      return { error: `${product.name} is ${product.available === false || available === 0 ? "out of stock" : `short — only ${available} left`}.` };
     }
     lines.push({
       id: product.id,
@@ -179,14 +204,25 @@ export function mountPharmacy(app, ctx) {
   const { readDb, writeDb, notify, emailPatient, io, addInvoice } = ctx;
 
   const broadcastStock = (db) => {
-    io.emit("pharmacy-stock", (db.pharmacyStock || []).map(publicStock));
+    io.emit("pharmacy-stock", catalogStock(db));
+  };
+
+  const actorOrDeny = (req, res) => {
+    const db = readDb();
+    const actorId = req.body?.actorId || req.query.actorId;
+    const actor = db.users.find((u) => u.id === actorId);
+    if (!actor || !["nurse", "admin"].includes(actor.role)) {
+      res.status(403).json({ message: "Only pharmacy nurses and operations can manage stock." });
+      return { db: null, actor: null };
+    }
+    return { db, actor };
   };
 
   app.get("/api/pharmacy/categories", (_, res) => res.json(PHARMACY_CATEGORIES));
 
   app.get("/api/pharmacy/stock", (_, res) => {
     const db = readDb();
-    res.json((db.pharmacyStock || []).map(publicStock));
+    res.json(catalogStock(db));
   });
 
   app.post("/api/pharmacy/stock", (req, res) => {
@@ -205,9 +241,12 @@ export function mountPharmacy(app, ctx) {
       form: String(req.body.form || "").trim() || "Tablet",
       price: Math.max(0, Number(req.body.price || 0)),
       nhis: Boolean(req.body.nhis),
-      category: PHARMACY_CATEGORIES.includes(req.body.category) ? req.body.category : "Vitamins",
+      category: String(req.body.category || "").trim() || "Vitamins",
       qty: Math.max(0, Number(req.body.qty || 0)),
+      available: req.body.available === false ? false : Number(req.body.qty || 0) > 0,
+      archived: false,
     };
+    if (row.available === false) row.qty = 0;
     db.pharmacyStock.push(row);
     audit(db, { actorId: actor.id, action: "stock.create", entity: "pharmacy", entityId: row.id, detail: row.name });
     writeDb(db);
@@ -227,12 +266,48 @@ export function mountPharmacy(app, ctx) {
       if (req.body[key] !== undefined && String(req.body[key]).trim()) row[key] = String(req.body[key]).trim();
     });
     if (req.body.price !== undefined) row.price = Math.max(0, Number(req.body.price));
-    if (req.body.qty !== undefined) row.qty = Math.max(0, Number(req.body.qty));
     if (req.body.nhis !== undefined) row.nhis = Boolean(req.body.nhis);
+    if (req.body.archived !== undefined) row.archived = Boolean(req.body.archived);
+    if (req.body.available !== undefined) {
+      const next = Boolean(req.body.available);
+      if (!next) {
+        row.lastQty = Number(row.qty || 0) || row.lastQty || 0;
+        row.qty = 0;
+      } else if (Number(row.qty || 0) === 0 && req.body.qty === undefined) {
+        row.qty = Math.max(1, Number(row.lastQty || 10));
+      }
+      row.available = next;
+    }
+    if (req.body.qty !== undefined) {
+      row.qty = Math.max(0, Number(req.body.qty));
+      if (req.body.available === undefined) row.available = row.qty > 0;
+    }
+    if (req.body.restock !== undefined) {
+      const add = Math.max(0, Number(req.body.restock) || 0);
+      row.qty = Number(row.qty || 0) + add;
+      if (add > 0) {
+        row.available = true;
+        row.archived = false;
+      }
+    }
+    if (row.archived) row.available = false;
     audit(db, { actorId: actor.id, action: "stock.update", entity: "pharmacy", entityId: row.id, detail: `${row.name} ×${row.qty}` });
     writeDb(db);
     broadcastStock(db);
     res.json(publicStock(row));
+  });
+
+  app.delete("/api/pharmacy/stock/:id", (req, res) => {
+    const { db, actor } = actorOrDeny(req, res);
+    if (!actor) return;
+    const row = db.pharmacyStock.find((p) => p.id === req.params.id);
+    if (!row) return res.status(404).json({ message: "That medicine is not on the shelf." });
+    row.archived = true;
+    row.available = false;
+    audit(db, { actorId: actor.id, action: "stock.archive", entity: "pharmacy", entityId: row.id, detail: row.name });
+    writeDb(db);
+    broadcastStock(db);
+    res.json({ ok: true, id: row.id });
   });
 
   app.get("/api/pharmacy/orders", (req, res) => {

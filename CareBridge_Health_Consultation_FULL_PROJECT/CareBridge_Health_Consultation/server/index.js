@@ -316,13 +316,11 @@ app.get("/api/contacts", (req, res) => {
     return res.json(db.users.filter((u) => u.id !== userId && u.status !== "inactive").map((u) => withThread(db, u, userId)));
   }
   if (role === "nurse") {
-    const ids = new Set();
-    (db.pharmacyOrders || []).forEach((o) => ids.add(o.patientId));
-    (db.messages || []).forEach((m) => {
-      String(m.roomId || "").split("-").forEach((p) => { if (p !== userId) ids.add(p); });
-    });
-    const patients = db.users.filter((u) => u.role === "patient" && ids.has(u.id) && u.status !== "inactive").map((u) => withThread(db, u, userId));
-    return res.json(patients.length ? patients : db.users.filter((u) => u.role === "patient" && u.status !== "inactive").map((u) => withThread(db, u, userId)));
+    return res.json(
+      db.users
+        .filter((u) => u.id !== userId && u.status !== "inactive" && (u.role === "doctor" || u.role === "admin"))
+        .map((u) => withThread(db, u, userId))
+    );
   }
   const ids = new Set();
   db.appointments.filter((a) => a.doctorId === userId).forEach((a) => ids.add(a.patientId));
@@ -335,7 +333,11 @@ app.get("/api/contacts", (req, res) => {
       });
   });
   const patients = db.users.filter((u) => u.role === "patient" && ids.has(u.id) && u.status !== "inactive").map((u) => withThread(db, u, userId));
-  res.json(patients.length ? patients : db.users.filter((u) => u.role === "patient" && u.status !== "inactive").map((u) => withThread(db, u, userId)));
+  const caseload = patients.length ? patients : db.users.filter((u) => u.role === "patient" && u.status !== "inactive").map((u) => withThread(db, u, userId));
+  const staff = db.users
+    .filter((u) => u.id !== userId && u.status !== "inactive" && (u.role === "nurse" || u.role === "admin"))
+    .map((u) => withThread(db, u, userId));
+  res.json([...caseload, ...staff]);
 });
 
 app.get("/api/appointments", (req, res) => {
@@ -715,13 +717,17 @@ io.on("connection", (socket) => {
 
   socket.on("chat-message", async (message) => {
     const db = readDb();
-    const record = { ...message, id: `m${Date.now()}`, timestamp: new Date().toISOString() };
-    db.messages.push(record);
     const sender = db.users.find((u) => u.id === message.senderId);
     const recipientId = String(message.roomId)
       .split("-")
       .find((id) => id !== message.senderId);
     const recipient = db.users.find((u) => u.id === recipientId);
+    const nursePatient = (sender?.role === "nurse" && recipient?.role === "patient")
+      || (sender?.role === "patient" && recipient?.role === "nurse");
+    if (nursePatient) return;
+    if (sender?.role === "nurse" && recipient && !["doctor", "admin"].includes(recipient.role)) return;
+    const record = { ...message, id: `m${Date.now()}`, timestamp: new Date().toISOString() };
+    db.messages.push(record);
     if (sender && recipient?.role === "patient" && sender.role !== "patient") {
       notify(db, recipient.id, "New care message", `${sender.name} sent you a message.`);
       await emailPatient(db, recipient.id, {
