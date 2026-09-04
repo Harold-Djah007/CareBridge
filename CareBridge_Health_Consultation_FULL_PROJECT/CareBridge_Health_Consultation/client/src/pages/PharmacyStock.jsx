@@ -5,7 +5,7 @@ import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { ghs } from "../utils";
 
-const blank = { name: "", sku: "", pack: "30 tablets", form: "Tablet", category: "Vitamins", price: 20, qty: 12, nhis: true };
+const blank = { name: "", sku: "", pack: "30 tablets", form: "Tablet", category: "Vitamins", price: 20, qty: 12, nhis: true, available: true };
 
 function ShelfToggle({ on, disabled, onChange }) {
   return (
@@ -88,7 +88,12 @@ export default function PharmacyStock() {
     try {
       await api("/pharmacy/stock", {
         method: "POST",
-        body: JSON.stringify({ actorId: user.id, ...form }),
+        body: JSON.stringify({
+          actorId: user.id,
+          ...form,
+          qty: form.available === false ? 0 : form.qty,
+          available: form.available !== false,
+        }),
       });
       push(`${form.name} added to the cupboard`);
       setForm(blank);
@@ -100,7 +105,27 @@ export default function PharmacyStock() {
     }
   };
 
+  const toggleShelf = (row, available) => {
+    if (!available) {
+      saveRow(row, { available: false }, `${row.name} marked out of stock.`);
+      return;
+    }
+    if (Number(row.qty) > 0) {
+      saveRow(row, { available: true }, `${row.name} marked in stock.`);
+      return;
+    }
+    const raw = window.prompt(`How many packs of ${row.name} should go back on the shelf?`, "10");
+    if (raw === null) return;
+    const qty = Math.max(0, Number(raw));
+    if (!qty) {
+      push("Enter a quantity above 0 so patients can buy again.", "error");
+      return;
+    }
+    saveRow(row, { available: true, qty }, `${row.name} restocked and marked in stock.`);
+  };
+
   const archive = async (row) => {
+    if (!window.confirm(`Remove ${row.name} from the shelf? Patients will no longer see it in Shop & pay.`)) return;
     setBusy(row.id);
     try {
       await api(`/pharmacy/stock/${row.id}?actorId=${user.id}`, { method: "DELETE" });
@@ -159,9 +184,11 @@ export default function PharmacyStock() {
           </thead>
           <tbody>
             {visible.map((row) => {
-              const on = !row.archived && row.shelf !== false && row.available !== false;
+              const on = !row.archived && row.inStock;
+              const qty = Number(row.qty || 0);
+              const low = !row.archived && qty <= 5;
               return (
-                <tr key={row.id} className={row.archived ? "oos-row" : ""}>
+                <tr key={`${row.id}-${row.qty}-${row.inStock}-${row.archived}-${row.price}-${row.nhis}`} className={row.archived ? "oos-row" : low ? "stock-row-low" : ""}>
                   <td>
                     <input
                       defaultValue={row.name}
@@ -172,7 +199,17 @@ export default function PharmacyStock() {
                       }}
                       aria-label={`Name for ${row.name}`}
                     />
-                    <div className="muted">{row.sku} · {row.form}</div>
+                    <div className="muted stock-sku">{row.sku || "No SKU"}</div>
+                    <input
+                      className="stock-input wide"
+                      defaultValue={row.form}
+                      disabled={busy === row.id}
+                      onBlur={(e) => {
+                        const formValue = e.target.value.trim();
+                        if (formValue && formValue !== row.form) saveRow(row, { form: formValue });
+                      }}
+                      aria-label={`Form for ${row.name}`}
+                    />
                   </td>
                   <td>
                     <select
@@ -216,10 +253,11 @@ export default function PharmacyStock() {
                       defaultValue={row.qty}
                       disabled={busy === row.id}
                       onBlur={(e) => {
-                        const qty = Number(e.target.value);
-                        if (qty !== Number(row.qty)) saveRow(row, { qty });
+                        const nextQty = Number(e.target.value);
+                        if (nextQty !== Number(row.qty)) saveRow(row, { qty: nextQty });
                       }}
                     />
+                    {low && <em className={`stock-warn ${qty === 0 ? "empty" : ""}`}>{qty === 0 ? "Empty — patients cannot buy" : `Low stock · ${qty} left`}</em>}
                   </td>
                   <td>
                     {row.archived ? (
@@ -228,7 +266,7 @@ export default function PharmacyStock() {
                       <ShelfToggle
                         on={on}
                         disabled={busy === row.id}
-                        onChange={(available) => saveRow(row, { available }, available ? `${row.name} marked in stock.` : `${row.name} marked out of stock.`)}
+                        onChange={(available) => toggleShelf(row, available)}
                       />
                     )}
                   </td>
@@ -294,13 +332,21 @@ export default function PharmacyStock() {
             </div>
             <div className="form-grid">
               <label>Price (GHS)<input type="number" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></label>
-              <label>Quantity<input type="number" min="0" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} /></label>
+              <label>Quantity<input type="number" min="0" value={form.qty} disabled={form.available === false} onChange={(e) => setForm({ ...form, qty: e.target.value })} /></label>
             </div>
             <label className="check-row">
               <input type="checkbox" checked={form.nhis} onChange={(e) => setForm({ ...form, nhis: e.target.checked })} />
               NHIS eligible
             </label>
-            <p className="muted">Preview: {form.name || "New SKU"} · {ghs(form.price)} · patients see this in Shop & pay immediately.</p>
+            <div className="add-shelf">
+              <span>Shelf</span>
+              <ShelfToggle
+                on={form.available !== false}
+                disabled={false}
+                onChange={(on) => setForm({ ...form, available: on, qty: on ? (Number(form.qty) || 10) : 0 })}
+              />
+            </div>
+            <p className="muted">Preview: {form.name || "New SKU"} · {ghs(form.price)} · {form.available === false ? "Out of stock" : `${form.qty || 0} on shelf`}</p>
             <div className="modal-actions">
               <button type="button" className="secondary-btn" onClick={() => setOpen(false)}>Cancel</button>
               <button className="primary-btn" disabled={busy === "new"}>{busy === "new" ? "Saving…" : "Add to cupboard"}</button>
