@@ -15,7 +15,7 @@ function lineKind(item) {
 export function normalizeLine(item) {
   const kind = lineKind(item);
   const qty = Math.max(kind === "invoice" ? 1 : 0, Number(item.qty || (kind === "invoice" ? 1 : 0)));
-  const price = Number(item.price ?? item.unit ?? (kind === "invoice" ? item.amount : 0) || 0);
+  const price = Number(item.price ?? item.unit ?? (kind === "invoice" ? item.amount : 0) ?? 0);
   const name = item.name || item.item || "";
   return {
     ...item,
@@ -91,28 +91,65 @@ export function invoiceLine(row, fallbackPatientId) {
   });
 }
 
+function simplifyName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export function matchStock(stock, line) {
+  const rows = stock || [];
+  if (line?.stockId) {
+    const byId = rows.find((s) => s.id === line.stockId);
+    if (byId) return byId;
+  }
+  const raw = simplifyName(line?.drug || line?.name || "");
+  if (!raw) return null;
+  const exact = rows.find((s) => simplifyName(s.name) === raw);
+  if (exact) return exact;
+  return rows.find((s) => {
+    const name = simplifyName(s.name);
+    return name && (raw.startsWith(name) || name.startsWith(raw));
+  }) || null;
+}
+
 export function mergePrescription(cart, rx, stock) {
-  const next = cart.map(normalizeLine);
-  (rx.items || [{ drug: rx.drug, stockId: "" }]).forEach((line) => {
-    const product = stock.find((s) => s.id === line.stockId)
-      || stock.find((s) => s.name.toLowerCase() === String(line.drug || "").toLowerCase());
-    if (!product || Number(product.qty) <= 0) return;
-    const add = rxOrderQty(line, product);
-    const found = next.find((c) => c.kind === "med" && c.id === product.id);
-    if (found) found.qty = Math.min(Number(product.qty), Number(found.qty || 0) + add);
-    else {
+  const next = (cart || []).map(normalizeLine);
+  const skipped = [];
+  const added = [];
+  const lines = rx?.items?.length ? rx.items : [{ drug: rx?.drug, stockId: "" }];
+  lines.forEach((line) => {
+    const label = line.drug || line.name || "A prescribed medicine";
+    const product = matchStock(stock, line);
+    if (!product) {
+      skipped.push({ name: label, reason: "missing" });
+      return;
+    }
+    if (product.inStock === false || Number(product.qty) <= 0) {
+      skipped.push({ name: product.name || label, reason: "out" });
+      return;
+    }
+    const add = Math.max(1, Number(rxOrderQty(line, product) || 1));
+    const cap = Number(product.qty || add);
+    const index = next.findIndex((c) => c.kind === "med" && c.id === product.id);
+    if (index >= 0) {
+      const qty = Math.min(cap, Number(next[index].qty || 0) + add);
+      next[index] = normalizeLine({ ...next[index], qty, max: cap, price: Number(product.price || next[index].price || 0) });
+    } else {
       next.push(normalizeLine({
         kind: "med",
         id: product.id,
         name: product.name,
         price: Number(product.price || 0),
-        qty: add,
+        qty: Math.min(cap, add),
         pack: product.pack || "",
-        max: Number(product.qty || 1),
+        max: cap,
         category: product.category,
         nhis: Boolean(product.nhis),
       }));
     }
+    added.push(product.name);
   });
-  return next;
+  return { cart: next, skipped, added };
 }

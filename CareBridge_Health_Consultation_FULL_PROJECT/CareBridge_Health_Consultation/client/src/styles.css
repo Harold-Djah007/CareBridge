@@ -1045,6 +1045,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .basket-totals { border-top: 1px solid var(--line); padding-top: 10px; margin: 8px 0 12px; }
 .basket-totals p { display: flex; justify-content: space-between; margin: 6px 0; }
 .basket-grand { font-size: 16px; }
+.running-total { margin: 0 0 10px; padding-top: 0; border-top: 0; }
+.running-total b { font-size: 18px; }
 .qty-ctrl.shop input { width: 52px; text-align: center; padding: 6px; }
 .pharm-cat { margin-bottom: 12px; }
 .stock-badge {

@@ -1,63 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Printer, ShoppingBag, Hospital, ArrowLeft } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
-import { HOSPITAL, formatDate, rxOrderQty } from "../utils";
+import { HOSPITAL, formatDate } from "../utils";
 
 export default function PrescriptionPrint() {
   const { id } = useParams();
   const { user } = useAuth();
   const { push } = useToast();
-  const navigate = useNavigate();
   const [rx, setRx] = useState(null);
-  const [stock, setStock] = useState([]);
-  const [busy, setBusy] = useState("");
 
   useEffect(() => {
     api(`/prescriptions/${id}`).then(setRx).catch((e) => push(e.message, "error"));
-    api("/pharmacy/stock").then(setStock).catch(() => {});
   }, [id]);
 
   if (!rx) return <p className="muted">Loading prescription…</p>;
 
   const items = rx.items || [];
   const printRx = () => window.print();
-
-  const fulfill = async (mode) => {
-    const lines = items.map((line) => {
-      const product = stock.find((p) => p.id === line.stockId) || stock.find((p) => p.name.toLowerCase() === String(line.drug || "").toLowerCase());
-      if (!product) return null;
-      return { id: product.id, qty: rxOrderQty(line, product) };
-    }).filter(Boolean);
-    if (!lines.length) {
-      push("Those medicines are not on the Ridge shelf.", "error");
-      return;
-    }
-    setBusy(mode);
-    try {
-      const { order, invoice } = await api("/pharmacy/orders", {
-        method: "POST",
-        body: JSON.stringify({
-          patientId: rx.patientId,
-          actorId: user.id,
-          prescriptionId: rx.id,
-          fulfill: mode,
-          items: lines,
-        }),
-      });
-      if (mode === "online") {
-        push("Pharmacy billed. Pay to complete the purchase.");
-        navigate(`/pay?invoice=${invoice?.id || order.invoiceId}`);
-      } else {
-        push("Queued at Ridge pharmacy for collection.");
-      }
-    } catch (err) {
-      push(err.message, "error");
-    } finally {
-      setBusy("");
-    }
-  };
 
   return (
     <div>
@@ -75,9 +36,9 @@ export default function PrescriptionPrint() {
               <Link className="primary-btn" to={`/pay?rx=${rx.id}`}>
                 <ShoppingBag size={16} /> Buy on site
               </Link>
-              <button type="button" className="ghost-btn" disabled={!!busy} onClick={() => fulfill("hospital")}>
+              <Link className="ghost-btn" to={`/pay?rx=${rx.id}&fulfill=hospital`}>
                 <Hospital size={16} /> Collect at hospital
-              </button>
+              </Link>
             </>
           )}
         </div>

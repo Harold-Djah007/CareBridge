@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ShoppingCart, Plus, Minus, Trash2 } from "lucide-react";
 import { io } from "socket.io-client";
@@ -17,7 +17,7 @@ const METHODS = [
 function tabFromParams(params) {
   const tab = params.get("tab");
   if (tab === "labs" || tab === "services" || tab === "pharmacy" || tab === "bills") return tab;
-  if (params.get("rx")) return "pharmacy";
+  if (params.get("rx") || params.get("fulfill") === "hospital") return "pharmacy";
   return "bills";
 }
 
@@ -47,6 +47,7 @@ export default function Pay() {
   const [payment, setPayment] = useState(null);
   const [busy, setBusy] = useState(false);
   const [cart, setCart] = useState(() => loadCart(user.id));
+  const appliedRx = useRef("");
 
   const persist = (next) => setCart(saveCart(user.id, next));
 
@@ -106,19 +107,53 @@ export default function Pay() {
 
   useEffect(() => {
     const rxId = params.get("rx");
-    if (!rxId || !stock.length || isAdmin) return;
+    if (!rxId) {
+      appliedRx.current = "";
+      return;
+    }
+    if (!stock.length || isAdmin) return;
+    if (appliedRx.current === rxId) return;
     let cancelled = false;
+    const fulfill = params.get("fulfill");
     api(`/prescriptions/${rxId}`).then((rx) => {
       if (cancelled) return;
-      persist(mergePrescription(loadCart(user.id), rx, stock));
+      appliedRx.current = rxId;
+      const result = mergePrescription(loadCart(user.id), rx, stock);
+      persist(result.cart);
       setTab("pharmacy");
-      push("Prescription medicines added to your basket. Set the amount you need, then pay or collect at the hospital.");
+      const totalNow = cartTotal(result.cart);
+      const bits = [];
+      if (result.added.length) {
+        bits.push(fulfill === "hospital"
+          ? "Prescription medicines added. Collect at Ridge pharmacy or pay the combined total."
+          : "Prescription medicines added to your basket.");
+      }
+      if (result.skipped.length) {
+        const names = result.skipped.map((s) => s.name).join(", ");
+        const out = result.skipped.every((s) => s.reason === "out");
+        bits.push(result.skipped.length === 1
+          ? `${names} ${out ? "is out of stock" : "is not on the Ridge shelf"} and was not added.`
+          : `${names} were skipped (${out ? "out of stock" : "not on the Ridge shelf"}).`);
+      }
+      if (!result.added.length && !result.skipped.length) {
+        bits.push("No medicines from that prescription could be added.");
+      }
+      bits.push(`Basket ${ghs(totalNow)}.`);
+      push(bits.join(" "), result.added.length ? "ok" : "error");
       const clean = new URLSearchParams(params);
       clean.delete("rx");
+      clean.delete("fulfill");
       setParams(clean, { replace: true });
-    }).catch(() => {});
+      if (fulfill === "hospital") {
+        requestAnimationFrame(() => {
+          document.getElementById("shop-basket")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+      }
+    }).catch(() => {
+      appliedRx.current = "";
+    });
     return () => { cancelled = true; };
-  }, [params.get("rx"), stock.length, isAdmin]);
+  }, [params.get("rx"), params.get("fulfill"), stock.length, isAdmin]);
 
   const categories = useMemo(() => {
     const set = new Set(stock.map((s) => s.category).filter(Boolean));
@@ -479,8 +514,12 @@ export default function Pay() {
             </div>
             {cart.length > 0 && !payment && <button type="button" className="ghost-btn" onClick={() => persist([])}>Clear</button>}
           </div>
+          <p className="basket-grand running-total">
+            <span>Running total</span>
+            <b>{ghs(payment ? payment.amount : total)}</b>
+          </p>
           {cart.length === 0 && !payment && (
-            <p className="muted">Add unpaid bills, medicines, or labs. Changing tab does not empty this basket. You will see the full amount before you pay.</p>
+            <p className="muted">Add unpaid bills, medicines, or labs. Changing tab or leaving this page does not empty this basket. Buy on site adds to the total already here.</p>
           )}
           {billItems.length > 0 && (
             <BasketGroup
