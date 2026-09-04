@@ -220,8 +220,11 @@ export function mountPharmacy(app, ctx) {
 
   app.get("/api/pharmacy/categories", (_, res) => res.json(PHARMACY_CATEGORIES));
 
-  app.get("/api/pharmacy/stock", (_, res) => {
+  app.get("/api/pharmacy/stock", (req, res) => {
     const db = readDb();
+    if (String(req.query.manage) === "1") {
+      return res.json((db.pharmacyStock || []).map(publicStock));
+    }
     res.json(catalogStock(db));
   });
 
