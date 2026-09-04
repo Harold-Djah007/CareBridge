@@ -3,15 +3,16 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   CalendarDays, LayoutDashboard, MessageCircle, BedDouble, Video, LogOut, HeartPulse,
   Bell, Users, Mail, UserRound, Stethoscope, ClipboardList, Building2, Search, Inbox,
-  FolderOpen, ScrollText, Pill, Wallet, Settings, LifeBuoy, HelpCircle, PanelTop, ChevronDown, ChevronUp,
+  FolderOpen, ScrollText, Pill, Wallet, Settings, LifeBuoy, HelpCircle, PanelTop, ChevronDown, ChevronUp, FolderKanban,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
 import { api, socketUrl } from "../api";
-import { HOSPITAL, isUpcoming, longDate } from "../utils";
+import { HOSPITAL, isUpcoming, BUILD } from "../utils";
 import { LiveClock } from "./LiveMeter";
 import PageAtmosphere from "./PageAtmosphere";
 import { useTopbar } from "../chrome";
+import Avatar from "./Avatar";
 
 const NAV = {
   patient: [
@@ -79,6 +80,7 @@ const NAV = {
         { to: "/admin/hospital", icon: Building2, label: "Bed board", primary: true, badge: "wards" },
         { to: "/admin/appointments", icon: CalendarDays, label: "Clinic diary", primary: true },
         { to: "/admin/reports", icon: ScrollText, label: "Reports & audit", primary: true },
+        { to: "/admin/cases", icon: FolderKanban, label: "Case workflow", primary: true },
         { to: "/pay", icon: Wallet, label: "Patient billing" },
       ],
     },
@@ -244,7 +246,7 @@ export default function AppShell() {
         </div>
         <div className="sidebar-campus">
           <strong>{HOSPITAL.campus}</strong>
-          <span>{HOSPITAL.city} · {longDate()}</span>
+          <span>{HOSPITAL.city} · {BUILD}</span>
         </div>
         <NavRail>
           {groups.map((group) => (
@@ -256,7 +258,7 @@ export default function AppShell() {
         </NavRail>
         <div className="mobile-nav">{mobileItems.map(renderLink)}</div>
         <div className="sidebar-user">
-          <button className="avatar" onClick={() => navigate("/settings")}>{user.avatar}</button>
+          <button type="button" className="avatar-btn" title="Settings" onClick={() => navigate("/settings")}><Avatar person={user} /></button>
           <div className="sidebar-user-text">
             <strong>{user.name}</strong>
             <span>{user.role === "patient" ? `MRN ${user.mrn || "—"}` : user.employeeId || user.specialty || user.department}</span>
@@ -276,7 +278,7 @@ export default function AppShell() {
             <button className="icon-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications">
               <Bell size={18} />{unread > 0 && <i className="dot" />}
             </button>
-            <button className="avatar small" title="Settings" onClick={() => navigate("/settings")}>{user.avatar}</button>
+            <button type="button" className="avatar-btn" title="Settings" onClick={() => navigate("/settings")}><Avatar person={user} className="small" /></button>
           </div>
         )}
         {topbarOn && (
@@ -301,7 +303,7 @@ export default function AppShell() {
               <button className="icon-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications">
                 <Bell size={19} />{unread > 0 && <i className="dot" />}
               </button>
-              <button className="avatar small" title="Settings" onClick={() => navigate("/settings")}>{user.avatar}</button>
+              <button type="button" className="avatar-btn" title="Settings" onClick={() => navigate("/settings")}><Avatar person={user} className="small" /></button>
               <button type="button" className="ghost-btn toolbar-hide" onClick={() => setTopbarOn(false)}>
                 Hide <ChevronUp size={14} />
               </button>

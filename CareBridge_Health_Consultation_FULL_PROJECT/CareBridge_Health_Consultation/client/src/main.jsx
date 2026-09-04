@@ -23,6 +23,8 @@ import AdminUsers from "./pages/admin/Users";
 import AdminSchedule from "./pages/admin/Schedule";
 import AdminHospital from "./pages/admin/Hospital";
 import AdminReports from "./pages/admin/Reports";
+import AdminCases from "./pages/admin/Cases";
+import AdminCaseDetail from "./pages/admin/CaseDetail";
 import Pay from "./pages/Pay";
 import Pharmacy from "./pages/Pharmacy";
 import Receipt from "./pages/Receipt";
@@ -72,6 +74,8 @@ function AppRoutes() {
           <Route path="/admin/appointments" element={<RoleRoute roles={["admin"]}><AdminSchedule /></RoleRoute>} />
           <Route path="/admin/hospital" element={<RoleRoute roles={["admin"]}><AdminHospital /></RoleRoute>} />
           <Route path="/admin/reports" element={<RoleRoute roles={["admin"]}><AdminReports /></RoleRoute>} />
+          <Route path="/admin/cases" element={<RoleRoute roles={["admin"]}><AdminCases /></RoleRoute>} />
+          <Route path="/admin/cases/:id" element={<RoleRoute roles={["admin"]}><AdminCaseDetail /></RoleRoute>} />
         </Route>
         <Route path="*" element={<Navigate to={user ? homeFor(user) : "/"} />} />
       </Routes>

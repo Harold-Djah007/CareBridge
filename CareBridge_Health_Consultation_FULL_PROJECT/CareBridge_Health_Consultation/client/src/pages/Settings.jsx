@@ -4,6 +4,7 @@ import { LogOut, Shield, Wallet, Bell, UserRound, PanelTop } from "lucide-react"
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { useTopbar } from "../chrome";
+import PhotoPicker from "../components/PhotoPicker";
 
 export default function Settings() {
   const { user, updateUser, logout } = useAuth();
@@ -18,6 +19,7 @@ export default function Settings() {
     about: user.about || "",
     specialty: user.specialty || "",
     available: user.available !== false,
+    photo: user.photo || "",
   });
   const [security, setSecurity] = useState({ currentPassword: "", password: "", confirm: "" });
   const [pay, setPay] = useState({
@@ -128,6 +130,7 @@ export default function Settings() {
         <div className="card-head">
           <div><span className="eyebrow">Identity</span><h3><UserRound size={16} /> Name and contact</h3></div>
         </div>
+        <PhotoPicker value={account.photo} name={account.name} onChange={(photo) => setAccount({ ...account, photo })} onError={(m) => push(m, "error")} />
         <div className="form-grid">
           <label>Full name<input value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} required /></label>
           <label>Email<input type="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} required /></label>

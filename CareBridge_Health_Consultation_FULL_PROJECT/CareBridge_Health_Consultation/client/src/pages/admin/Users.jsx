@@ -4,8 +4,10 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "../../api";
 import { useToast } from "../../state";
 import { roleLabel } from "../../utils";
+import PhotoPicker from "../../components/PhotoPicker";
+import Avatar from "../../components/Avatar";
 
-const blank = { name: "", email: "", password: "care123", role: "patient", phone: "", city: "", specialty: "" };
+const blank = { name: "", email: "", password: "care123", role: "patient", phone: "", city: "", specialty: "", photo: "" };
 
 export default function AdminUsers() {
   const { push } = useToast();
@@ -26,17 +28,21 @@ export default function AdminUsers() {
 
   const save = async (e) => {
     e.preventDefault();
-    if (editing) {
-      await api(`/admin/users/${editing.id}`, { method: "PATCH", body: JSON.stringify(form) });
-      push("Person updated");
-    } else {
-      await api("/admin/users", { method: "POST", body: JSON.stringify(form) });
-      push("Account created");
+    try {
+      if (editing) {
+        await api(`/admin/users/${editing.id}`, { method: "PATCH", body: JSON.stringify(form) });
+        push("Person updated");
+      } else {
+        await api("/admin/users", { method: "POST", body: JSON.stringify(form) });
+        push("Account created");
+      }
+      setOpen(false);
+      setEditing(null);
+      setForm(blank);
+      load();
+    } catch (err) {
+      push(err.message, "error");
     }
-    setOpen(false);
-    setEditing(null);
-    setForm(blank);
-    load();
   };
 
   const toggle = async (u) => {
@@ -62,7 +68,12 @@ export default function AdminUsers() {
           <tbody>
             {visible.map((u) => (
               <tr key={u.id}>
-                <td><b>{u.name}</b></td>
+                <td>
+                  <div className="person-name">
+                    <Avatar person={u} />
+                    <b>{u.name}</b>
+                  </div>
+                </td>
                 <td>{roleLabel(u.role)}</td>
                 <td>{u.email}</td>
                 <td><span className={`status ${u.status || "active"}`}>{u.status || "active"}</span></td>
@@ -81,6 +92,7 @@ export default function AdminUsers() {
         <div className="modal-backdrop" onMouseDown={() => setOpen(false)}>
           <form className="modal-card" onMouseDown={(e) => e.stopPropagation()} onSubmit={save}>
             <h2>{editing ? "Edit person" : "Add person"}</h2>
+            <PhotoPicker value={form.photo} name={form.name} onChange={(photo) => setForm({ ...form, photo })} onError={(m) => push(m, "error")} />
             <label>Full name<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label>
             <label>Email<input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></label>
             <label>Password<input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editing ? "Leave blank to keep" : ""} required={!editing} /></label>

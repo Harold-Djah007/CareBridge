@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { formatDate, formatTime, isUpcoming, todayISO, ghs, consultQuote } from "../utils";
+import Avatar from "../components/Avatar";
 
 export default function Appointments() {
   const { user } = useAuth();
@@ -13,25 +14,26 @@ export default function Appointments() {
   const [patients, setPatients] = useState([]);
   const [tab, setTab] = useState("upcoming");
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ doctorId: "d1", patientId: user.role === "patient" ? user.id : "p1", date: todayISO(), time: "09:00", reason: "", mode: "video" });
+  const [form, setForm] = useState({ doctorId: "", patientId: user.role === "patient" ? user.id : "", date: todayISO(), time: "09:00", reason: "", mode: "video" });
   const [rates, setRates] = useState(null);
 
   const load = () => api(`/appointments?userId=${user.id}&role=${user.role}`).then(setAppointments);
   useEffect(() => {
     load();
-    api("/doctors").then((d) => {
-      setDoctors(d);
-      if (d[0]) setForm((f) => ({ ...f, doctorId: d[0].id }));
-    });
+    api("/doctors").then(setDoctors);
     if (user.role !== "patient") api("/patients").then(setPatients);
     api("/finance/rates").then(setRates);
   }, []);
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!form.doctorId) {
+      push("Choose a doctor from the list.", "error");
+      return;
+    }
     await api("/appointments", { method: "POST", body: JSON.stringify({ ...form, patientId: user.role === "patient" ? user.id : form.patientId }) });
     setOpen(false);
-    setForm((f) => ({ ...f, reason: "" }));
+    setForm({ doctorId: "", patientId: user.role === "patient" ? user.id : "", date: todayISO(), time: "09:00", reason: "", mode: "video" });
     push(user.role === "patient" ? "Consultation booked and billed. Pay from Pay bills to receive a receipt." : "Appointment created and billed to the patient account.");
     load();
   };
@@ -60,7 +62,7 @@ export default function Appointments() {
           <h1>{user.role === "patient" ? "Your appointments" : "Clinic schedule"}</h1>
           <p>{user.role === "patient" ? "Book a video or campus visit. The consultant fee is billed to your account and payable by MoMo, GCB, NHIS, or cash." : "Today’s list, plus upcoming and completed encounters."}</p>
         </div>
-        <button className="primary-btn" onClick={() => setOpen(true)}><Plus size={18} /> {user.role === "patient" ? "Request a visit" : "Add slot"}</button>
+        <button className="primary-btn" onClick={() => { setForm({ doctorId: "", patientId: user.role === "patient" ? user.id : "", date: todayISO(), time: "09:00", reason: "", mode: "video" }); setOpen(true); }}><Plus size={18} /> {user.role === "patient" ? "Request a visit" : "Add slot"}</button>
       </div>
       <div className="filters">
         {["upcoming", "past", "all"].map((t) => (
@@ -74,6 +76,7 @@ export default function Appointments() {
           ) : rows.map((a) => (
             <div className="clinic-row" key={a.id}>
               <div className="time">{formatTime(a.time)}<div className="muted" style={{ fontSize: 11 }}>{formatDate(a.date)}</div></div>
+              <Avatar person={a.patient} />
               <div>
                 <strong>{a.patient?.name}</strong>
                 <div className="muted">{a.reason} · {a.mode === "video" ? "Teleconsult" : "Face to face"}{a.fee ? ` · ${ghs(a.fee)}` : ""}</div>
@@ -94,7 +97,7 @@ export default function Appointments() {
           ) : rows.map((a) => (
             <div className="appointment-row" key={a.id}>
               <div className="date-box"><span>{new Date(a.date + "T00:00").toLocaleDateString(undefined, { month: "short" })}</span><b>{new Date(a.date + "T00:00").getDate()}</b></div>
-              <div className="avatar">{user.role === "patient" ? a.doctor.avatar : a.patient.avatar}</div>
+              <Avatar person={user.role === "patient" ? a.doctor : a.patient} />
               <div className="grow">
                 <strong>{user.role === "patient" ? a.doctor.name : a.patient.name}</strong>
                 <span className="muted">{a.reason}</span>
@@ -126,16 +129,25 @@ export default function Appointments() {
             <p className="muted">A confirmation email is sent. The fee below is billed to the patient account.</p>
             {user.role !== "patient" && (
               <label>Patient
-                <select value={form.patientId} onChange={(e) => setForm({ ...form, patientId: e.target.value })}>
+                <select value={form.patientId} onChange={(e) => setForm({ ...form, patientId: e.target.value })} required>
+                  <option value="">Select a patient</option>
                   {patients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </label>
             )}
-            <label>Doctor
-              <select value={form.doctorId} onChange={(e) => setForm({ ...form, doctorId: e.target.value })}>
-                {doctors.map((d) => <option key={d.id} value={d.id}>{d.name} — {d.specialty}</option>)}
-              </select>
-            </label>
+            <p className="eyebrow">Choose a doctor</p>
+            <div className="doctor-pick">
+              {doctors.map((d) => (
+                <button type="button" key={d.id} className={`doctor-chip ${form.doctorId === d.id ? "on" : ""} ${user.preferredDoctorId === d.id ? "preferred" : ""}`} onClick={() => setForm({ ...form, doctorId: d.id })}>
+                  <Avatar person={d} />
+                  <span>
+                    <b>{d.name}</b>
+                    <small>{d.specialty || "Consultant"}{user.preferredDoctorId === d.id ? " · your doctor" : ""}{rates ? ` · ${ghs(consultQuote(rates, d.specialty, form.mode) || 0)}` : ""}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+            {!form.doctorId && <p className="muted">Pick the consultant you want. No doctor is selected until you choose one.</p>}
             <div className="form-grid">
               <label>Date<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></label>
               <label>Time<input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} required /></label>

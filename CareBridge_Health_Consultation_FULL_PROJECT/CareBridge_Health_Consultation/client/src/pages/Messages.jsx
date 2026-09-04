@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { roomIdFor } from "../utils";
+import Avatar from "../components/Avatar";
 
 export default function Messages() {
   const { user } = useAuth();
@@ -74,7 +75,7 @@ export default function Messages() {
           <div className="search-box"><Search size={17} /><input placeholder="Search conversations" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
           {visible.map((c) => (
             <button key={c.id} onClick={() => setSelected(c)} className={`contact ${selected?.id === c.id ? "selected" : ""}`}>
-              <div className="avatar">{c.avatar}</div>
+              <Avatar person={c} />
               <span><b>{c.name}</b><small>{c.specialty || c.role || "Patient"}</small></span>
             </button>
           ))}
@@ -84,7 +85,7 @@ export default function Messages() {
           {selected ? (
             <>
               <div className="chat-head">
-                <div className="avatar">{selected.avatar}</div>
+                <Avatar person={selected} />
                 <div><strong>{selected.name}</strong><span className="muted">{selected.specialty || selected.city || "Care contact"}</span></div>
               </div>
               <div className="messages">

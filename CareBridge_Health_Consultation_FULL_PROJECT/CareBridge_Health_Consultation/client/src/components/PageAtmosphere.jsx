@@ -19,6 +19,7 @@ function sceneFor(pathname, role) {
   if (pathname.startsWith("/alerts")) return "alerts";
   if (pathname.startsWith("/admin/users")) return "directory";
   if (pathname.startsWith("/admin/reports")) return "reports";
+  if (pathname.startsWith("/admin/cases")) return "cases";
   if (pathname.startsWith("/admin")) return "ops";
   if (pathname === "/home" && role === "doctor") return "clinic";
   return role === "admin" ? "ops" : "home";
@@ -69,6 +70,7 @@ export default function PageAtmosphere() {
       {scene === "alerts" && <div className="atm-mail"><i /><i /><i /></div>}
       {scene === "directory" && <div className="atm-cards"><i /><i /><i /></div>}
       {scene === "reports" && <div className="atm-bars"><i /><i /><i /><i /></div>}
+      {scene === "cases" && <div className="atm-cards"><i /><i /><i /></div>}
       {scene === "profile" && <div className="atm-id-ring" />}
     </div>
   );

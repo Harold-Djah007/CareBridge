@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth, useToast } from "../state";
 import { api, socketUrl } from "../api";
 import { roomIdFor } from "../utils";
+import Avatar from "../components/Avatar";
 
 export default function VideoConsultation() {
   const { user } = useAuth();
@@ -15,6 +16,7 @@ export default function VideoConsultation() {
   const pcRef = useRef();
   const streamRef = useRef();
   const socketRef = useRef();
+  const [contacts, setContacts] = useState([]);
   const [peer, setPeer] = useState(null);
   const [joined, setJoined] = useState(false);
   const [mic, setMic] = useState(true);
@@ -25,14 +27,15 @@ export default function VideoConsultation() {
 
   useEffect(() => {
     api(`/contacts?userId=${user.id}&role=${user.role}`).then((list) => {
+      setContacts(list);
       const wanted = params.get("with");
-      setPeer(list.find((c) => c.id === wanted) || list[0] || null);
+      setPeer(list.find((c) => c.id === wanted) || null);
     });
     return () => stop();
   }, [user.id]);
 
-  const otherId = peer?.id || (user.role === "patient" ? "d1" : "p1");
-  const roomId = roomIdFor(user.id, otherId);
+  const otherId = peer?.id;
+  const roomId = otherId ? roomIdFor(user.id, otherId) : "";
 
   const initPeer = () => {
     const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
@@ -44,6 +47,10 @@ export default function VideoConsultation() {
   };
 
   const join = async () => {
+    if (!peer || !roomId) {
+      push("Choose who you are calling first.", "error");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
@@ -136,15 +143,26 @@ export default function VideoConsultation() {
           {!joined && (
             <div className="video-placeholder">
               <div className="video-icon" style={{ margin: "0 auto 16px", width: 70, height: 70, borderRadius: 22, display: "grid", placeItems: "center", background: "rgba(255,255,255,.1)" }}><Video size={36} /></div>
-              <h2>Your consultation room is ready</h2>
-              <p>Allow camera and microphone access when prompted.</p>
-              {user.role === "patient" && (
+              <h2>{peer ? "Your consultation room is ready" : user.role === "patient" ? "Choose a doctor first" : "Choose who you are calling"}</h2>
+              <p>{peer ? "Allow camera and microphone access when prompted." : "Pick the person for this room. Nobody is joined until you choose."}</p>
+              {!peer && (
+                <div className="doctor-pick" style={{ textAlign: "left", marginTop: 16, maxHeight: 220 }}>
+                  {contacts.map((c) => (
+                    <button type="button" key={c.id} className="doctor-chip" onClick={() => setPeer(c)}>
+                      <Avatar person={c} />
+                      <span><b>{c.name}</b><small>{c.specialty || c.city || c.role}</small></span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {user.role === "patient" && peer && (
                 <label className="check-row" style={{ justifyContent: "center", margin: "12px 0", color: "#fff" }}>
                   <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
                   I consent to a telehealth consult (privacy notice applies)
                 </label>
               )}
-              <button className="primary-btn" onClick={async () => {
+              <button className="primary-btn" disabled={!peer} onClick={async () => {
+                if (!peer) { push("Choose who you are calling first.", "error"); return; }
                 if (user.role === "patient") {
                   if (!consent) { push("Please confirm telehealth consent first.", "error"); return; }
                   await api("/consents", { method: "POST", body: JSON.stringify({ patientId: user.id, type: "telehealth" }) });
@@ -166,8 +184,8 @@ export default function VideoConsultation() {
         </div>
         <aside className="call-sidebar">
           <div className="secure-note"><ShieldCheck /><div><b>Private consultation</b><span>Only you and your care partner are invited to this room.</span></div></div>
-          <div className="call-info"><span>With</span><b>{peer?.name || "Care partner"}</b></div>
-          <div className="call-info"><span>Room</span><b>{roomId.toUpperCase()}</b></div>
+          <div className="call-info"><span>With</span><b>{peer?.name || "Choose a doctor"}</b></div>
+          <div className="call-info"><span>Room</span><b>{roomId ? roomId.toUpperCase() : "Not assigned"}</b></div>
           <div className="call-info"><span>Helpful tip</span><p className="muted">Use headphones in a quiet room. Screen share is available after you join.</p></div>
         </aside>
       </div>

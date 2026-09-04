@@ -1,7 +1,10 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Mail } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
+import PhotoPicker from "../components/PhotoPicker";
+import Avatar from "../components/Avatar";
 
 export default function Profile() {
   const { user, updateUser } = useAuth();
@@ -16,6 +19,7 @@ export default function Profile() {
     allergies: user.allergies || "",
     insurance: user.insurance || "",
     bloodType: user.bloodType || "",
+    photo: user.photo || "",
     emailAlerts: user.emailAlerts !== false,
     alertPrefs: {
       appointments: user.alertPrefs?.appointments !== false,
@@ -62,7 +66,7 @@ export default function Profile() {
       </div>
       <form className="card" onSubmit={save} style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 14 }}>
         <div className="appointment-feature">
-          <div className="avatar large">{user.avatar}</div>
+          <Avatar person={{ ...user, photo: form.photo }} className="large" />
           <div className="grow">
             <strong>{user.name}</strong>
             <span className="muted">{user.email}</span>
@@ -70,6 +74,7 @@ export default function Profile() {
             {user.role !== "patient" && <small className="muted">{user.employeeId} · {user.department || user.specialty}</small>}
           </div>
         </div>
+        <PhotoPicker value={form.photo} name={form.name} onChange={(photo) => set("photo", photo)} onError={(m) => push(m, "error")} />
         {user.role === "patient" && (
           <>
             <div className="form-grid">

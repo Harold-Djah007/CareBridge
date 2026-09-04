@@ -9,6 +9,7 @@ import { deliverEmail, renderEmail, shouldEmail } from "./email.js";
 import { audit, ensureClinical, mountClinical } from "./clinical.js";
 import { addInvoice, consultFee, mountFinance, wardFee } from "./finance.js";
 import { mountSupport } from "./support.js";
+import { mountCases } from "./cases.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +32,21 @@ const io = new Server(server, {
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
+
+const applyPhoto = (user, photo) => {
+  if (photo === undefined) return null;
+  if (!photo) {
+    user.photo = "";
+    return null;
+  }
+  if (typeof photo !== "string" || !photo.startsWith("data:image/")) {
+    return "Upload a photo file.";
+  }
+  if (photo.length > 450000) return "That photo is too large. Choose a smaller picture.";
+  user.photo = photo;
+  return null;
+};
 
 const initials = (name = "") =>
   name
@@ -143,6 +158,7 @@ app.post("/api/register", async (req, res) => {
     email: req.body.email.trim(),
     password: req.body.password,
     avatar: initials(req.body.name),
+    photo: "",
     specialty: "",
     phone: req.body.phone || "",
     city: req.body.city || "",
@@ -154,6 +170,8 @@ app.post("/api/register", async (req, res) => {
     emailAlerts: true,
     alertPrefs: { appointments: true, wards: true, messages: true, account: true },
   };
+  const photoErr = applyPhoto(user, req.body.photo);
+  if (photoErr) return res.status(400).json({ message: photoErr });
   db.users.push(user);
   db.users.filter((u) => u.role === "admin").forEach((a) => {
     notify(db, a.id, "New patient registered", `${user.name} created a patient account.`);
@@ -162,7 +180,7 @@ app.post("/api/register", async (req, res) => {
     type: "account",
     subject: "Welcome to CareBridge Health",
     heading: "Your patient account is ready",
-    intro: `Hello ${user.name}, welcome to CareBridge. You can now book video consultations, chat with doctors, and reserve a ward before you arrive.`,
+    intro: `Hello ${user.name}, welcome to CareBridge. Choose a consultant from the hospital directory, then book video or campus visits, pay published fees, and reserve a ward before you arrive.`,
     details: [
       ["Email", user.email],
       ["Portal", "Patient"],
@@ -194,10 +212,16 @@ app.patch("/api/users/:id", (req, res) => {
     }
     user.email = email;
   }
-  const allowed = ["name", "phone", "city", "about", "specialty", "available", "years", "emailAlerts", "alertPrefs", "emergencyContact", "allergies", "insurance", "bloodType", "dob", "paymentPrefs"];
+  if (req.body.preferredDoctorId) {
+    const chosen = db.users.find((u) => u.id === req.body.preferredDoctorId && u.role === "doctor" && u.status !== "inactive");
+    if (!chosen) return res.status(400).json({ message: "Choose a doctor from the hospital directory." });
+  }
+  const allowed = ["name", "phone", "city", "about", "specialty", "available", "years", "emailAlerts", "alertPrefs", "emergencyContact", "allergies", "insurance", "bloodType", "dob", "paymentPrefs", "preferredDoctorId"];
   allowed.forEach((key) => {
     if (req.body[key] !== undefined) user[key] = req.body[key];
   });
+  const photoErr = applyPhoto(user, req.body.photo);
+  if (photoErr) return res.status(400).json({ message: photoErr });
   if (req.body.name) user.avatar = initials(req.body.name);
   writeDb(db);
   res.json(safeUser(user));
@@ -249,6 +273,8 @@ app.post("/api/appointments", async (req, res) => {
   const missing = requireFields(req.body, ["patientId", "doctorId", "date", "time"]);
   if (missing.length) return res.status(400).json({ message: "Please choose a doctor, date, and time." });
   const db = readDb();
+  const doctor = db.users.find((u) => u.id === req.body.doctorId && u.role === "doctor" && u.status !== "inactive");
+  if (!doctor) return res.status(400).json({ message: "Choose a doctor from the hospital directory." });
   const item = {
     id: `apt${Date.now()}`,
     patientId: req.body.patientId,
@@ -260,7 +286,6 @@ app.post("/api/appointments", async (req, res) => {
     mode: req.body.mode || "video",
   };
   db.appointments.push(item);
-  const doctor = db.users.find((u) => u.id === item.doctorId) || {};
   const fee = consultFee(db, item);
   addInvoice(db, {
     patientId: item.patientId,
@@ -508,12 +533,14 @@ app.get("/api/admin/overview", (_, res) => {
     messages: db.messages.length,
     bedsAvailable: (db.wards || []).reduce((sum, w) => sum + Number(w.available || 0), 0),
     openTickets: (db.tickets || []).filter((t) => t.status !== "resolved").length,
+    openCases: (db.cases || []).filter((c) => c.status === "open").length,
   });
 });
 
 mountClinical(app, { readDb, writeDb, safeUser, notify, emailPatient });
 mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient });
 mountSupport(app, { readDb, writeDb, safeUser, notify, emailPatient });
+mountCases(app, { readDb, writeDb, safeUser });
 
 app.get("/api/admin/users", (_, res) => {
   const db = readDb();
@@ -539,6 +566,7 @@ app.post("/api/admin/users", (req, res) => {
     email: req.body.email.trim(),
     password: req.body.password,
     avatar: initials(req.body.name),
+    photo: "",
     specialty: req.body.specialty || (role === "admin" ? "Hospital Administration" : ""),
     phone: req.body.phone || "",
     city: req.body.city || "",
@@ -549,6 +577,8 @@ app.post("/api/admin/users", (req, res) => {
     emailAlerts: true,
     alertPrefs: { appointments: true, wards: true, messages: true, account: true },
   };
+  const photoErr = applyPhoto(user, req.body.photo);
+  if (photoErr) return res.status(400).json({ message: photoErr });
   db.users.push(user);
   writeDb(db);
   res.status(201).json(safeUser(user));
@@ -561,6 +591,8 @@ app.patch("/api/admin/users/:id", (req, res) => {
   ["name", "email", "phone", "city", "about", "specialty", "role", "status", "available", "years", "password"].forEach((key) => {
     if (req.body[key] !== undefined && req.body[key] !== "") user[key] = req.body[key];
   });
+  const photoErr = applyPhoto(user, req.body.photo);
+  if (photoErr) return res.status(400).json({ message: photoErr });
   if (req.body.name) user.avatar = initials(req.body.name);
   writeDb(db);
   res.json(safeUser(user));

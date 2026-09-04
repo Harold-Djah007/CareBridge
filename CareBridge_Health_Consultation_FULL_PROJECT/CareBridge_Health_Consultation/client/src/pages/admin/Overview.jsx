@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../api";
 import { HOSPITAL } from "../../utils";
 import { OccupancyBars, OpsRadar } from "../../components/LiveMeter";
+import Avatar from "../../components/Avatar";
 
 export default function AdminOverview() {
   const [stats, setStats] = useState(null);
@@ -41,6 +42,7 @@ export default function AdminOverview() {
         <div className="kpi"><span>Open beds</span><strong>{stats.bedsAvailable}</strong><small>~{occupancy}% occupied</small></div>
         <div className="kpi"><span>Support desk</span><strong>{stats.openTickets || 0}</strong><small><Link to="/support">Open the queue</Link></small></div>
       </div>
+      <p className="muted" style={{ margin: "-8px 0 18px" }}><Link to="/admin/cases"><b>Case workflow</b></Link> — patient files, encounters, admissions, bills, and tickets as CommCare-style cases.</p>
       <section className="card" style={{ marginBottom: 18 }}>
         <div className="card-head"><div><span className="eyebrow">Live occupancy</span><h3>Beds in use · {occupancy}% campus load</h3></div></div>
         <OccupancyBars items={occItems} />
@@ -51,7 +53,7 @@ export default function AdminOverview() {
           {pending.length === 0 && <p className="muted">No pending admissions.</p>}
           {pending.map((b) => (
             <div className="appointment-row" key={b.id}>
-              <div className="avatar">{b.patient?.avatar}</div>
+              <Avatar person={b.patient} />
               <div className="grow"><strong>{b.patient?.name}</strong><span className="muted">{b.ward} · {b.date} · {b.nights} nights</span></div>
               <span className="status pending">pending</span>
             </div>

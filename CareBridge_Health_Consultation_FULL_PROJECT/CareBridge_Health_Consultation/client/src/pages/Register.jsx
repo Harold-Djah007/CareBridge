@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { HeartPulse, ArrowRight } from "lucide-react";
 import { api } from "../api";
+import PhotoPicker from "../components/PhotoPicker";
 import { useAuth, useToast } from "../state";
 
 export default function Register() {
   const { login } = useAuth();
   const { push } = useToast();
-  const [form, setForm] = useState({ name: "", email: "", password: "", phone: "", city: "", insurance: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", phone: "", city: "", insurance: "", photo: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -39,6 +40,7 @@ export default function Register() {
       <section className="login-panel">
         <form className="login-card" onSubmit={submit}>
           <div><span className="eyebrow">New patient</span><h2>Create an account</h2></div>
+          <PhotoPicker value={form.photo} name={form.name} onChange={(photo) => set("photo", photo)} onError={setError} />
           <label>Full name<input value={form.name} onChange={(e) => set("name", e.target.value)} required /></label>
           <label>Email<input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} required /></label>
           <label>Password<input type="password" value={form.password} onChange={(e) => set("password", e.target.value)} required minLength={6} /></label>

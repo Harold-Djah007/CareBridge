@@ -1,22 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { CalendarDays, BedDouble, Video, ArrowRight, Mail, FolderOpen, Wallet, Pill } from "lucide-react";
+import { CalendarDays, BedDouble, Video, ArrowRight, Mail, FolderOpen, Wallet, Pill, Stethoscope } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../state";
 import { api } from "../api";
 import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate } from "../utils";
 import { CarePath, EcgRibbon, Heartbeat } from "../components/LiveMeter";
+import Avatar from "../components/Avatar";
 
 const ghs = (n) => `GHS ${Number(n || 0).toLocaleString()}`;
 
-function PatientHome({ user, appointments, wards, emails, due }) {
+function PatientHome({ user, appointments, wards, emails, due, doctors }) {
   const next = appointments.find(isUpcoming);
   const admission = wards.find((w) => w.status !== "declined");
   const dueTotal = due.reduce((s, i) => s + Number(i.amount || 0), 0);
+  const chosen = doctors.find((d) => d.id === user.preferredDoctorId);
 
   return (
     <>
       <div className="identity-strip">
-        <div className="avatar large">{user.avatar}</div>
+        <Avatar person={user} className="large" />
         <div>
           <span className="eyebrow">Patient record</span>
           <h1 style={{ margin: "4px 0 8px" }}>{greeting(firstName(user.name))}</h1>
@@ -32,7 +34,7 @@ function PatientHome({ user, appointments, wards, emails, due }) {
             <Link className="ghost-btn" to="/pay">{due.length ? `${ghs(dueTotal)} due` : "Receipts"}</Link>
           </div>
         </div>
-        <CarePath caption={next ? `Next: ${formatDate(next.date)} · ${formatTime(next.time)}` : admission ? `${admission.ward} · ${admission.status}` : "Book a visit when you are ready"} />
+        <CarePath caption={next ? `Next: ${formatDate(next.date)} · ${formatTime(next.time)}` : admission ? `${admission.ward} · ${admission.status}` : "Choose a doctor, then book a visit"} />
       </div>
 
       <div className="dashboard-grid">
@@ -45,7 +47,7 @@ function PatientHome({ user, appointments, wards, emails, due }) {
           {next ? (
             <>
               <div className="appointment-feature">
-                <div className="avatar large">{next.doctor.avatar}</div>
+                <Avatar person={next.doctor} className="large" />
                 <div className="grow">
                   <strong>{next.doctor.name}</strong>
                   <span className="muted">{next.doctor.specialty} · {next.mode === "video" ? "Video consultation" : "Ridge Campus clinic"}</span>
@@ -64,8 +66,29 @@ function PatientHome({ user, appointments, wards, emails, due }) {
                 {user.allergies && <li>Allergy note: {user.allergies}</li>}
               </ul>
             </>
+          ) : chosen ? (
+            <>
+              <div className="appointment-feature">
+                <Avatar person={chosen} className="large" />
+                <div className="grow">
+                  <strong>{chosen.name}</strong>
+                  <span className="muted">{chosen.specialty} · your chosen consultant</span>
+                  <small className="muted">Nobody else is assigned. Book a time when you are ready.</small>
+                </div>
+                <div className="row-actions">
+                  <Link className="secondary-btn" to="/care">Change</Link>
+                  <Link className="primary-btn" to="/appointments">Book a visit</Link>
+                </div>
+              </div>
+            </>
           ) : (
-            <p className="muted">Book a consultant to schedule a visit. The fee is shown before you confirm and billed to your account.</p>
+            <>
+              <p className="muted">Browse Ridge Campus consultants and add the doctor you need. No doctor is selected for you.</p>
+              <div className="row-actions" style={{ marginTop: 12 }}>
+                <Link className="primary-btn" to="/care">View doctors</Link>
+                <Link className="secondary-btn" to="/appointments">Request a visit</Link>
+              </div>
+            </>
           )}
         </section>
         <section className="card">
@@ -81,6 +104,7 @@ function PatientHome({ user, appointments, wards, emails, due }) {
             </div>
           ) : <p className="muted">No bed reserved. Request a ward before you travel; the nightly rate is on the tariff.</p>}
           <div className="quick-actions" style={{ marginTop: 8 }}>
+            <Link to="/care"><Stethoscope /><span><b>Choose a doctor</b><small>Browse Ridge Campus consultants</small></span><ArrowRight size={18} /></Link>
             <Link to="/pharmacy"><Pill /><span><b>Pharmacy & labs</b><small>Priced items, then pay for a receipt</small></span><ArrowRight size={18} /></Link>
             <Link to="/wards"><BedDouble /><span><b>Request a bed</b><small>General, maternity, paediatric</small></span><ArrowRight size={18} /></Link>
             <Link to="/appointments"><CalendarDays /><span><b>Book a visit</b><small>Video or at Ridge Campus</small></span><ArrowRight size={18} /></Link>
@@ -120,6 +144,7 @@ function DoctorBoard({ user, appointments, wards }) {
         {today.map((a) => (
           <div className={`clinic-row ${a.id === nextId ? "next" : ""}`} key={a.id}>
             <div className="time">{formatTime(a.time)}<div className="muted" style={{ fontSize: 11 }}>{formatDate(a.date)}</div></div>
+            <Avatar person={a.patient} />
             <div>
               <strong>{a.patient?.name}</strong>
               <div className="muted">{a.reason} · {a.mode === "video" ? "Teleconsult" : "Room visit"}{a.fee ? ` · ${ghs(a.fee)}` : ""}</div>
@@ -143,6 +168,7 @@ export default function Dashboard() {
   const [wards, setWards] = useState([]);
   const [emails, setEmails] = useState([]);
   const [due, setDue] = useState([]);
+  const [doctors, setDoctors] = useState([]);
 
   useEffect(() => {
     api(`/appointments?userId=${user.id}&role=${user.role}`).then(setAppointments);
@@ -150,9 +176,10 @@ export default function Dashboard() {
     if (user.role === "patient") {
       api(`/emails/${user.id}`).then(setEmails);
       api(`/billing?userId=${user.id}&role=${user.role}`).then((rows) => setDue(rows.filter((i) => i.status === "due")));
+      api("/doctors").then(setDoctors);
     }
   }, [user]);
 
   if (user.role === "doctor") return <DoctorBoard user={user} appointments={appointments} wards={wards} />;
-  return <PatientHome user={user} appointments={appointments} wards={wards} emails={emails} due={due} />;
+  return <PatientHome user={user} appointments={appointments} wards={wards} emails={emails} due={due} doctors={doctors} />;
 }
