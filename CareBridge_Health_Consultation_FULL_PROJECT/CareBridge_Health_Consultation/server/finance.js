@@ -126,7 +126,10 @@ function orderFromCatalog(catalog, items, label) {
 function receiptPayload(db, payment, invoice) {
   const patient = (db.users.find((u) => u.id === (payment?.patientId || invoice?.patientId)) || {});
   const { password, ...safe } = patient;
-  return { payment, invoice, patient: safe, hospital: ACCOUNTS };
+  const ids = payment?.invoiceIds?.length ? payment.invoiceIds : [payment?.invoiceId || invoice?.id];
+  const invoices = ids.map((id) => (db.invoices || []).find((i) => i.id === id)).filter(Boolean);
+  const lines = invoices.flatMap((inv) => inv.lines || [{ name: inv.item, lineTotal: inv.amount }]);
+  return { payment, invoice: invoices[0] || invoice, invoices, lines, patient: safe, hospital: ACCOUNTS };
 }
 
 export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient }) {
@@ -199,16 +202,47 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     const inv = (db.invoices || []).find((i) => i.id === req.body.invoiceId);
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
     if (inv.status === "paid") return res.status(400).json({ message: "This invoice is already paid." });
+    return startPayment(req, res, db, [inv]);
+  });
+
+  app.post("/api/finance/checkout-cart", async (req, res) => {
+    const db = readDb();
+    const pid = req.body.patientId;
+    if (!pid) return res.status(400).json({ message: "Patient is required." });
+    const invoices = [];
+    for (const id of req.body.invoiceIds || []) {
+      const inv = (db.invoices || []).find((i) => i.id === id && i.patientId === pid && i.status === "due");
+      if (inv && !invoices.some((x) => x.id === inv.id)) invoices.push(inv);
+    }
+    for (const svc of req.body.services || []) {
+      const service = SERVICES.find((s) => s.id === svc.id);
+      if (!service) continue;
+      const qty = Math.max(1, Number(svc.qty || 1));
+      invoices.push(addInvoice(db, {
+        patientId: pid,
+        item: qty > 1 ? `${service.name} ×${qty}` : service.name,
+        amount: service.price * qty,
+        category: "service",
+        nhis: service.nhis,
+      }));
+    }
+    if (!invoices.length) return res.status(400).json({ message: "Your cart is empty. Add a bill or a hospital service first." });
+    return startPayment(req, res, db, invoices);
+  });
+
+  function startPayment(req, res, db, invoices) {
     const method = req.body.method;
     if (!["momo", "bank", "nhis", "cash"].includes(method)) {
       return res.status(400).json({ message: "Choose MoMo, bank transfer, NHIS, or cash." });
     }
     const network = req.body.network || "mtn";
+    const amount = invoices.reduce((s, i) => s + Number(i.amount || 0), 0);
     const payment = {
       id: `pay${Date.now()}`,
-      invoiceId: inv.id,
-      patientId: inv.patientId,
-      amount: inv.amount,
+      invoiceId: invoices[0].id,
+      invoiceIds: invoices.map((i) => i.id),
+      patientId: invoices[0].patientId,
+      amount,
       currency: "GHS",
       method,
       network,
@@ -230,37 +264,42 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     db.payments = db.payments || [];
     db.payments.push(payment);
     if (payment.status === "paid") {
-      inv.status = "paid";
-      inv.method = "Cash at Ridge cashier";
-      inv.paidAt = payment.createdAt;
-      inv.receiptNo = payment.receiptNo;
-      inv.paymentId = payment.id;
+      invoices.forEach((inv) => {
+        inv.status = "paid";
+        inv.method = "Cash at Ridge cashier";
+        inv.paidAt = payment.createdAt;
+        inv.receiptNo = payment.receiptNo;
+        inv.paymentId = payment.id;
+      });
     }
-    audit(db, { actorId: req.body.actorId, action: "payment.start", entity: "payment", entityId: payment.id, detail: `${method} GHS ${inv.amount}` });
+    audit(db, { actorId: req.body.actorId, action: "payment.start", entity: "payment", entityId: payment.id, detail: `${method} GHS ${amount}` });
     writeDb(db);
-    res.status(201).json({ payment, invoice: inv, accounts: ACCOUNTS });
-  });
+    res.status(201).json({ payment, invoices, invoice: invoices[0], accounts: ACCOUNTS });
+  }
 
   app.post("/api/finance/confirm", async (req, res) => {
     const db = readDb();
     const payment = (db.payments || []).find((p) => p.id === req.body.paymentId);
     if (!payment) return res.status(404).json({ message: "Payment not found" });
-    const inv = (db.invoices || []).find((i) => i.id === payment.invoiceId);
+    const ids = payment.invoiceIds?.length ? payment.invoiceIds : [payment.invoiceId];
+    const invoices = ids.map((id) => (db.invoices || []).find((i) => i.id === id)).filter(Boolean);
+    const inv = invoices[0];
     payment.status = "paid";
     payment.confirmedAt = new Date().toISOString();
-    if (inv) {
-      inv.status = "paid";
-      inv.paidAt = payment.confirmedAt;
-      inv.receiptNo = payment.receiptNo;
-      inv.paymentId = payment.id;
-      inv.method = payment.method === "momo"
-        ? `${(payment.network || "MoMo").toUpperCase()} ${payment.phone}`
-        : payment.method === "bank"
-          ? `GCB transfer ${payment.reference}`
-          : payment.method === "nhis"
-            ? `NHIS ${payment.nhisNumber}`
-            : "Cash";
-    }
+    const methodLabel = payment.method === "momo"
+      ? `${(payment.network || "MoMo").toUpperCase()} ${payment.phone}`
+      : payment.method === "bank"
+        ? `GCB transfer ${payment.reference}`
+        : payment.method === "nhis"
+          ? `NHIS ${payment.nhisNumber}`
+          : "Cash";
+    invoices.forEach((row) => {
+      row.status = "paid";
+      row.paidAt = payment.confirmedAt;
+      row.receiptNo = payment.receiptNo;
+      row.paymentId = payment.id;
+      row.method = methodLabel;
+    });
     audit(db, { actorId: req.body.actorId, action: "payment.confirm", entity: "payment", entityId: payment.id, detail: payment.receiptNo });
     notify(db, payment.patientId, "Payment received", `Receipt ${payment.receiptNo} · GHS ${payment.amount}`);
     await emailPatient(db, payment.patientId, {
@@ -273,12 +312,12 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
         ["Reference", payment.reference],
         ["Amount", `GHS ${payment.amount}`],
         ["Method", inv?.method || payment.method],
-        ["Item", inv?.item || "Hospital services"],
+        ["Item", invoices.map((i) => i.item).join("; ") || "Hospital services"],
         ["Settled to", payment.method === "momo" ? `MoMo ${payment.destination?.number}` : payment.method === "bank" ? `GCB ${ACCOUNTS.bank.accountNumber}` : "Ridge cashier / NHIS"],
       ],
     });
     writeDb(db);
-    res.json({ payment, invoice: inv });
+    res.json({ payment, invoice: inv, invoices });
   });
 
   app.get("/api/receipts/:id", (req, res) => {

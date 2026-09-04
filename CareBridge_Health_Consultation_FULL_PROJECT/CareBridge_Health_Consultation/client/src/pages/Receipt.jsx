@@ -18,7 +18,7 @@ export default function Receipt() {
   if (error) return <p className="error-box">{error}</p>;
   if (!data) return <p className="muted">Loading receipt…</p>;
 
-  const { payment, invoice, patient, hospital } = data;
+  const { payment, invoice, patient, hospital, lines } = data;
   return (
     <div>
       <div className="page-title">
@@ -49,7 +49,7 @@ export default function Receipt() {
         <table className="table">
           <thead><tr><th>Description</th><th>Amount</th></tr></thead>
           <tbody>
-            {(invoice?.lines || [{ name: invoice?.item, lineTotal: payment.amount }]).map((line, i) => (
+            {(lines || invoice?.lines || [{ name: invoice?.item, lineTotal: payment.amount }]).map((line, i) => (
               <tr key={i}><td>{line.name}{line.qty ? ` × ${line.qty}` : ""}</td><td>{ghs(line.lineTotal || payment.amount)}</td></tr>
             ))}
             <tr><td><b>Total paid</b></td><td><b>{ghs(payment.amount)}</b></td></tr>

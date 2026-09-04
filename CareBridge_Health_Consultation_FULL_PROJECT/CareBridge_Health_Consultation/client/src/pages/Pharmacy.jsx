@@ -53,7 +53,7 @@ export default function Pharmacy() {
         <div>
           <span className="eyebrow">Ridge Campus</span>
           <h1>Pharmacy, laboratory & services</h1>
-          <p>Every item has a published fee. NHIS items can be claimed; others settle by MoMo, GCB, or cash. Collection requires a receipt.</p>
+          <p>Put medicines or tests in the basket, then pay the cart. A receipt is required before collection.</p>
         </div>
       </div>
       <div className="filters">
@@ -77,8 +77,8 @@ export default function Pharmacy() {
             ))}
           </section>
           <section className="card">
-            <h3>Order</h3>
-            {items.length === 0 && <p className="muted">Select items to bill.</p>}
+            <h3>Your basket</h3>
+            {items.length === 0 && <p className="muted">Tap Add on an item. Checkout opens your hospital cart.</p>}
             {items.map((i) => (
               <div className="appointment-row" key={i.id}>
                 <div className="grow"><strong>{i.name}</strong><span className="muted">× {i.qty}</span></div>
@@ -86,7 +86,7 @@ export default function Pharmacy() {
               </div>
             ))}
             <p><b>Total {ghs(total)}</b></p>
-            <button className="primary-btn" disabled={!items.length} type="button" onClick={order}>Bill and pay</button>
+            <button className="primary-btn" disabled={!items.length} type="button" onClick={order}>Add to cart and pay</button>
           </section>
         </div>
       ) : (
@@ -98,7 +98,7 @@ export default function Pharmacy() {
                 <span className="muted">{s.nhis ? "NHIS eligible" : "Private pay"}</span>
               </div>
               <b>{ghs(s.price)}</b>
-              <button className="primary-btn" type="button" onClick={() => billService(s.id)}>Bill this</button>
+              <button className="primary-btn" type="button" onClick={() => billService(s.id)}>Add to cart</button>
             </div>
           ))}
         </section>

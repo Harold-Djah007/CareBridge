@@ -31,7 +31,7 @@ const NAV = {
       items: [
         { to: "/records", icon: FolderOpen, label: "Clinical file", primary: true },
         { to: "/pay", icon: Wallet, label: "Pay bills", primary: true },
-        { to: "/care", icon: Stethoscope, label: "My doctors" },
+        { to: "/care", icon: Stethoscope, label: "Find a doctor" },
         { to: "/alerts", icon: Inbox, label: "Notifications" },
         { to: "/profile", icon: UserRound, label: "My details" },
       ],

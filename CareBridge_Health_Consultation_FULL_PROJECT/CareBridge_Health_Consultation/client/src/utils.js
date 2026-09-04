@@ -40,7 +40,7 @@ export const roleLabel = (role) => ({
   admin: "Administrator",
 }[role] || role);
 
-export const BUILD = "2026.09.04-photos";
+export const BUILD = "2026.09.04-cart";
 
 export const HOSPITAL = {
   name: "CareBridge Medical Centre",

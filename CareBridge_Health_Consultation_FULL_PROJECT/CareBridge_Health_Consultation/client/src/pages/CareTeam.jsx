@@ -1,19 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Video, MessageCircle, CalendarPlus, Search } from "lucide-react";
+import { Video, MessageCircle, CalendarPlus, Search, UserPlus } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { api } from "../api";
+import { io } from "socket.io-client";
+import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { todayISO, ghs, consultQuote } from "../utils";
 import Avatar from "../components/Avatar";
+import Presence from "../components/Presence";
 
 export default function CareTeam() {
   const { user, updateUser } = useAuth();
   const { push } = useToast();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const fromMessages = params.get("from") === "messages";
   const [people, setPeople] = useState([]);
   const [booking, setBooking] = useState(null);
   const [specialty, setSpecialty] = useState("all");
+  const [status, setStatus] = useState("all");
   const [query, setQuery] = useState(params.get("q") || "");
   const [form, setForm] = useState({ date: todayISO(), time: "10:00", reason: "Consultation", mode: "video" });
   const [rates, setRates] = useState(null);
@@ -22,6 +26,11 @@ export default function CareTeam() {
     if (user.role === "patient") api("/doctors").then(setPeople);
     else api(`/contacts?userId=${user.id}&role=${user.role}`).then(setPeople);
     api("/finance/rates").then(setRates);
+    const socket = io(socketUrl, { autoConnect: true });
+    socket.on("doctor-status", (p) => {
+      setPeople((list) => list.map((d) => (d.id === p.id ? { ...d, available: p.available, photo: p.photo || d.photo } : d)));
+    });
+    return () => socket.disconnect();
   }, [user]);
 
   const specialties = useMemo(
@@ -29,19 +38,30 @@ export default function CareTeam() {
     [people]
   );
 
+  const onTeam = (id) => (user.careTeamIds || []).includes(id) || user.preferredDoctorId === id;
+
   const visible = people.filter((p) => {
     const hay = `${p.name} ${p.specialty || ""} ${p.city || ""}`.toLowerCase();
     if (query && !hay.includes(query.toLowerCase())) return false;
     if (user.role === "patient" && specialty !== "all" && p.specialty !== specialty) return false;
+    if (user.role === "patient" && status === "available" && p.available === false) return false;
+    if (user.role === "patient" && status === "busy" && p.available !== false) return false;
     return true;
   });
 
-  const choose = async (doctor) => {
+  const choose = async (doctor, thenMessage) => {
     if (user.role !== "patient") return;
     try {
-      const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ preferredDoctorId: doctor.id }) });
+      const next = await api(`/users/${user.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          preferredDoctorId: doctor.id,
+          careTeamIds: [...new Set([...(user.careTeamIds || []), doctor.id])],
+        }),
+      });
       updateUser({ ...user, ...next });
-      push(`${doctor.name} is now your chosen consultant. Book a time when you are ready.`);
+      push(`${doctor.name} is now on your care team.`);
+      if (thenMessage || fromMessages) navigate(`/messages?with=${doctor.id}`);
     } catch (err) {
       push(err.message, "error");
     }
@@ -49,6 +69,10 @@ export default function CareTeam() {
 
   const book = async (e) => {
     e.preventDefault();
+    if (booking.available === false) {
+      push(`${booking.name} is marked busy and is not taking new visits right now.`, "error");
+      return;
+    }
     await api("/appointments", { method: "POST", body: JSON.stringify({ ...form, doctorId: booking.id, patientId: user.id }) });
     push("Consultation scheduled and billed. Pay from Pay bills for a receipt.");
     setBooking(null);
@@ -60,9 +84,12 @@ export default function CareTeam() {
       <div className="page-title">
         <div>
           <span className="eyebrow">{user.role === "patient" ? "Hospital directory" : "Caseload"}</span>
-          <h1>{user.role === "patient" ? "Choose your doctor" : "Patients under your care"}</h1>
-          <p>{user.role === "patient" ? "Browse Ridge Campus consultants, add the one you need, then book a time. Nobody is assigned for you." : "Open the chart, message, or start a teleconsult."}</p>
+          <h1>{user.role === "patient" ? (fromMessages ? "Add a doctor to your chats" : "Doctors at Ridge Campus") : "Patients under your care"}</h1>
+          <p>{user.role === "patient"
+            ? "Photos, specialty, and live available/busy status. Add the consultant you need — nobody is assigned for you."
+            : "Open the chart, message, or start a teleconsult."}</p>
         </div>
+        {user.role === "patient" && fromMessages && <Link className="ghost-btn" to="/messages">Back to messages</Link>}
       </div>
       {user.role === "patient" && (
         <>
@@ -73,6 +100,15 @@ export default function CareTeam() {
               </button>
             ))}
           </div>
+          <div className="filters">
+            {[
+              ["all", "Everyone"],
+              ["available", "Available now"],
+              ["busy", "Busy"],
+            ].map(([id, label]) => (
+              <button key={id} className={status === id ? "active" : ""} onClick={() => setStatus(id)}>{label}</button>
+            ))}
+          </div>
           <div className="search-box" style={{ maxWidth: 360, marginBottom: 16 }}>
             <Search size={16} />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or specialty" />
@@ -81,28 +117,33 @@ export default function CareTeam() {
       )}
       <div className="people-grid">
         {visible.map((p) => (
-          <article className={`person-card ${user.preferredDoctorId === p.id ? "chosen" : ""}`} key={p.id}>
+          <article className={`person-card ${onTeam(p.id) ? "chosen" : ""} ${p.available === false ? "busy" : ""}`} key={p.id}>
             <div className="appointment-feature" style={{ border: 0, padding: 0, background: "transparent" }}>
               <Avatar person={p} className="large" />
               <div className="grow">
                 <h3>{p.name}</h3>
                 <span className="muted">{p.specialty || p.city || "Patient"}{user.role === "patient" && p.specialty && rates ? ` · from ${ghs(consultQuote(rates, p.specialty, "video"))}` : ""}</span>
+                {user.role === "patient" && <Presence person={p} />}
               </div>
-              {user.preferredDoctorId === p.id && <span className="status confirmed">Your doctor</span>}
-              {p.available === false && <span className="status pending">Away</span>}
+              {onTeam(p.id) && <span className="status confirmed">On your team</span>}
             </div>
             <p className="muted">{p.about || "Available through CareBridge."}</p>
+            {p.available === false && user.role === "patient" && (
+              <p className="muted">Busy — not taking new visits. You can still add them and leave a message.</p>
+            )}
             <div className="actions">
-              <Link className="secondary-btn" to={`/messages?with=${p.id}`}><MessageCircle size={16} /> Message</Link>
               {user.role === "patient" ? (
                 <>
-                  <button className="secondary-btn" type="button" onClick={() => choose(p)}>
-                    {user.preferredDoctorId === p.id ? "Added to your file" : "Add this doctor"}
+                  <button className="primary-btn" type="button" onClick={() => choose(p, true)}>
+                    <UserPlus size={16} /> {onTeam(p.id) ? "Open chat" : "Add & message"}
                   </button>
-                  <button className="primary-btn" type="button" onClick={() => setBooking(p)}><CalendarPlus size={16} /> Book</button>
+                  <button className="secondary-btn" type="button" disabled={p.available === false} onClick={() => setBooking(p)}>
+                    <CalendarPlus size={16} /> {p.available === false ? "Busy" : "Book"}
+                  </button>
                 </>
               ) : (
                 <>
+                  <Link className="secondary-btn" to={`/messages?with=${p.id}`}><MessageCircle size={16} /> Message</Link>
                   <Link className="secondary-btn" to={`/records/${p.id}`}>Chart</Link>
                   <Link className="primary-btn" to={`/video?with=${p.id}`}><Video size={16} /> Video</Link>
                 </>

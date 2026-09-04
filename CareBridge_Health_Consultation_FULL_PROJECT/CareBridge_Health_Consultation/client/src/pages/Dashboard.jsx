@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { CalendarDays, BedDouble, Video, ArrowRight, Mail, FolderOpen, Wallet, Pill, Stethoscope } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../state";
+import { useAuth, useToast } from "../state";
 import { api } from "../api";
 import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate } from "../utils";
 import { CarePath, EcgRibbon, Heartbeat } from "../components/LiveMeter";
 import Avatar from "../components/Avatar";
+import Presence from "../components/Presence";
 
 const ghs = (n) => `GHS ${Number(n || 0).toLocaleString()}`;
 
@@ -73,7 +74,8 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
                 <div className="grow">
                   <strong>{chosen.name}</strong>
                   <span className="muted">{chosen.specialty} · your chosen consultant</span>
-                  <small className="muted">Nobody else is assigned. Book a time when you are ready.</small>
+                  <Presence person={chosen} />
+                  <small className="muted">{chosen.available === false ? "Busy right now — you can still message them." : "Available — book a time when you are ready."}</small>
                 </div>
                 <div className="row-actions">
                   <Link className="secondary-btn" to="/care">Change</Link>
@@ -104,7 +106,7 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
             </div>
           ) : <p className="muted">No bed reserved. Request a ward before you travel; the nightly rate is on the tariff.</p>}
           <div className="quick-actions" style={{ marginTop: 8 }}>
-            <Link to="/care"><Stethoscope /><span><b>Choose a doctor</b><small>Browse Ridge Campus consultants</small></span><ArrowRight size={18} /></Link>
+            <Link to="/care"><Stethoscope /><span><b>Find a doctor</b><small>Photos, specialty, available or busy</small></span><ArrowRight size={18} /></Link>
             <Link to="/pharmacy"><Pill /><span><b>Pharmacy & labs</b><small>Priced items, then pay for a receipt</small></span><ArrowRight size={18} /></Link>
             <Link to="/wards"><BedDouble /><span><b>Request a bed</b><small>General, maternity, paediatric</small></span><ArrowRight size={18} /></Link>
             <Link to="/appointments"><CalendarDays /><span><b>Book a visit</b><small>Video or at Ridge Campus</small></span><ArrowRight size={18} /></Link>
@@ -119,12 +121,29 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
 }
 
 function DoctorBoard({ user, appointments, wards }) {
+  const { updateUser } = useAuth();
+  const { push } = useToast();
+  const [busy, setBusy] = useState(false);
   const today = appointments
     .slice()
     .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
   const nextId = today.find(isUpcoming)?.id;
   const pending = wards.filter((w) => w.status === "pending").length;
   const remaining = today.filter(isUpcoming).length;
+  const available = user.available !== false;
+
+  const toggleAvail = async () => {
+    setBusy(true);
+    try {
+      const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ available: !available }) });
+      updateUser({ ...user, ...next });
+      push(!available ? "Patients now see you as available." : "Patients now see you as busy.");
+    } catch (err) {
+      push(err.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <>
@@ -136,6 +155,13 @@ function DoctorBoard({ user, appointments, wards }) {
           <p>{longDate()} · {user.shift || "Day clinic"} · {remaining} patient{remaining === 1 ? "" : "s"} remaining</p>
           {pending > 0 && <p style={{ marginTop: 10 }}>{pending} admission request{pending > 1 ? "s" : ""} waiting</p>}
         </div>
+        <button type="button" className={`avail-switch ${available ? "on" : "off"}`} disabled={busy} onClick={toggleAvail}>
+          <i />
+          <span>
+            <b>{available ? "Available" : "Busy"}</b>
+            <small>{available ? "Patients can book and see you as free" : "Patients see you as busy — no new visits"}</small>
+          </span>
+        </button>
         <Heartbeat />
       </section>
 

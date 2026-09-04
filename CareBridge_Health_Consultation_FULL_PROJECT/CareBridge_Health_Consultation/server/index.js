@@ -59,7 +59,21 @@ const initials = (name = "") =>
 
 const safeUser = (u = {}) => {
   const { password, ...rest } = u;
+  const portraits = { d1: "/portraits/d1.jpg", d2: "/portraits/d2.jpg", d3: "/portraits/d3.jpg", d4: "/portraits/d4.jpg" };
+  if (!rest.photo && portraits[rest.id]) rest.photo = portraits[rest.id];
   return rest;
+};
+
+const roomOf = (a, b) => [a, b].filter(Boolean).sort().join("-");
+
+const withThread = (db, person, userId) => {
+  const roomId = roomOf(userId, person.id);
+  const thread = (db.messages || []).filter((m) => m.roomId === roomId);
+  const last = thread[thread.length - 1] || null;
+  return {
+    ...safeUser(person),
+    lastMessage: last ? { text: last.text, timestamp: last.timestamp, senderId: last.senderId } : null,
+  };
 };
 
 const notify = (db, userId, title, body) => {
@@ -215,6 +229,11 @@ app.patch("/api/users/:id", (req, res) => {
   if (req.body.preferredDoctorId) {
     const chosen = db.users.find((u) => u.id === req.body.preferredDoctorId && u.role === "doctor" && u.status !== "inactive");
     if (!chosen) return res.status(400).json({ message: "Choose a doctor from the hospital directory." });
+    user.careTeamIds = [...new Set([...(user.careTeamIds || []), chosen.id])];
+  }
+  if (req.body.careTeamIds !== undefined) {
+    if (!Array.isArray(req.body.careTeamIds)) return res.status(400).json({ message: "Care team must be a list of doctors." });
+    user.careTeamIds = [...new Set(req.body.careTeamIds.filter((id) => db.users.some((u) => u.id === id && u.role === "doctor" && u.status !== "inactive")))];
   }
   const allowed = ["name", "phone", "city", "about", "specialty", "available", "years", "emailAlerts", "alertPrefs", "emergencyContact", "allergies", "insurance", "bloodType", "dob", "paymentPrefs", "preferredDoctorId"];
   allowed.forEach((key) => {
@@ -224,6 +243,9 @@ app.patch("/api/users/:id", (req, res) => {
   if (photoErr) return res.status(400).json({ message: photoErr });
   if (req.body.name) user.avatar = initials(req.body.name);
   writeDb(db);
+  if (user.role === "doctor" && req.body.available !== undefined) {
+    io.emit("doctor-status", { id: user.id, available: user.available !== false, name: user.name, specialty: user.specialty, photo: safeUser(user).photo });
+  }
   res.json(safeUser(user));
 });
 
@@ -241,10 +263,21 @@ app.get("/api/contacts", (req, res) => {
   const { userId, role } = req.query;
   const db = readDb();
   if (role === "patient") {
-    return res.json(db.users.filter((u) => u.role === "doctor" && u.status !== "inactive").map(safeUser));
+    const me = db.users.find((u) => u.id === userId) || {};
+    const ids = new Set([...(me.careTeamIds || []), me.preferredDoctorId].filter(Boolean));
+    (db.appointments || []).filter((a) => a.patientId === userId).forEach((a) => ids.add(a.doctorId));
+    (db.messages || []).forEach((m) => {
+      const parts = String(m.roomId || "").split("-");
+      if (parts.includes(userId)) parts.forEach((p) => { if (p !== userId) ids.add(p); });
+    });
+    return res.json(
+      db.users
+        .filter((u) => u.role === "doctor" && ids.has(u.id) && u.status !== "inactive")
+        .map((u) => withThread(db, u, userId))
+    );
   }
   if (role === "admin") {
-    return res.json(db.users.filter((u) => u.id !== userId && u.status !== "inactive").map(safeUser));
+    return res.json(db.users.filter((u) => u.id !== userId && u.status !== "inactive").map((u) => withThread(db, u, userId)));
   }
   const ids = new Set();
   db.appointments.filter((a) => a.doctorId === userId).forEach((a) => ids.add(a.patientId));
@@ -256,8 +289,8 @@ app.get("/api/contacts", (req, res) => {
         if (p !== userId) ids.add(p);
       });
   });
-  const patients = db.users.filter((u) => u.role === "patient" && ids.has(u.id) && u.status !== "inactive").map(safeUser);
-  res.json(patients.length ? patients : db.users.filter((u) => u.role === "patient" && u.status !== "inactive").map(safeUser));
+  const patients = db.users.filter((u) => u.role === "patient" && ids.has(u.id) && u.status !== "inactive").map((u) => withThread(db, u, userId));
+  res.json(patients.length ? patients : db.users.filter((u) => u.role === "patient" && u.status !== "inactive").map((u) => withThread(db, u, userId)));
 });
 
 app.get("/api/appointments", (req, res) => {

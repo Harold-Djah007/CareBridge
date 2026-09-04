@@ -143,9 +143,19 @@ export default function Settings() {
           <label>Title / specialty<input value={account.specialty} onChange={(e) => setAccount({ ...account, specialty: e.target.value })} /></label>
         )}
         {user.role === "doctor" && (
-          <label className="check-row">
-            <input type="checkbox" checked={account.available} onChange={(e) => setAccount({ ...account, available: e.target.checked })} />
-            Show me as available for new consultations
+          <label className="check-row avail-row">
+            <input type="checkbox" checked={account.available} onChange={async (e) => {
+              const available = e.target.checked;
+              setAccount({ ...account, available });
+              try {
+                const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ available }) });
+                updateUser({ ...user, ...next });
+                push(available ? "Patients now see you as available." : "Patients now see you as busy.");
+              } catch (err) {
+                push(err.message, "error");
+              }
+            }} />
+            Show me as available. When this is off, patients see Busy and cannot book a new visit.
           </label>
         )}
         <label>About<textarea rows="3" value={account.about} onChange={(e) => setAccount({ ...account, about: e.target.value })} /></label>

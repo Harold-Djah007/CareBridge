@@ -1,11 +1,21 @@
-import React, { useEffect, useRef, useState } from "react";
-import { MessageCircle, Send, Paperclip, Search } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { MessageCircle, Send, Paperclip, Search, UserPlus, Video, CalendarDays } from "lucide-react";
 import { io } from "socket.io-client";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { roomIdFor } from "../utils";
 import Avatar from "../components/Avatar";
+import Presence from "../components/Presence";
+
+const prettyTime = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  return sameDay
+    ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString([], { month: "short", day: "numeric" });
+};
 
 export default function Messages() {
   const { user } = useAuth();
@@ -20,17 +30,30 @@ export default function Messages() {
   const fileRef = useRef();
   const socketRef = useRef();
 
-  useEffect(() => {
+  const loadContacts = (keepId) => {
     api(`/contacts?userId=${user.id}&role=${user.role}`).then((list) => {
       setContacts(list);
-      const wanted = params.get("with");
-      setSelected(list.find((c) => c.id === wanted) || list[0] || null);
+      const wanted = keepId || params.get("with");
+      setSelected((cur) => list.find((c) => c.id === (wanted || cur?.id)) || (wanted ? list.find((c) => c.id === wanted) : list[0]) || null);
     });
+  };
+
+  useEffect(() => {
+    loadContacts();
     const socket = io(socketUrl, { autoConnect: true });
     socket.emit("join-user", user.id);
+    socket.on("doctor-status", (p) => {
+      setContacts((list) => list.map((c) => (c.id === p.id ? { ...c, available: p.available, photo: p.photo || c.photo } : c)));
+      setSelected((cur) => (cur?.id === p.id ? { ...cur, available: p.available, photo: p.photo || cur.photo } : cur));
+    });
     socketRef.current = socket;
     return () => socket.disconnect();
   }, [user.id]);
+
+  useEffect(() => {
+    const wanted = params.get("with");
+    if (wanted) loadContacts(wanted);
+  }, [params.get("with")]);
 
   const roomId = selected ? roomIdFor(user.id, selected.id) : "";
 
@@ -38,7 +61,14 @@ export default function Messages() {
     if (!roomId || !socketRef.current) return;
     socketRef.current.emit("join-room", roomId);
     api(`/messages/${roomId}`).then(setMessages);
-    const handler = (m) => { if (m.roomId === roomId) setMessages((prev) => prev.some((x) => x.id === m.id) ? prev : [...prev, m]); };
+    const handler = (m) => {
+      if (m.roomId === roomId) setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+      setContacts((list) => list.map((c) => {
+        const other = m.roomId?.split("-").find((id) => id !== user.id);
+        if (c.id !== other) return c;
+        return { ...c, lastMessage: { text: m.text, timestamp: m.timestamp, senderId: m.senderId } };
+      }));
+    };
     socketRef.current.on("chat-message", handler);
     return () => socketRef.current?.off("chat-message", handler);
   }, [roomId]);
@@ -59,40 +89,86 @@ export default function Messages() {
     push(`Attached ${file.name} to the conversation`);
   };
 
-  const visible = contacts.filter((c) => `${c.name} ${c.specialty || ""}`.toLowerCase().includes(query.toLowerCase()));
+  const visible = useMemo(
+    () => contacts.filter((c) => `${c.name} ${c.specialty || ""}`.toLowerCase().includes(query.toLowerCase())),
+    [contacts, query]
+  );
+
+  const title = user.role === "patient" ? "Messages" : user.role === "doctor" ? "Clinical inbox" : "Switchboard";
 
   return (
     <div>
       <div className="page-title">
         <div>
-          <span className="eyebrow">{user.role === "patient" ? "Messages" : user.role === "doctor" ? "Clinical inbox" : "Switchboard"}</span>
-          <h1>{user.role === "patient" ? "Talk to your doctors" : user.role === "doctor" ? "Patient messages" : "Internal and patient mail"}</h1>
-          <p>{user.role === "patient" ? "Ask a question before your visit. Replies also arrive by email." : user.role === "doctor" ? "Keep encounter notes in the thread. Patients are notified by email." : "Route messages across the hospital."}</p>
+          <span className="eyebrow">{title}</span>
+          <h1>{user.role === "patient" ? "Chat with your doctors" : user.role === "doctor" ? "Patient messages" : "Hospital mail"}</h1>
+          <p>{user.role === "patient"
+            ? "Only doctors you add appear here. Tap Add a doctor to see who is available or busy, with their photo and specialty."
+            : user.role === "doctor"
+              ? "Reply in the thread. Patients also get an email when you write."
+              : "Route messages across the hospital."}</p>
         </div>
+        {user.role === "patient" && (
+          <Link className="primary-btn" to="/care?from=messages"><UserPlus size={16} /> Add a doctor</Link>
+        )}
       </div>
       <div className="chat-layout">
         <aside className="contact-panel">
-          <div className="search-box"><Search size={17} /><input placeholder="Search conversations" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
+          <div className="search-box"><Search size={17} /><input placeholder="Search chats" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
+          {user.role === "patient" && (
+            <Link className="secondary-btn full" style={{ margin: "8px 0 12px" }} to="/care?from=messages">
+              <UserPlus size={16} /> Add a doctor
+            </Link>
+          )}
           {visible.map((c) => (
             <button key={c.id} onClick={() => setSelected(c)} className={`contact ${selected?.id === c.id ? "selected" : ""}`}>
-              <Avatar person={c} />
-              <span><b>{c.name}</b><small>{c.specialty || c.role || "Patient"}</small></span>
+              <span className="avatar-wrap">
+                <Avatar person={c} />
+                <i className={`online-dot ${c.available === false ? "busy" : "on"}`} />
+              </span>
+              <span>
+                <b>{c.name}</b>
+                <small>{c.lastMessage?.text || c.specialty || c.role || "Tap to write"}</small>
+              </span>
+              {c.lastMessage?.timestamp && <em className="chat-time">{prettyTime(c.lastMessage.timestamp)}</em>}
             </button>
           ))}
-          {visible.length === 0 && <p className="muted">No matches.</p>}
+          {visible.length === 0 && (
+            <div className="empty compact">
+              <MessageCircle size={28} />
+              <h3>{user.role === "patient" ? "No doctors in your chats yet" : "No conversations"}</h3>
+              <p>{user.role === "patient" ? "Add a doctor from the hospital list. You will see who is available or busy." : "Open a patient chart or wait for a message."}</p>
+            </div>
+          )}
         </aside>
         <section className="chat-panel">
           {selected ? (
             <>
               <div className="chat-head">
                 <Avatar person={selected} />
-                <div><strong>{selected.name}</strong><span className="muted">{selected.specialty || selected.city || "Care contact"}</span></div>
+                <div className="grow">
+                  <strong>{selected.name}</strong>
+                  <span className="muted">{selected.specialty || selected.city || "Care contact"}</span>
+                  {selected.role === "doctor" || user.role === "patient" ? <Presence person={selected} /> : null}
+                </div>
+                {user.role === "patient" && (
+                  <div className="row-actions">
+                    <Link className="ghost-btn" to={`/appointments`}><CalendarDays size={16} /> Book</Link>
+                    <Link className="secondary-btn" to={`/video?with=${selected.id}`}><Video size={16} /> Video</Link>
+                  </div>
+                )}
               </div>
               <div className="messages">
-                {messages.length === 0 && <div className="empty compact"><MessageCircle size={32} /><h3>Start the conversation</h3><p>Messages are delivered instantly.</p></div>}
+                {messages.length === 0 && (
+                  <div className="empty compact">
+                    <MessageCircle size={32} />
+                    <h3>No messages yet</h3>
+                    <p>Say hello. {selected.name.split(" ")[0]} will see this instantly{user.role === "patient" ? ", and by email if alerts are on" : ""}.</p>
+                  </div>
+                )}
                 {messages.map((m) => (
                   <div key={m.id} className={`bubble-wrap ${m.senderId === user.id ? "mine" : ""}`}>
-                    <div className="bubble">{m.text}<small>{new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small></div>
+                    <div className="bubble">{m.text}<small>{prettyTime(m.timestamp)}</small></div>
                   </div>
                 ))}
                 <div ref={endRef} />
@@ -100,11 +176,17 @@ export default function Messages() {
               <form className="message-composer" onSubmit={(e) => { e.preventDefault(); sendText(text); }}>
                 <input type="file" hidden ref={fileRef} onChange={onFile} />
                 <button type="button" className="icon-btn" title="Attach a file" onClick={() => fileRef.current?.click()}><Paperclip size={19} /></button>
-                <input placeholder="Write a message..." value={text} onChange={(e) => setText(e.target.value)} />
+                <input placeholder={selected.available === false && user.role === "patient" ? `${selected.name.split(" ")[0]} is busy — you can still leave a message` : "Write a message..."} value={text} onChange={(e) => setText(e.target.value)} />
                 <button className="send-btn" type="submit"><Send size={18} /></button>
               </form>
             </>
-          ) : <div className="empty"><MessageCircle /><h3>Select a conversation</h3></div>}
+          ) : (
+            <div className="empty">
+              <MessageCircle />
+              <h3>{user.role === "patient" ? "Add a doctor to start chatting" : "Select a conversation"}</h3>
+              {user.role === "patient" && <Link className="primary-btn" to="/care?from=messages"><UserPlus size={16} /> View available doctors</Link>}
+            </div>
+          )}
         </section>
       </div>
     </div>

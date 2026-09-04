@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Clock, XCircle, Plus, Stethoscope, Video, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { io } from "socket.io-client";
+import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { formatDate, formatTime, isUpcoming, todayISO, ghs, consultQuote } from "../utils";
 import Avatar from "../components/Avatar";
@@ -23,12 +24,22 @@ export default function Appointments() {
     api("/doctors").then(setDoctors);
     if (user.role !== "patient") api("/patients").then(setPatients);
     api("/finance/rates").then(setRates);
+    const socket = io(socketUrl, { autoConnect: true });
+    socket.on("doctor-status", (p) => {
+      setDoctors((list) => list.map((d) => (d.id === p.id ? { ...d, available: p.available, photo: p.photo || d.photo } : d)));
+    });
+    return () => socket.disconnect();
   }, []);
 
   const submit = async (e) => {
     e.preventDefault();
     if (!form.doctorId) {
       push("Choose a doctor from the list.", "error");
+      return;
+    }
+    const picked = doctors.find((d) => d.id === form.doctorId);
+    if (picked?.available === false) {
+      push(`${picked.name} is busy and is not taking new visits. Pick an available doctor.`, "error");
       return;
     }
     await api("/appointments", { method: "POST", body: JSON.stringify({ ...form, patientId: user.role === "patient" ? user.id : form.patientId }) });
@@ -138,11 +149,11 @@ export default function Appointments() {
             <p className="eyebrow">Choose a doctor</p>
             <div className="doctor-pick">
               {doctors.map((d) => (
-                <button type="button" key={d.id} className={`doctor-chip ${form.doctorId === d.id ? "on" : ""} ${user.preferredDoctorId === d.id ? "preferred" : ""}`} onClick={() => setForm({ ...form, doctorId: d.id })}>
+                <button type="button" key={d.id} className={`doctor-chip ${form.doctorId === d.id ? "on" : ""} ${user.preferredDoctorId === d.id ? "preferred" : ""} ${d.available === false ? "busy" : ""}`} onClick={() => setForm({ ...form, doctorId: d.id })}>
                   <Avatar person={d} />
                   <span>
                     <b>{d.name}</b>
-                    <small>{d.specialty || "Consultant"}{user.preferredDoctorId === d.id ? " · your doctor" : ""}{rates ? ` · ${ghs(consultQuote(rates, d.specialty, form.mode) || 0)}` : ""}</small>
+                    <small>{d.specialty || "Consultant"} · {d.available === false ? "Busy" : "Available"}{user.preferredDoctorId === d.id ? " · your doctor" : ""}{rates ? ` · ${ghs(consultQuote(rates, d.specialty, form.mode) || 0)}` : ""}</small>
                   </span>
                 </button>
               ))}
