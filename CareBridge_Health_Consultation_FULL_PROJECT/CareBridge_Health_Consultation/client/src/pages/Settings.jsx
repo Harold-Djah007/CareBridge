@@ -1,18 +1,33 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogOut, Shield, Wallet, Bell, UserRound, PanelTop } from "lucide-react";
+import { LogOut, Shield, Wallet, Bell, UserRound, Building2, IdCard } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
-import { useTopbar } from "../chrome";
+import { HOSPITAL, roleLabel } from "../utils";
 import PhotoPicker from "../components/PhotoPicker";
 import DutyToggle from "../components/DutyToggle";
+import Avatar from "../components/Avatar";
 import PageHero from "../components/PageHero";
+
+const FILE_NOTE = {
+  patient: "Printed on receipts, letters, and the ward board. Clinical facts stay on My details.",
+  doctor: "Used on prescriptions, the clinic board, and the staff directory.",
+  nurse: "Used on the dispensary queue and the staff directory.",
+  admin: "Used on operations notices and the staff directory.",
+};
 
 export default function Settings() {
   const { user, updateUser, logout } = useAuth();
   const { push } = useToast();
   const navigate = useNavigate();
   const prefs = user.paymentPrefs || {};
+  const tabs = [
+    { id: "identity", label: "Identity" },
+    { id: "signin", label: "Sign-in" },
+    ...(user.role === "patient" ? [{ id: "pay", label: "How you pay" }] : []),
+    { id: "notices", label: "Notices" },
+  ];
+  const [tab, setTab] = useState("identity");
   const [account, setAccount] = useState({
     name: user.name || "",
     email: user.email || "",
@@ -41,7 +56,9 @@ export default function Settings() {
     },
   });
   const [busy, setBusy] = useState("");
-  const [topbarOn, setTopbarOn] = useTopbar();
+
+  const fileNo = user.role === "patient" ? (user.mrn || "Pending MRN") : (user.employeeId || "Staff file");
+  const desk = user.role === "patient" ? (user.insurance || "Self-pay") : (user.department || user.specialty || roleLabel(user.role));
 
   const patch = async (body, ok) => {
     const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -54,7 +71,7 @@ export default function Settings() {
     e.preventDefault();
     setBusy("account");
     try {
-      await patch(account, "Account details saved");
+      await patch(account, "Account details saved to your hospital file.");
     } catch (err) {
       push(err.message, "error");
     } finally {
@@ -86,7 +103,7 @@ export default function Settings() {
     e.preventDefault();
     setBusy("pay");
     try {
-      await patch({ paymentPrefs: pay, insurance: pay.nhisNumber || user.insurance }, "Payment defaults saved. Shop & pay will use these next.");
+      await patch({ paymentPrefs: pay, insurance: pay.nhisNumber || user.insurance }, "Payment defaults saved. Shop & pay will open with these.");
     } catch (err) {
       push(err.message, "error");
     } finally {
@@ -98,7 +115,7 @@ export default function Settings() {
     e.preventDefault();
     setBusy("alerts");
     try {
-      await patch(alerts, "Notification preferences saved");
+      await patch(alerts, "Notice preferences saved.");
     } catch (err) {
       push(err.message, "error");
     } finally {
@@ -116,12 +133,12 @@ export default function Settings() {
   };
 
   return (
-    <div>
+    <div className="settings-desk">
       <PageHero
-        scene="settings"
-        eyebrow="Account"
+        scene="records"
+        eyebrow={`${HOSPITAL.campus} · hospital file`}
         title="Settings"
-        lead="These controls write to your hospital file. Nothing here is decorative — each save is stored and used on the next visit, bill, or alert."
+        lead="Each save writes to your CareBridge file and is used on the next visit, bill, or notice. Nothing here is decorative."
         actions={(
           <button className="secondary-btn" type="button" onClick={() => { logout(); navigate("/login"); }}>
             <LogOut size={16} /> Sign out
@@ -129,130 +146,173 @@ export default function Settings() {
         )}
       />
 
-      <form className="card settings-card" onSubmit={saveAccount}>
-        <div className="card-head">
-          <div><span className="eyebrow">Identity</span><h3><UserRound size={16} /> Name and contact</h3></div>
-        </div>
-        <PhotoPicker value={account.photo} name={account.name} onChange={(photo) => setAccount({ ...account, photo })} onError={(m) => push(m, "error")} />
-        <div className="form-grid">
-          <label>Full name<input value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} required /></label>
-          <label>Email<input type="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} required /></label>
-        </div>
-        <div className="form-grid">
-          <label>Phone<input value={account.phone} onChange={(e) => setAccount({ ...account, phone: e.target.value })} /></label>
-          <label>City<input value={account.city} onChange={(e) => setAccount({ ...account, city: e.target.value })} /></label>
-        </div>
-        {(user.role === "doctor" || user.role === "admin" || user.role === "nurse") && (
-          <label>Title / specialty<input value={account.specialty} onChange={(e) => setAccount({ ...account, specialty: e.target.value })} /></label>
-        )}
-        {user.role === "doctor" && (
-          <div className="avail-row">
-            <span className="eyebrow">Duty</span>
-            <DutyToggle
-              available={account.available}
-              onChange={async (available) => {
-                setAccount({ ...account, available });
-                try {
-                  const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ available }) });
-                  updateUser({ ...user, ...next });
-                  push(available ? "Patients now see you as available." : "Patients now see you as busy.");
-                } catch (err) {
-                  push(err.message, "error");
-                }
-              }}
-            />
+      <div className="settings-layout">
+        <aside className="settings-jacket">
+          <div className="settings-jacket-photo" style={{ backgroundImage: "url(/imagery/records.jpg)" }} aria-hidden="true" />
+          <div className="settings-jacket-body">
+            <Avatar person={{ ...user, photo: account.photo, name: account.name }} className="large" />
+            <b>{account.name || user.name}</b>
+            <span className="muted">{account.email || user.email}</span>
+            <ul className="settings-meta">
+              <li><IdCard size={14} /> {user.role === "patient" ? "MRN" : "Staff"} <strong>{fileNo}</strong></li>
+              <li><UserRound size={14} /> {roleLabel(user.role)}</li>
+              <li><Building2 size={14} /> {HOSPITAL.campus}</li>
+              <li>{desk}</li>
+            </ul>
+            {user.role === "patient" && <Link className="ghost-btn" to="/profile">Open clinical details</Link>}
+            {user.role === "doctor" && <Link className="ghost-btn" to="/profile">Open credentials</Link>}
           </div>
-        )}
-        <label>About<textarea rows="3" value={account.about} onChange={(e) => setAccount({ ...account, about: e.target.value })} /></label>
-        <p className="muted">Clinical details (allergies, NHIS on the file, emergency contact) stay on <Link to="/profile"><b>My details</b></Link>.</p>
-        <button className="primary-btn" disabled={busy === "account"}>{busy === "account" ? "Saving…" : "Save account"}</button>
-      </form>
+        </aside>
 
-      <form className="card settings-card" onSubmit={savePassword}>
-        <div className="card-head">
-          <div><span className="eyebrow">Sign-in</span><h3><Shield size={16} /> Password</h3></div>
-        </div>
-        <label>Current password<input type="password" value={security.currentPassword} onChange={(e) => setSecurity({ ...security, currentPassword: e.target.value })} required autoComplete="current-password" /></label>
-        <div className="form-grid">
-          <label>New password<input type="password" value={security.password} onChange={(e) => setSecurity({ ...security, password: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
-          <label>Confirm new password<input type="password" value={security.confirm} onChange={(e) => setSecurity({ ...security, confirm: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
-        </div>
-        <button className="primary-btn" disabled={busy === "password"}>{busy === "password" ? "Updating…" : "Update password"}</button>
-      </form>
-
-      {user.role === "patient" && (
-        <form className="card settings-card" onSubmit={savePay}>
-          <div className="card-head">
-            <div><span className="eyebrow">Accounts</span><h3><Wallet size={16} /> How you pay hospital bills</h3></div>
-          </div>
-          <p className="muted">Shop & pay opens with these defaults. You can still pick another method at checkout.</p>
-          <label>Preferred method
-            <select value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}>
-              <option value="momo">Mobile money</option>
-              <option value="bank">GCB bank transfer</option>
-              <option value="nhis">NHIS / insurance</option>
-              <option value="cash">Cash at Ridge cashier</option>
-            </select>
-          </label>
-          <div className="form-grid">
-            <label>MoMo network
-              <select value={pay.momoNetwork} onChange={(e) => setPay({ ...pay, momoNetwork: e.target.value })}>
-                <option value="mtn">MTN MoMo</option>
-                <option value="telecel">Telecel Cash</option>
-                <option value="at">AirtelTigo Money</option>
+        <div className="settings-work">
+          <div className="settings-tabs" role="tablist" aria-label="Settings sections">
+            <label className="jump-menu">
+              <span>Section</span>
+              <select value={tab} onChange={(e) => setTab(e.target.value)}>
+                {tabs.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
             </label>
-            <label>Wallet number<input value={pay.momoNumber} onChange={(e) => setPay({ ...pay, momoNumber: e.target.value })} placeholder="024…" /></label>
+            <div className="chip-row">
+              {tabs.map((t) => (
+                <button key={t.id} type="button" className={`chip-link ${tab === t.id ? "on" : ""}`} onClick={() => setTab(t.id)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <label>NHIS / policy number<input value={pay.nhisNumber} onChange={(e) => setPay({ ...pay, nhisNumber: e.target.value })} /></label>
-          <button className="primary-btn" disabled={busy === "pay"}>{busy === "pay" ? "Saving…" : "Save payment defaults"}</button>
-        </form>
-      )}
 
-      <section className="card settings-card">
-        <div className="card-head">
-          <div><span className="eyebrow">Display</span><h3><PanelTop size={16} /> Toolbar</h3></div>
-        </div>
-        <p className="muted">The top bar stays hidden until you open it. This switch is stored on this browser and takes effect immediately.</p>
-        <label className="check-row">
-          <input type="checkbox" checked={topbarOn} onChange={(e) => setTopbarOn(e.target.checked)} />
-          Show the top toolbar (search, shortcuts, clock)
-        </label>
-        <button type="button" className="secondary-btn" onClick={() => setTopbarOn(!topbarOn)}>
-          {topbarOn ? "Hide toolbar now" : "Show toolbar now"}
-        </button>
-      </section>
+          {tab === "identity" && (
+            <form className="card settings-card" onSubmit={saveAccount}>
+              <div className="card-head">
+                <div>
+                  <span className="eyebrow">Identity</span>
+                  <h3><UserRound size={16} /> Name and contact</h3>
+                </div>
+              </div>
+              <p className="muted">{FILE_NOTE[user.role] || FILE_NOTE.patient}</p>
+              <PhotoPicker value={account.photo} name={account.name} onChange={(photo) => setAccount({ ...account, photo })} onError={(m) => push(m, "error")} />
+              <div className="form-grid">
+                <label>Full name<input value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} required /></label>
+                <label>Email<input type="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} required /></label>
+              </div>
+              <div className="form-grid">
+                <label>Phone<input value={account.phone} onChange={(e) => setAccount({ ...account, phone: e.target.value })} /></label>
+                <label>City<input value={account.city} onChange={(e) => setAccount({ ...account, city: e.target.value })} /></label>
+              </div>
+              {(user.role === "doctor" || user.role === "admin" || user.role === "nurse") && (
+                <label>Title / specialty<input value={account.specialty} onChange={(e) => setAccount({ ...account, specialty: e.target.value })} /></label>
+              )}
+              {user.role === "doctor" && (
+                <div className="avail-row">
+                  <span className="eyebrow">Duty on the directory</span>
+                  <DutyToggle
+                    available={account.available}
+                    onChange={async (available) => {
+                      setAccount({ ...account, available });
+                      try {
+                        const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ available }) });
+                        updateUser({ ...user, ...next });
+                        push(available ? "Patients now see you as available." : "Patients now see you as busy.");
+                      } catch (err) {
+                        push(err.message, "error");
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              <label>About<textarea rows="3" value={account.about} onChange={(e) => setAccount({ ...account, about: e.target.value })} placeholder={user.role === "doctor" ? "Short note for the consultant directory" : "Optional note on your file"} /></label>
+              <button className="primary-btn" disabled={busy === "account"}>{busy === "account" ? "Saving…" : "Save to file"}</button>
+            </form>
+          )}
 
-      <form className="card settings-card" onSubmit={saveAlerts}>
-        <div className="card-head">
-          <div><span className="eyebrow">Notices</span><h3><Bell size={16} /> Email and in-app alerts</h3></div>
+          {tab === "signin" && (
+            <form className="card settings-card" onSubmit={savePassword}>
+              <div className="card-head">
+                <div>
+                  <span className="eyebrow">Hospital sign-in</span>
+                  <h3><Shield size={16} /> Password</h3>
+                </div>
+              </div>
+              <p className="muted">This password opens the {user.role === "patient" ? "patient portal" : user.role === "doctor" ? "clinical workspace" : user.role === "nurse" ? "pharmacy workspace" : "operations desk"} at {HOSPITAL.short}. It is not shared with other staff.</p>
+              <label>Current password<input type="password" value={security.currentPassword} onChange={(e) => setSecurity({ ...security, currentPassword: e.target.value })} required autoComplete="current-password" /></label>
+              <div className="form-grid">
+                <label>New password<input type="password" value={security.password} onChange={(e) => setSecurity({ ...security, password: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
+                <label>Confirm new password<input type="password" value={security.confirm} onChange={(e) => setSecurity({ ...security, confirm: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
+              </div>
+              <button className="primary-btn" disabled={busy === "password"}>{busy === "password" ? "Updating…" : "Update password"}</button>
+            </form>
+          )}
+
+          {tab === "pay" && user.role === "patient" && (
+            <form className="card settings-card" onSubmit={savePay}>
+              <div className="card-head">
+                <div>
+                  <span className="eyebrow">Ridge cashier</span>
+                  <h3><Wallet size={16} /> How you pay hospital bills</h3>
+                </div>
+              </div>
+              <p className="muted">Shop & pay opens with these defaults. You can still choose another method at checkout — MoMo, GCB, NHIS, or cash at the ground-floor desk.</p>
+              <label>Preferred method
+                <select value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}>
+                  <option value="momo">Mobile money</option>
+                  <option value="bank">GCB bank transfer</option>
+                  <option value="nhis">NHIS / insurance</option>
+                  <option value="cash">Cash at Ridge cashier</option>
+                </select>
+              </label>
+              <div className="form-grid">
+                <label>MoMo network
+                  <select value={pay.momoNetwork} onChange={(e) => setPay({ ...pay, momoNetwork: e.target.value })}>
+                    <option value="mtn">MTN MoMo</option>
+                    <option value="telecel">Telecel Cash</option>
+                    <option value="at">AirtelTigo Money</option>
+                  </select>
+                </label>
+                <label>Wallet number<input value={pay.momoNumber} onChange={(e) => setPay({ ...pay, momoNumber: e.target.value })} placeholder="024…" /></label>
+              </div>
+              <label>NHIS / policy number<input value={pay.nhisNumber} onChange={(e) => setPay({ ...pay, nhisNumber: e.target.value })} /></label>
+              <button className="primary-btn" disabled={busy === "pay"}>{busy === "pay" ? "Saving…" : "Save payment defaults"}</button>
+            </form>
+          )}
+
+          {tab === "notices" && (
+            <form className="card settings-card" onSubmit={saveAlerts}>
+              <div className="card-head">
+                <div>
+                  <span className="eyebrow">Hospital notices</span>
+                  <h3><Bell size={16} /> Email and in-app alerts</h3>
+                </div>
+              </div>
+              <p className="muted">Ridge Campus sends these when a visit, bed, message, bill, or help-desk ticket changes. They also appear under the bell on this portal.</p>
+              <label className="check-row">
+                <input type="checkbox" checked={alerts.emailAlerts} onChange={(e) => setAlerts({ ...alerts, emailAlerts: e.target.checked })} />
+                Email {user.email} when something on this list happens
+              </label>
+              {[
+                ["appointments", "Consultations scheduled or updated"],
+                ["wards", "Admissions received or accepted"],
+                ["messages", "New messages from the care team"],
+                ["account", "Billing receipts and account notices"],
+                ["support", "Help-desk tickets and operations replies"],
+              ].map(([key, label]) => (
+                <label className="check-row" key={key}>
+                  <input
+                    type="checkbox"
+                    checked={alerts.alertPrefs[key]}
+                    disabled={!alerts.emailAlerts}
+                    onChange={(e) => setAlerts((f) => ({ ...f, alertPrefs: { ...f.alertPrefs, [key]: e.target.checked } }))}
+                  />
+                  {label}
+                </label>
+              ))}
+              <div className="modal-actions">
+                <button className="primary-btn" disabled={busy === "alerts"}>{busy === "alerts" ? "Saving…" : "Save notices"}</button>
+                <button type="button" className="secondary-btn" onClick={testEmail}>Send a test notice</button>
+              </div>
+            </form>
+          )}
         </div>
-        <label className="check-row">
-          <input type="checkbox" checked={alerts.emailAlerts} onChange={(e) => setAlerts({ ...alerts, emailAlerts: e.target.checked })} />
-          Email {user.email} when something on this list happens
-        </label>
-        {[
-          ["appointments", "Consultations scheduled or updated"],
-          ["wards", "Admissions received or accepted"],
-          ["messages", "New messages from the care team"],
-          ["account", "Billing receipts and account notices"],
-          ["support", "Help-desk tickets and operations replies"],
-        ].map(([key, label]) => (
-          <label className="check-row" key={key}>
-            <input
-              type="checkbox"
-              checked={alerts.alertPrefs[key]}
-              disabled={!alerts.emailAlerts}
-              onChange={(e) => setAlerts((f) => ({ ...f, alertPrefs: { ...f.alertPrefs, [key]: e.target.checked } }))}
-            />
-            {label}
-          </label>
-        ))}
-        <div className="modal-actions">
-          <button className="primary-btn" disabled={busy === "alerts"}>{busy === "alerts" ? "Saving…" : "Save alerts"}</button>
-          <button type="button" className="secondary-btn" onClick={testEmail}>Send a test notice</button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

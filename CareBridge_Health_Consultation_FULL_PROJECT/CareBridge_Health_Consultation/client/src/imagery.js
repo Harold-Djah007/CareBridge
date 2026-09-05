@@ -25,7 +25,7 @@ export const SCENE_PHOTOS = {
   messages: IMAGERY.consult,
   wards: IMAGERY.wards,
   records: IMAGERY.records,
-  settings: IMAGERY.campus,
+  settings: IMAGERY.records,
   support: IMAGERY.ops,
   care: IMAGERY.clinic,
   profile: IMAGERY.patient,

@@ -856,8 +856,67 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .landing .feature-grid { grid-template-columns: repeat(3, 1fr); }
 .landing .card, .landing .page-title { margin-left: 7vw; margin-right: 7vw; }
 .landing .hero-panel { position: relative; overflow: hidden; }
-.settings-card { max-width: 720px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px; }
+.settings-card { max-width: none; display: flex; flex-direction: column; gap: 14px; margin-bottom: 0; }
 .settings-card h3 { display: flex; align-items: center; gap: 8px; }
+.settings-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.settings-jacket {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(0, 51, 102, 0.05);
+}
+.settings-jacket-photo {
+  height: 88px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+.settings-jacket-photo::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0, 51, 102, 0.15), rgba(0, 51, 102, 0.45));
+}
+.settings-jacket-body {
+  padding: 0 16px 16px;
+  margin-top: -22px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-jacket-body .avatar { box-shadow: 0 0 0 3px #fff; }
+.settings-jacket-body b { margin-top: 8px; color: var(--navy); }
+.settings-meta {
+  list-style: none; margin: 10px 0 8px; padding: 0;
+  display: flex; flex-direction: column; gap: 7px;
+  font-size: 12px; color: var(--muted);
+}
+.settings-meta li { display: flex; align-items: center; gap: 8px; }
+.settings-meta strong { color: var(--ink); }
+.settings-work { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.settings-tabs {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px;
+}
+.settings-tabs .chip-link {
+  border: 0;
+  background: #fff;
+  cursor: pointer;
+}
+.settings-tabs .chip-link.on {
+  background: var(--teal);
+  color: #fff;
+  border-color: var(--teal);
+}
+.chip-link.on { background: var(--teal); color: #fff; border-color: var(--teal); }
+@media (max-width: 800px) {
+  .settings-layout { grid-template-columns: 1fr; }
+}
 .support-layout { display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px; align-items: start; }
 .ticket-thread { display: flex; flex-direction: column; gap: 12px; }
 .ticket-msg { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: #fff; }
@@ -1579,7 +1638,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .scene-consult .atm-photo, .scene-messages .atm-photo { background-image: url("/imagery/teleconsult.jpg"); }
 .scene-wards .atm-photo { background-image: url("/imagery/wards.jpg"); }
 .scene-records .atm-photo, .scene-billing .atm-photo, .scene-cases .atm-photo { background-image: url("/imagery/records.jpg"); }
-.scene-settings .atm-photo, .scene-directory .atm-photo, .scene-tariff .atm-photo { background-image: url("/imagery/hero-campus.jpg"); }
+.scene-directory .atm-photo, .scene-tariff .atm-photo { background-image: url("/imagery/hero-campus.jpg"); }
+.scene-settings .atm-photo { background-image: url("/imagery/records.jpg"); }
 .scene-pharmacy .atm-photo, .scene-shop .atm-photo { background-image: url("/imagery/pharmacy.jpg"); }
 .scene-nurse .atm-photo { background-image: url("/imagery/login-nurse.jpg"); }
 .scene-schedule .atm-photo, .scene-care .atm-photo { background-image: url("/imagery/clinic.jpg"); }
