@@ -4,6 +4,7 @@ import { io } from "socket.io-client";
 import { api, socketUrl } from "../api";
 import { HOSPITAL, ghs, prettyDate } from "../utils";
 import { useAuth, useToast } from "../state";
+import PublicChrome from "../components/PublicChrome";
 
 function MapEditor({ title, note, values, onChange, extra }) {
   return (
@@ -124,17 +125,8 @@ export default function Tariff() {
     }
   };
 
-  return (
-    <div className={user ? "" : "landing"}>
-      {!user && (
-        <nav className="public-nav">
-          <Link to="/" className="brand"><b>{HOSPITAL.short}</b></Link>
-          <div className="links">
-            <Link to="/login">Sign in</Link>
-            <Link className="primary-btn" to="/register">Register</Link>
-          </div>
-        </nav>
-      )}
+  const body = (
+    <div>
       <div className="page-title">
         <div>
           <span className="eyebrow">{HOSPITAL.campus} accounts</span>
@@ -302,4 +294,7 @@ export default function Tariff() {
       )}
     </div>
   );
+
+  if (user) return body;
+  return <PublicChrome><div className="hospital-inner">{body}</div></PublicChrome>;
 }

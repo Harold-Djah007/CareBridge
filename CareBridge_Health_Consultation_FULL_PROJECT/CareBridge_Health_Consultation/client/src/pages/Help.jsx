@@ -2,17 +2,11 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { HOSPITAL } from "../utils";
 import { useAuth } from "../state";
+import PublicChrome from "../components/PublicChrome";
 
-export default function Help() {
-  const { user } = useAuth();
+function HelpBody({ user }) {
   return (
-    <div className={user ? "" : "landing"}>
-      {!user && (
-        <nav className="public-nav">
-          <Link to="/" className="brand"><b>{HOSPITAL.short}</b></Link>
-          <div className="links"><Link to="/login">Sign in</Link></div>
-        </nav>
-      )}
+    <>
       <div className="page-title">
         <div>
           <span className="eyebrow">{HOSPITAL.campus}</span>
@@ -44,8 +38,26 @@ export default function Help() {
       <section className="card">
         <h3>Emergency</h3>
         <p>Call {HOSPITAL.emergency}. CareBridge is for scheduled care, not a substitute for 24-hour emergency services.</p>
-        <p className="muted"><Link to="/privacy">Privacy notice</Link> · Records office {HOSPITAL.phone}</p>
+        <p className="muted"><Link to="/privacy">Privacy notice</Link> · Records office {HOSPITAL.phone} · {HOSPITAL.email}</p>
       </section>
-    </div>
+    </>
+  );
+}
+
+export default function Help() {
+  const { user } = useAuth();
+  if (user) {
+    return (
+      <div>
+        <HelpBody user={user} />
+      </div>
+    );
+  }
+  return (
+    <PublicChrome>
+      <div className="hospital-inner">
+        <HelpBody user={null} />
+      </div>
+    </PublicChrome>
   );
 }

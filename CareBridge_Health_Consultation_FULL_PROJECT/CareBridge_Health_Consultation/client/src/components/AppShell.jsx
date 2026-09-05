@@ -275,6 +275,11 @@ export default function AppShell() {
         </div>
       </aside>
       <main className={`main ${topbarOn ? "has-topbar" : "topbar-hidden"}`}>
+        <div className="app-util" aria-label="Hospital switchboard">
+          <span>{HOSPITAL.campus}, {HOSPITAL.city}</span>
+          <span>Switchboard {HOSPITAL.phone}</span>
+          <span>Emergency {HOSPITAL.emergency}</span>
+        </div>
         {!topbarOn && (
           <div className="chrome-strip">
             <button type="button" className="toolbar-toggle" onClick={() => setTopbarOn(true)}>
