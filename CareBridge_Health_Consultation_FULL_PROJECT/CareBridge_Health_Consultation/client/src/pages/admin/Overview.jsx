@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Users, Building2, CalendarDays, ScrollText, FolderKanban, Receipt, LifeBuoy, Wallet } from "lucide-react";
 import { api } from "../../api";
 import { HOSPITAL } from "../../utils";
 import { OccupancyBars, OpsRadar } from "../../components/LiveMeter";
 import Avatar from "../../components/Avatar";
+import TileCard, { TileGrid } from "../../components/TileCard";
 
 export default function AdminOverview() {
   const [stats, setStats] = useState(null);
@@ -32,17 +34,26 @@ export default function AdminOverview() {
         <div>
           <span className="eyebrow">{HOSPITAL.campus} operations</span>
           <h1>Operations</h1>
-          <p>Beds, clinic load, support desk, and outbound notices. Billing sits under Patient billing.</p>
+          <p>Beds, clinic load, support desk, and outbound notices. Paid invoices are under Receipts — operations does not check out for patients.</p>
         </div>
         <OpsRadar occupancy={occupancy} pending={stats.pendingWards} beds={stats.bedsAvailable} />
       </div>
-      <div className="kpi-row">
+      <div className="kpi-row compact">
         <div className="kpi"><span>Registered patients</span><strong>{stats.patients}</strong><small>{stats.doctors} consultants on staff</small></div>
         <div className="kpi"><span>Clinic book</span><strong>{stats.appointments}</strong><small>{stats.pendingAppointments} awaiting confirmation</small></div>
         <div className="kpi"><span>Open beds</span><strong>{stats.bedsAvailable}</strong><small>~{occupancy}% occupied</small></div>
         <div className="kpi"><span>Support desk</span><strong>{stats.openTickets || 0}</strong><small><Link to="/support">Open the queue</Link></small></div>
       </div>
-      <p className="muted" style={{ margin: "-8px 0 18px" }}><Link to="/admin/cases"><b>Case workflow</b></Link> — patient files, encounters, admissions, bills, and tickets as CommCare-style cases.</p>
+      <TileGrid label="Operations shortcuts">
+        <TileCard to="/admin/users" icon={Users} title="Staff directory" subtitle="Patients and clinicians" />
+        <TileCard to="/admin/hospital" icon={Building2} title="Bed board" subtitle={`${stats.bedsAvailable} beds open`} />
+        <TileCard to="/admin/appointments" icon={CalendarDays} title="Clinic diary" subtitle="Confirm and schedule" />
+        <TileCard to="/admin/reports" icon={ScrollText} title="Reports" subtitle="Revenue and audit" />
+        <TileCard to="/admin/cases" icon={FolderKanban} title="Case workflow" subtitle="Files and encounters" />
+        <TileCard to="/pay" icon={Receipt} title="Receipts" subtitle="Paid patient receipts" />
+        <TileCard to="/billing/tariff" icon={Wallet} title="Tariff" subtitle="Published hospital fees" />
+        <TileCard to="/support" icon={LifeBuoy} title="Support desk" subtitle={`${stats.openTickets || 0} open tickets`} />
+      </TileGrid>
       <section className="card" style={{ marginBottom: 18 }}>
         <div className="card-head"><div><span className="eyebrow">Live occupancy</span><h3>Beds in use · {occupancy}% campus load</h3></div></div>
         <OccupancyBars items={occItems} />

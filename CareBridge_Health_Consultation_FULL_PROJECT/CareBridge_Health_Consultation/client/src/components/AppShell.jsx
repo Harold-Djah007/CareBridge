@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   CalendarDays, LayoutDashboard, MessageCircle, BedDouble, Video, LogOut, HeartPulse,
   Bell, Users, Mail, UserRound, Stethoscope, ClipboardList, Building2, Search, Inbox,
-  FolderOpen, ScrollText, Pill, Wallet, ShoppingBag, Settings, LifeBuoy, HelpCircle, PanelTop, ChevronDown, ChevronUp, FolderKanban,
+  FolderOpen, ScrollText, Pill, Receipt, ShoppingBag, Settings, LifeBuoy, HelpCircle, PanelTop, ChevronDown, ChevronUp, FolderKanban,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
@@ -83,7 +83,7 @@ const NAV = {
         { to: "/admin/appointments", icon: CalendarDays, label: "Clinic diary", primary: true },
         { to: "/admin/reports", icon: ScrollText, label: "Reports & audit", primary: true },
         { to: "/admin/cases", icon: FolderKanban, label: "Case workflow", primary: true },
-        { to: "/pay", icon: Wallet, label: "Patient billing" },
+        { to: "/pay", icon: Receipt, label: "Receipts", primary: true },
         { to: "/billing/tariff", icon: ScrollText, label: "Hospital tariff", primary: true },
       ],
     },
@@ -299,6 +299,7 @@ export default function AppShell() {
             <nav className="topbar-nav" aria-label="Hospital shortcuts">
               <Link className="topbar-link" to={user.role === "admin" ? "/admin" : "/home"}>Home</Link>
               {user.role === "patient" && <Link className="topbar-link" to="/pay">Shop & pay</Link>}
+              {user.role === "admin" && <Link className="topbar-link" to="/pay">Receipts</Link>}
               {user.role === "nurse" && <Link className="topbar-link" to="/pharmacy-stock">Stock</Link>}
               <Link className="topbar-link" to="/support"><LifeBuoy size={15} /> Support</Link>
               <Link className="topbar-link" to="/settings"><Settings size={15} /> Settings</Link>

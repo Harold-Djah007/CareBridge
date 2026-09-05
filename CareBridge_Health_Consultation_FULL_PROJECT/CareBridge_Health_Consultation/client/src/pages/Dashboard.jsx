@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { CalendarDays, BedDouble, Video, ArrowRight, Mail, FolderOpen, Wallet, Pill, Stethoscope, Check, PackageCheck } from "lucide-react";
+import { CalendarDays, BedDouble, Video, FolderOpen, Pill, Stethoscope, Check, PackageCheck, ShoppingBag, ClipboardList, LifeBuoy, Users, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
 import { api, socketUrl } from "../api";
 import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate, prettyDate, ghs } from "../utils";
-import { CarePath, EcgRibbon, Heartbeat } from "../components/LiveMeter";
+import { EcgRibbon, Heartbeat } from "../components/LiveMeter";
 import Avatar from "../components/Avatar";
 import Presence from "../components/Presence";
 import DutyToggle from "../components/DutyToggle";
+import TileCard, { TileGrid } from "../components/TileCard";
 
 function PatientHome({ user, appointments, wards, emails, due, doctors }) {
   const next = appointments.find(isUpcoming);
@@ -18,102 +19,81 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
 
   return (
     <>
-      <div className="identity-strip">
+      <div className="identity-strip compact">
         <Avatar person={user} className="large" />
         <div>
           <span className="eyebrow">Patient record</span>
-          <h1 style={{ margin: "4px 0 8px" }}>{greeting(firstName(user.name))}</h1>
+          <h1>{greeting(firstName(user.name))}</h1>
           <div className="identity-meta">
             <span>MRN <b>{user.mrn || "Pending"}</b></span>
             <span>DOB <b>{user.dob || "—"}</b></span>
             <span>Blood <b>{user.bloodType || "—"}</b></span>
             <span>Cover <b>{user.insurance || "Self-pay"}</b></span>
           </div>
-          <div className="row-actions" style={{ marginTop: 12 }}>
-            <Link className="secondary-btn" to="/profile">My details</Link>
-            <Link className="ghost-btn" to="/billing/tariff">Hospital tariff</Link>
-            <Link className="ghost-btn" to="/pay">{due.length ? `${ghs(dueTotal)} due` : "Receipts"}</Link>
-          </div>
         </div>
-        <CarePath caption={next ? `Next: ${formatDate(next.date)} · ${formatTime(next.time)}` : admission ? `${admission.ward} · ${admission.status}` : "Choose a doctor, then book a visit"} />
+        <div className="identity-aside">
+          <Link className="secondary-btn" to="/profile">My details</Link>
+          {due.length > 0 && <span className="muted">{ghs(dueTotal)} outstanding</span>}
+        </div>
       </div>
 
+      <TileGrid label="Patient shortcuts">
+        <TileCard to="/pay" icon={ShoppingBag} title="Shop & pay" subtitle={due.length ? `${ghs(dueTotal)} outstanding` : "Bills, medicines, labs"} />
+        <TileCard to="/prescriptions" icon={ClipboardList} title="Prescriptions" subtitle="Print, buy, or collect at Ridge" />
+        <TileCard to="/care" icon={Stethoscope} title="Doctors" subtitle={chosen ? chosen.name : "Find a consultant"} />
+        <TileCard to="/appointments" icon={CalendarDays} title="Visits" subtitle={next ? `${formatDate(next.date)} · ${formatTime(next.time)}` : "Book a visit"} />
+        <TileCard to="/records" icon={FolderOpen} title="Clinical file" subtitle="Notes, labs, and medicines" />
+        <TileCard to="/support" icon={LifeBuoy} title="Support" subtitle={emails.length ? `${emails.length} notices on file` : "Help desk"} />
+      </TileGrid>
+
       <div className="dashboard-grid">
-        <section className="card">
+        <section className="card home-panel">
           <div className="card-head">
             <div><span className="eyebrow">Your next visit</span>
               <h3>{next ? `${formatDate(next.date)} at ${formatTime(next.time)}` : "No visit booked"}</h3>
             </div>
           </div>
           {next ? (
-            <>
-              <div className="appointment-feature">
-                <Avatar person={next.doctor} className="large" />
-                <div className="grow">
-                  <strong>{next.doctor.name}</strong>
-                  <span className="muted">{next.doctor.specialty} · {next.mode === "video" ? "Video consultation" : "Ridge Campus clinic"}</span>
-                  <small className="muted">{next.reason}{next.fee ? ` · ${ghs(next.fee)}` : ""}</small>
-                </div>
-                <div className="row-actions">
-                  <Link className="secondary-btn" to={`/messages?with=${next.doctorId}`}>Message</Link>
-                  {next.mode === "video" && <Link className="primary-btn" to={`/video?with=${next.doctorId}`}><Video size={17} /> Join</Link>}
-                </div>
+            <div className="appointment-feature">
+              <Avatar person={next.doctor} />
+              <div className="grow">
+                <strong>{next.doctor.name}</strong>
+                <span className="muted">{next.doctor.specialty} · {next.mode === "video" ? "Video consultation" : "Ridge Campus clinic"}</span>
+                <small className="muted">{next.reason}{next.fee ? ` · ${ghs(next.fee)}` : ""}</small>
               </div>
-              <h3 style={{ marginTop: 18 }}>Please bring</h3>
-              <ul className="prep-list">
-                <li>Ghana Card or other photo ID</li>
-                <li>NHIS or insurance card</li>
-                <li>A list of medicines you take</li>
-                {user.allergies && <li>Allergy note: {user.allergies}</li>}
-              </ul>
-            </>
+              <div className="row-actions">
+                <Link className="secondary-btn" to={`/messages?with=${next.doctorId}`}>Message</Link>
+                {next.mode === "video" && <Link className="primary-btn" to={`/video?with=${next.doctorId}`}><Video size={17} /> Join</Link>}
+              </div>
+            </div>
           ) : chosen ? (
-            <>
-              <div className="appointment-feature">
-                <Avatar person={chosen} className="large" />
-                <div className="grow">
-                  <strong>{chosen.name}</strong>
-                  <span className="muted">{chosen.specialty} · your chosen consultant</span>
-                  <Presence person={chosen} />
-                  <small className="muted">{chosen.available === false ? "Busy right now — you can still message them." : "Available — book a time when you are ready."}</small>
-                </div>
-                <div className="row-actions">
-                  <Link className="secondary-btn" to="/care">Change</Link>
-                  <Link className="primary-btn" to="/appointments">Book a visit</Link>
-                </div>
+            <div className="appointment-feature">
+              <Avatar person={chosen} />
+              <div className="grow">
+                <strong>{chosen.name}</strong>
+                <span className="muted">{chosen.specialty} · your chosen consultant</span>
+                <Presence person={chosen} />
               </div>
-            </>
+              <div className="row-actions">
+                <Link className="primary-btn" to="/appointments">Book a visit</Link>
+              </div>
+            </div>
           ) : (
-            <>
-              <p className="muted">Browse Ridge Campus consultants and add the doctor you need. No doctor is selected for you.</p>
-              <div className="row-actions" style={{ marginTop: 12 }}>
-                <Link className="primary-btn" to="/care">View doctors</Link>
-                <Link className="secondary-btn" to="/appointments">Request a visit</Link>
-              </div>
-            </>
+            <p className="muted">Choose a Ridge Campus consultant, then book a visit.</p>
           )}
         </section>
-        <section className="card">
-          <div className="card-head"><div><span className="eyebrow">Hospital</span><h3>Admissions, pharmacy, notices</h3></div></div>
+        <section className="card home-panel">
+          <div className="card-head"><div><span className="eyebrow">Admission</span><h3>{admission ? admission.ward : "No bed reserved"}</h3></div></div>
           {admission ? (
             <div className="appointment-feature">
-              <BedDouble />
+              <BedDouble size={20} />
               <div className="grow">
-                <strong>{admission.ward}</strong>
-                <span className="muted">{admission.roomType} · arrive {admission.date}{admission.fee ? ` · ${ghs(admission.fee)}` : ""}</span>
+                <strong>{admission.roomType}</strong>
+                <span className="muted">Arrive {admission.date}{admission.fee ? ` · ${ghs(admission.fee)}` : ""}</span>
               </div>
               <span className={`status ${admission.status}`}>{admission.status}</span>
             </div>
-          ) : <p className="muted">No bed reserved. Request a ward before you travel; the nightly rate is on the tariff.</p>}
-          <div className="quick-actions" style={{ marginTop: 8 }}>
-            <Link to="/care"><Stethoscope /><span><b>Find a doctor</b><small>Photos, specialty, available or busy</small></span><ArrowRight size={18} /></Link>
-            <Link to="/prescriptions"><Pill /><span><b>Prescriptions</b><small>Print, buy on site, or collect at Ridge</small></span><ArrowRight size={18} /></Link>
-            <Link to="/pay"><Wallet /><span><b>Shop & pay</b><small>Bills, medicines, labs — one basket</small></span><ArrowRight size={18} /></Link>
-            <Link to="/wards"><BedDouble /><span><b>Request a bed</b><small>General, maternity, paediatric</small></span><ArrowRight size={18} /></Link>
-            <Link to="/appointments"><CalendarDays /><span><b>Book a visit</b><small>Video or at Ridge Campus</small></span><ArrowRight size={18} /></Link>
-            <Link to="/alerts"><Mail /><span><b>Notifications</b><small>{emails.length} notices on file</small></span><ArrowRight size={18} /></Link>
-            <Link to="/records"><FolderOpen /><span><b>Clinical file</b><small>Notes, labs, medicines, bills</small></span><ArrowRight size={18} /></Link>
-          </div>
+          ) : <p className="muted">Request a ward before you travel. Nightly rates are on the hospital tariff.</p>}
         </section>
       </div>
     </>
@@ -149,7 +129,7 @@ function DoctorBoard({ user, appointments, wards }) {
 
   return (
     <>
-      <section className="welcome doctor-welcome">
+      <section className="welcome doctor-welcome compact">
         <EcgRibbon />
         <div>
           <span className="eyebrow">{user.department || "Outpatient"} · {user.clinic || "Consulting room"}</span>
@@ -161,7 +141,15 @@ function DoctorBoard({ user, appointments, wards }) {
         <Heartbeat />
       </section>
 
-      <div className="clinic-board" style={{ marginTop: 16 }}>
+      <TileGrid label="Clinic shortcuts">
+        <TileCard to="/care" icon={Users} title="Patients" subtitle="Caseload directory" />
+        <TileCard to="/records" icon={FolderOpen} title="Open chart" subtitle="Notes and letters" />
+        <TileCard to="/prescriptions" icon={Pill} title="Prescriptions" subtitle="Issued letters" />
+        <TileCard to="/wards" icon={BedDouble} title="Admissions" subtitle={pending ? `${pending} waiting` : "Ward requests"} />
+        <TileCard to="/messages" icon={MessageCircle} title="Inbox" subtitle="Clinical messages" />
+      </TileGrid>
+
+      <div className="clinic-board">
         {today.length === 0 && <div className="empty"><h3>No patients on your list</h3></div>}
         {today.map((a) => (
           <div className={`clinic-row ${a.id === nextId ? "next" : ""}`} key={a.id}>
@@ -224,14 +212,18 @@ function NurseBoard({ user }) {
 
   return (
     <>
-      <section className="welcome doctor-welcome nurse-welcome">
+      <section className="welcome doctor-welcome nurse-welcome compact">
         <div>
           <span className="eyebrow">{user.department || "Ridge Campus pharmacy"} · {user.shift || "Day dispensary"}</span>
           <h1>{greeting(firstName(user.name.replace("Nurse ", "")))}</h1>
           <p>{longDate()} · {queued} waiting for prep · {ready} ready for collection</p>
         </div>
       </section>
-      <div className="filters" style={{ marginTop: 16 }}>
+      <TileGrid label="Dispensary shortcuts">
+        <TileCard to="/pharmacy-stock" icon={Pill} title="Stock" subtitle="Cupboard, prices, and restock" />
+        <TileCard to="/messages" icon={MessageCircle} title="Messages" subtitle="Doctors and operations" />
+      </TileGrid>
+      <div className="filters">
         <button className={filter === "queued" ? "active" : ""} onClick={() => setFilter("queued")}>Queued ({queued})</button>
         <button className={filter === "ready" ? "active" : ""} onClick={() => setFilter("ready")}>Ready ({ready})</button>
         <button className={filter === "collected" ? "active" : ""} onClick={() => setFilter("collected")}>Collected</button>

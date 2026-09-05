@@ -2,11 +2,13 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { HOSPITAL, prettyDate } from "../utils";
+import { useAuth } from "../state";
 
 const ghs = (n) => `GHS ${Number(n || 0).toLocaleString()}`;
 
 export default function Receipt() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
 
@@ -28,7 +30,7 @@ export default function Receipt() {
           <p>{HOSPITAL.name} · {HOSPITAL.campus}, {HOSPITAL.city}</p>
         </div>
         <div className="row-actions">
-          <Link className="ghost-btn" to="/pay">Back to shop</Link>
+          <Link className="ghost-btn" to="/pay">{user?.role === "admin" ? "Back to receipts" : "Back to shop"}</Link>
           <button className="secondary-btn" type="button" onClick={() => window.print()}>Print / save PDF</button>
         </div>
       </div>

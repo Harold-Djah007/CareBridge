@@ -69,6 +69,8 @@ function AppRoutes() {
           <Route path="/records" element={<RoleRoute roles={["patient", "doctor", "admin"]}><ClinicalRecord /></RoleRoute>} />
           <Route path="/records/:patientId" element={<RoleRoute roles={["doctor", "admin"]}><ClinicalRecord /></RoleRoute>} />
           <Route path="/pay" element={<RoleRoute roles={["patient", "admin"]}><Pay /></RoleRoute>} />
+          <Route path="/receipts" element={<RoleRoute roles={["patient", "admin"]}><Navigate to="/pay" replace /></RoleRoute>} />
+          <Route path="/admin/billing" element={<RoleRoute roles={["admin"]}><Navigate to="/pay" replace /></RoleRoute>} />
           <Route path="/pharmacy" element={<RoleRoute roles={["patient", "admin"]}><Pharmacy /></RoleRoute>} />
           <Route path="/pharmacy-stock" element={<RoleRoute roles={["nurse", "admin"]}><PharmacyStock /></RoleRoute>} />
           <Route path="/prescriptions" element={<RoleRoute roles={["patient", "doctor"]}><Prescriptions /></RoleRoute>} />

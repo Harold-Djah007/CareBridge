@@ -35,7 +35,7 @@ export default function Help() {
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Hospital operations</h3>
-        <p className="muted">Administrators sign in with a staff account. Operations covers beds, the clinic diary, staff directory, outbound notices, patient billing, the live hospital tariff, revenue, and the audit log. Doctors and operations can edit published fees.</p>
+        <p className="muted">Administrators sign in with a staff account. Operations covers beds, the clinic diary, staff directory, outbound notices, paid receipts, the live hospital tariff, revenue, and the audit log. Operations reviews receipts only — patients complete payment in Shop &amp; pay. Doctors and operations can edit published fees.</p>
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Paying for care</h3>

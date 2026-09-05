@@ -269,7 +269,10 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     const { userId, role } = req.query;
     let rows = db.payments || [];
     if (role === "patient") rows = rows.filter((p) => p.patientId === userId);
-    res.json(rows.slice().reverse());
+    res.json(rows.slice().reverse().map((p) => ({
+      ...p,
+      patient: safeUser(db.users.find((u) => u.id === p.patientId) || {}),
+    })));
   });
 
   const placeOrder = (kind) => async (req, res) => {
@@ -330,8 +333,18 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     res.status(201).json(invoice);
   });
 
+  const rejectAdminPay = (req, res, db) => {
+    const actor = db.users.find((u) => u.id === req.body.actorId);
+    if (actor?.role === "admin") {
+      res.status(403).json({ message: "Administrators review receipts only. Patients complete payment in Shop & pay." });
+      return true;
+    }
+    return false;
+  };
+
   app.post("/api/finance/checkout", async (req, res) => {
     const db = readDb();
+    if (rejectAdminPay(req, res, db)) return;
     const inv = (db.invoices || []).find((i) => i.id === req.body.invoiceId);
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
     if (inv.status === "paid") return res.status(400).json({ message: "This invoice is already paid." });
@@ -340,6 +353,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
 
   app.post("/api/finance/checkout-cart", async (req, res) => {
     const db = readDb();
+    if (rejectAdminPay(req, res, db)) return;
     const pid = req.body.patientId;
     if (!pid) return res.status(400).json({ message: "Patient is required." });
     const invoices = [];
@@ -413,6 +427,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
 
   app.post("/api/finance/confirm", async (req, res) => {
     const db = readDb();
+    if (rejectAdminPay(req, res, db)) return;
     const payment = (db.payments || []).find((p) => p.id === req.body.paymentId);
     if (!payment) return res.status(404).json({ message: "Payment not found" });
     const ids = payment.invoiceIds?.length ? payment.invoiceIds : [payment.invoiceId];

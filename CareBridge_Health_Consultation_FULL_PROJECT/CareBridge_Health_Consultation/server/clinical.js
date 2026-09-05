@@ -323,6 +323,10 @@ export function mountClinical(app, ctx) {
 
   app.patch("/api/billing/:id/pay", (req, res) => {
     const db = readDb();
+    const actor = db.users.find((u) => u.id === req.body.actorId);
+    if (actor?.role === "admin") {
+      return res.status(403).json({ message: "Administrators review receipts only. Patients complete payment in Shop & pay." });
+    }
     const inv = db.invoices.find((i) => i.id === req.params.id);
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
     inv.status = "paid";

@@ -6,6 +6,7 @@ import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { ghs } from "../utils";
 import { loadCart, saveCart, cartTotal, cartCount, invoiceLine, mergePrescription, clampCartToStock } from "../cart";
+import AdminReceipts from "./admin/Receipts";
 
 const METHODS = [
   { id: "momo", label: "Mobile money", hint: "MTN, Telecel Cash, or AirtelTigo Money to the hospital merchant wallets" },
@@ -23,10 +24,15 @@ function tabFromParams(params) {
 
 export default function Pay() {
   const { user } = useAuth();
+  if (user.role === "admin") return <AdminReceipts />;
+  return <PatientShop />;
+}
+
+function PatientShop() {
+  const { user } = useAuth();
   const { push } = useToast();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const isAdmin = user.role === "admin";
   const [tab, setTab] = useState(() => tabFromParams(params));
   const [category, setCategory] = useState("all");
   const [stock, setStock] = useState([]);
@@ -34,8 +40,7 @@ export default function Pay() {
   const [services, setServices] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [accounts, setAccounts] = useState(null);
-  const [patients, setPatients] = useState([]);
-  const [patientId, setPatientId] = useState(user.role === "patient" ? user.id : "");
+  const patientId = user.id;
   const prefs = user.paymentPrefs || {};
   const [method, setMethod] = useState(prefs.method || "momo");
   const [form, setForm] = useState({
@@ -64,17 +69,14 @@ export default function Pay() {
       setServices(r.services || []);
       if (r.labs) setLabs(r.labs);
     });
-    if (!isAdmin) {
-      api("/pharmacy/stock").then((rows) => {
-        setStock(rows);
-        persist(clampCartToStock(loadCart(user.id), rows));
-      }).catch(() => api("/finance/pharmacy").then((rows) => {
-        setStock(rows);
-        persist(clampCartToStock(loadCart(user.id), rows));
-      }));
-      api("/finance/labs").then(setLabs);
-    }
-    if (isAdmin) api("/patients").then(setPatients);
+    api("/pharmacy/stock").then((rows) => {
+      setStock(rows);
+      persist(clampCartToStock(loadCart(user.id), rows));
+    }).catch(() => api("/finance/pharmacy").then((rows) => {
+      setStock(rows);
+      persist(clampCartToStock(loadCart(user.id), rows));
+    }));
+    api("/finance/labs").then(setLabs);
     const socket = io(socketUrl, { autoConnect: true });
     socket.on("pharmacy-stock", (rows) => {
       setStock(rows);
@@ -85,7 +87,7 @@ export default function Pay() {
       if (rates?.services) setServices(rates.services);
     });
     return () => socket.disconnect();
-  }, [user.id, user.role, isAdmin]);
+  }, [user.id, user.role]);
 
   useEffect(() => {
     const hydrate = () => setCart(loadCart(user.id));
@@ -131,7 +133,7 @@ export default function Pay() {
       appliedRx.current = "";
       return;
     }
-    if (!stock.length || isAdmin) return;
+    if (!stock.length) return;
     if (appliedRx.current === rxId) return;
     let cancelled = false;
     const fulfill = params.get("fulfill");
@@ -173,7 +175,7 @@ export default function Pay() {
       appliedRx.current = "";
     });
     return () => { cancelled = true; };
-  }, [params.get("rx"), params.get("fulfill"), stock.length, isAdmin]);
+  }, [params.get("rx"), params.get("fulfill"), stock.length]);
 
   const categories = useMemo(() => {
     const set = new Set(stock.map((s) => s.category).filter(Boolean));
@@ -237,7 +239,6 @@ export default function Pay() {
       return;
     }
     persist([...cart, invoiceLine(row, user.id)]);
-    if (isAdmin && row.patientId) setPatientId(row.patientId);
     push("Added to basket");
   };
 
@@ -369,31 +370,24 @@ export default function Pay() {
     }
   };
 
-  const tabs = isAdmin
-    ? [
-      { id: "bills", label: "Unpaid bills" },
-      { id: "services", label: "Hospital services" },
-    ]
-    : [
-      { id: "bills", label: "Unpaid bills" },
-      { id: "pharmacy", label: "Medicines" },
-      { id: "labs", label: "Laboratory" },
-      { id: "services", label: "Other services" },
-    ];
+  const tabs = [
+    { id: "bills", label: "Unpaid bills" },
+    { id: "pharmacy", label: "Medicines" },
+    { id: "labs", label: "Laboratory" },
+    { id: "services", label: "Other services" },
+  ];
 
   return (
     <div>
       <div className="page-title">
         <div>
-          <span className="eyebrow">{isAdmin ? "Accounts" : "Ridge Campus shop"}</span>
-          <h1>{isAdmin ? "Patient billing cart" : "Shop & pay"}</h1>
-          <p>{isAdmin
-            ? "Add a patient’s unpaid invoices and tariff services, then check out once — MoMo, GCB, NHIS, or cash."
-            : "Unpaid bills, medicines, and labs share one basket. Switching category does not empty it. The amount you will spend stays in view until you pay or collect at the hospital."}</p>
+          <span className="eyebrow">Ridge Campus shop</span>
+          <h1>Shop & pay</h1>
+          <p>Unpaid bills, medicines, and labs share one basket. Switching category does not empty it. The amount you will spend stays in view until you pay or collect at the hospital.</p>
         </div>
         <div className="row-actions">
           <Link className="secondary-btn" to="/billing/tariff">View tariff</Link>
-          {!isAdmin && <Link className="ghost-btn" to="/prescriptions">My prescriptions</Link>}
+          <Link className="ghost-btn" to="/prescriptions">My prescriptions</Link>
         </div>
       </div>
 
@@ -417,14 +411,6 @@ export default function Pay() {
                   </div>
                 </div>
                 <p className="muted">Consults, admissions, and earlier orders. Add them to the same basket as medicines and labs.</p>
-                {isAdmin && (
-                  <label>Patient
-                    <select value={patientId} onChange={(e) => setPatientId(e.target.value)}>
-                      <option value="">Select patient</option>
-                      {patients.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.mrn}</option>)}
-                    </select>
-                  </label>
-                )}
                 {due.length === 0 && <p className="muted">Nothing outstanding. Shop medicines, labs, or services if you need a new bill.</p>}
                 {due.map((i) => {
                   const added = cart.some((c) => c.kind === "invoice" && c.id === i.id);
@@ -432,7 +418,7 @@ export default function Pay() {
                     <div className={`pay-pick ${added ? "on" : ""}`} key={i.id}>
                       <span>
                         <b>{i.item}</b>
-                        <small>{i.date}{i.patient?.name && isAdmin ? ` · ${i.patient.name}` : ""}</small>
+                        <small>{i.date}</small>
                       </span>
                       <strong>{ghs(i.amount)}</strong>
                       <button type="button" className={added ? "ghost-btn" : "secondary-btn"} disabled={added} onClick={() => addInvoice(i)}>
@@ -456,7 +442,7 @@ export default function Pay() {
             </>
           )}
 
-          {tab === "pharmacy" && !isAdmin && (
+          {tab === "pharmacy" && (
             <>
               <div className="pharm-cats">
                 <button type="button" className={category === "all" ? "on" : ""} onClick={() => setCategory("all")}>
@@ -486,7 +472,7 @@ export default function Pay() {
             </>
           )}
 
-          {tab === "labs" && !isAdmin && (
+          {tab === "labs" && (
             <section className="card">
               <div className="card-head"><div><span className="eyebrow">Pathology</span><h3>Laboratory tests</h3></div></div>
               <p className="muted">Adding a test does not clear medicines already in the basket.</p>
@@ -500,15 +486,7 @@ export default function Pay() {
 
           {tab === "services" && (
             <section className="card">
-              <div className="card-head"><div><span className="eyebrow">Tariff</span><h3>{isAdmin ? "Bill a hospital service" : "Other hospital services"}</h3></div></div>
-              {isAdmin && (
-                <label>Patient
-                  <select value={patientId} onChange={(e) => setPatientId(e.target.value)}>
-                    <option value="">Select patient</option>
-                    {patients.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.mrn}</option>)}
-                  </select>
-                </label>
-              )}
+              <div className="card-head"><div><span className="eyebrow">Tariff</span><h3>Other hospital services</h3></div></div>
               <div className="pharm-grid">
                 {services.map((p) => (
                   <StockCard
