@@ -1,23 +1,24 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Montserrat:wght@500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap");
 
 :root {
-  --navy: #003366;
-  --navy-deep: #00264d;
-  --ink: #1a2332;
-  --muted: #5c6b7a;
-  --line: #d5dce3;
-  --paper: #f8f9fa;
-  --card: #ffffff;
-  --teal: #00a88f;
-  --teal-dark: #008f7a;
-  --teal-soft: #e6f6f3;
-  --gold: #8a7340;
-  --gold-bright: #00a88f;
-  --serif: "Montserrat", "IBM Plex Sans", system-ui, sans-serif;
-  --danger: #b42318;
-  --ok: #176c45;
-  --shadow: 0 8px 24px rgba(0, 51, 102, 0.06);
-  font-family: "IBM Plex Sans", "Montserrat", system-ui, sans-serif;
+  --navy: #2f4156;
+  --navy-deep: #243344;
+  --ink: #2c2620;
+  --muted: #6b6258;
+  --line: #e3d9ce;
+  --paper: #f6f1ea;
+  --card: #fffdf9;
+  --teal: #3d8b7a;
+  --teal-dark: #2f6f62;
+  --teal-soft: #e8f3ef;
+  --gold: #9a7048;
+  --gold-bright: #c47b6a;
+  --rose: #c47b6a;
+  --serif: "Source Serif 4", "Georgia", serif;
+  --danger: #a33b32;
+  --ok: #2f6b4f;
+  --shadow: 0 10px 28px rgba(47, 38, 32, 0.06);
+  font-family: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
   color: var(--ink);
   background: var(--paper);
 }
@@ -28,9 +29,9 @@ body { margin: 0; background: var(--paper); }
 button, input, select, textarea { font: inherit; }
 button, a { transition: 0.12s ease; }
 a { text-decoration: none; color: inherit; }
-h1, h2, h3, .serif { font-family: "Montserrat", "IBM Plex Sans", system-ui, sans-serif; font-weight: 700; letter-spacing: -0.02em; color: var(--navy); }
-h1 { font-size: 28px; margin: 6px 0 8px; }
-h2 { font-size: 22px; margin: 4px 0 8px; }
+h1, h2, h3, .serif { font-family: var(--serif); font-weight: 600; letter-spacing: -0.015em; color: var(--navy); }
+h1 { font-size: 26px; margin: 6px 0 8px; }
+h2 { font-size: 20px; margin: 4px 0 8px; }
 h3 { font-size: 16px; margin: 0 0 6px; }
 .muted { color: var(--muted); }
 .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -46,13 +47,13 @@ h3 { font-size: 16px; margin: 0 0 6px; }
 .brand.large b { font-size: 20px; }
 
 .primary-btn, .secondary-btn, .ghost-btn {
-  border: 0; border-radius: 6px; padding: 10px 14px; font-weight: 600; display: inline-flex;
+  border: 0; border-radius: 999px; padding: 9px 14px; font-weight: 600; display: inline-flex;
   align-items: center; justify-content: center; gap: 8px; cursor: pointer;
 }
 .primary-btn { background: var(--teal); color: #fff; box-shadow: 0 8px 18px rgba(0, 168, 143, 0.18); }
 .primary-btn:hover { background: var(--teal-dark); transform: translateY(-2px); box-shadow: 0 12px 24px rgba(0, 168, 143, 0.22); }
 .primary-btn:disabled, .secondary-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-.secondary-btn { background: #e8eef2; color: var(--ink); }
+.secondary-btn { background: #efe8de; color: var(--ink); }
 .ghost-btn { background: transparent; color: var(--teal); padding: 8px 10px; }
 .full { width: 100%; padding: 14px; }
 .icon-btn { border: 0; background: transparent; width: 38px; height: 38px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); cursor: pointer; position: relative; }
@@ -76,7 +77,7 @@ h3 { font-size: 16px; margin: 0 0 6px; }
 .person-name { display: flex; align-items: center; gap: 10px; }
 
 label, .field { display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 700; }
-input, select, textarea { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; background: #fff; outline: none; color: var(--ink); }
+input, select, textarea { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fffdf9; outline: none; color: var(--ink); }
 input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(21, 94, 117, 0.12); }
 .error-box { padding: 11px 13px; border-radius: 10px; background: #fff0ee; color: var(--danger); font-size: 13px; }
 .success-box { padding: 11px 13px; border-radius: 10px; background: #e8f6ee; color: var(--ok); font-size: 13px; }
@@ -242,7 +243,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 .notice-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
-.role-patient { --paper: #f4f8f7; --card: #ffffff; --teal: #00a88f; --sidebar-bg: #003366; --sidebar-ink: #f4f8fb; --nav-muted: #9db4c8; }
+.role-patient { --paper: #f6f1ea; --card: #fffdf9; --teal: #3d8b7a; --sidebar-bg: #2f4156; --sidebar-ink: #f7f1ea; --nav-muted: #c8bdb0; }
 .role-patient .welcome { background: linear-gradient(135deg, #003366 0%, #004d4a 72%); }
 .role-patient .page-wrap { max-width: 1180px; }
 .identity-strip { display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px 22px; margin-bottom: 18px; }
@@ -250,8 +251,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .identity-meta b { color: var(--ink); font-weight: 700; }
 .prep-list { margin: 0; padding-left: 18px; color: var(--muted); line-height: 1.8; }
 
-.role-doctor { --paper: #f4f6f8; --card: #ffffff; --line: #d5dce3; --teal: #00a88f; --ink: #1a2332; --sidebar-bg: #00264d; --sidebar-ink: #f4f7fb; --nav-muted: #9db4c8; font-family: "IBM Plex Sans", sans-serif; }
-.role-doctor h1, .role-doctor h2, .role-doctor h3, .role-doctor .serif { font-family: "IBM Plex Sans", sans-serif; letter-spacing: -0.02em; }
+.role-doctor { --paper: #f4f2ee; --card: #fffdf9; --line: #e3d9ce; --teal: #3d8b7a; --ink: #2c2620; --sidebar-bg: #2a3a4c; --sidebar-ink: #f7f1ea; --nav-muted: #c8bdb0; }
+.role-doctor h1, .role-doctor h2, .role-doctor h3, .role-doctor .serif { font-family: var(--serif); letter-spacing: -0.015em; }
 .role-doctor h1 { font-size: 26px; font-weight: 700; }
 .role-doctor .sidebar { border-right-color: #0a181c; }
 .role-doctor .sidebar .brand span, .role-doctor .sidebar-campus span, .role-doctor .sidebar-user-text span { color: #9db0b6; }
@@ -269,8 +270,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .clinic-row .time { font-variant-numeric: tabular-nums; font-weight: 700; color: #156e75; }
 .clinic-row.next { background: #e7f4f4; }
 
-.role-admin { --paper: #f3f5f8; --card: #f7f8fb; --line: #d5dae3; --teal: #00a88f; --ink: #1b2230; --gold: #b0892c; --sidebar-bg: #001a33; --sidebar-ink: #eef1f6; --nav-muted: #a7b0c0; font-family: "IBM Plex Sans", sans-serif; }
-.role-admin h1, .role-admin h2, .role-admin h3, .role-admin .serif { font-family: "IBM Plex Sans", sans-serif; }
+.role-admin { --paper: #f3efe8; --card: #fffdf9; --line: #e3d9ce; --teal: #3d8b7a; --ink: #2c2620; --gold: #9a7048; --sidebar-bg: #263544; --sidebar-ink: #f7f1ea; --nav-muted: #c8bdb0; }
+.role-admin h1, .role-admin h2, .role-admin h3, .role-admin .serif { font-family: var(--serif); }
 .role-admin h1 { font-size: 24px; font-weight: 700; }
 .role-admin .sidebar { border-right-color: #0f131c; }
 .role-admin .sidebar .brand-mark { background: #b0892c; }
@@ -690,15 +691,15 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
   background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px 22px; margin-bottom: 18px;
 }
 
-/* Doctor — navy clinical HIS */
+/* Doctor — warm clinic */
 .role-doctor {
-  --paper: #f4f6f8; --card: #ffffff; --line: #d5dce3; --ink: #1a2332; --muted: #5c6b7a;
-  --teal: #00a88f; --teal-dark: #008f7a; --teal-soft: #e6f6f3; --gold: #00a88f;
-  --sidebar-bg: #00264d; --sidebar-ink: #f4f7fb; --nav-muted: #9db4c8;
-  --shadow: 0 8px 24px rgba(0, 51, 102, 0.06);
-  color: var(--ink); font-family: "IBM Plex Sans", sans-serif;
+  --paper: #f4f2ee; --card: #fffdf9; --line: #e3d9ce; --ink: #2c2620; --muted: #6b6258;
+  --teal: #3d8b7a; --teal-dark: #2f6f62; --teal-soft: #e8f3ef; --gold: #9a7048;
+  --sidebar-bg: #2a3a4c; --sidebar-ink: #f7f1ea; --nav-muted: #c8bdb0;
+  --shadow: 0 10px 28px rgba(47, 38, 32, 0.06);
+  color: var(--ink);
 }
-.role-doctor h1, .role-doctor h2, .role-doctor h3, .role-doctor .serif { font-family: "IBM Plex Sans", sans-serif; letter-spacing: -0.02em; }
+.role-doctor h1, .role-doctor h2, .role-doctor h3, .role-doctor .serif { font-family: var(--serif); letter-spacing: -0.015em; }
 .role-doctor h1 { font-size: 24px; font-weight: 650; }
 .role-doctor .main { background: var(--paper); }
 .role-doctor .sidebar { border-right-color: #152a4a; }
@@ -746,15 +747,15 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .role-doctor .tile-card:hover { border-color: #00a88f; box-shadow: 0 12px 26px rgba(0, 168, 143, 0.14); }
 .role-doctor .welcome.compact { min-height: 96px; padding: 16px 20px; }
 
-/* Admin — navy operations */
+/* Admin — warm operations */
 .role-admin {
-  --paper: #f3f5f8; --card: #ffffff; --line: #dcdfe4; --ink: #1c2430; --muted: #5f6b78;
-  --teal: #00a88f; --teal-dark: #008f7a; --teal-soft: #e6f6f3; --gold: #b0892c;
-  --sidebar-bg: #001a33; --sidebar-ink: #eef2f6; --nav-muted: #a7b0c0;
-  --shadow: 0 8px 24px rgba(0, 51, 102, 0.06);
-  color: var(--ink); font-family: "IBM Plex Sans", sans-serif;
+  --paper: #f3efe8; --card: #fffdf9; --line: #e3d9ce; --ink: #2c2620; --muted: #6b6258;
+  --teal: #3d8b7a; --teal-dark: #2f6f62; --teal-soft: #e8f3ef; --gold: #9a7048;
+  --sidebar-bg: #263544; --sidebar-ink: #f7f1ea; --nav-muted: #c8bdb0;
+  --shadow: 0 10px 28px rgba(47, 38, 32, 0.06);
+  color: var(--ink);
 }
-.role-admin h1, .role-admin h2, .role-admin h3, .role-admin .serif { font-family: "IBM Plex Sans", sans-serif; }
+.role-admin h1, .role-admin h2, .role-admin h3, .role-admin .serif { font-family: var(--serif); }
 .role-admin h1 { font-size: 24px; font-weight: 650; }
 .role-admin .main { background: var(--paper); }
 .role-admin .sidebar { border-right-color: #1b2836; }
@@ -1108,12 +1109,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 }
 .duty-toggle.off .duty-slider { animation: none; }
 
-/* Nurse — navy + emerald dispensary */
+/* Nurse — warm dispensary */
 .role-nurse {
-  --paper: #f3f8f5; --card: #f7fbf8; --line: #cfe0d6; --ink: #143226; --muted: #4f6b5c;
-  --teal: #00a88f; --teal-dark: #008f7a; --teal-soft: #e6f6f3;
-  --sidebar-bg: #013326; --sidebar-ink: #eef8f2; --nav-muted: #9ec4ae;
-  color: var(--ink); font-family: "IBM Plex Sans", sans-serif;
+  --paper: #f3efe6; --card: #fffdf9; --line: #e0d6c8; --ink: #2c2620; --muted: #6b6258;
+  --teal: #3d8b7a; --teal-dark: #2f6f62; --teal-soft: #e8f3ef;
+  --sidebar-bg: #2d4038; --sidebar-ink: #f7f1ea; --nav-muted: #c8bdb0;
+  color: var(--ink);
 }
 .role-nurse .main { background: var(--paper); }
 .role-nurse .sidebar { border-right-color: #01241b; }
@@ -1922,7 +1923,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
   inset: 0;
   z-index: 0;
   background:
-    linear-gradient(100deg, rgba(0, 51, 102, 0.78) 0%, rgba(0, 51, 102, 0.52) 52%, rgba(0, 168, 143, 0.28) 100%);
+    linear-gradient(100deg, rgba(47, 65, 86, 0.62) 0%, rgba(47, 65, 86, 0.38) 48%, rgba(196, 123, 106, 0.28) 100%);
 }
 .page-hero-body {
   position: relative;
@@ -2006,7 +2007,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
     "pills pills"
     "side main";
   background:
-    radial-gradient(1200px 420px at 88% -10%, rgba(0, 168, 143, 0.08), transparent 55%),
+    radial-gradient(1200px 420px at 88% -10%, rgba(196, 123, 106, 0.1), transparent 55%),
     var(--paper);
 }
 
@@ -2072,7 +2073,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
   align-items: center;
   gap: 6px;
   padding: 8px 22px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 253, 249, 0.94);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(10px);
   overflow-x: auto;

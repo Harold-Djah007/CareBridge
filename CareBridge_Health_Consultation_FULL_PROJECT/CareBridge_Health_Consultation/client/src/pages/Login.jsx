@@ -19,36 +19,36 @@ const PORTALS = [
     tab: "Patient",
     icon: UserRound,
     title: "Patient sign-in",
-    blurb: `Book visits, pay invoices, collect receipts, and reserve a bed at ${HOSPITAL.name}.`,
+    blurb: `Welcome. Your visits, medicines, and bills wait here at ${HOSPITAL.name}.`,
   },
   {
     id: "doctor",
     tab: "Clinician",
     icon: Stethoscope,
     title: "Clinician sign-in",
-    blurb: "Clinic list, prescriptions from chat or video, and the admission queue.",
+    blurb: "Your clinic list and the people who need you today.",
   },
   {
     id: "nurse",
     tab: "Nurse",
     icon: Pill,
     title: "Nurse sign-in",
-    blurb: "Pharmacy nurses prepare hospital pickup orders and keep the Ridge cupboard current.",
+    blurb: "The cupboard and the families collecting medicines.",
   },
   {
     id: "admin",
     tab: "Operations",
     icon: Building2,
     title: "Administrator sign-in",
-    blurb: "Beds, staff directory, clinic diary, tariff, receipts, and the audit log.",
+    blurb: "Beds, staff, and the quiet work that keeps Ridge kind.",
   },
 ];
 
 const BENEFITS = [
-  "View your appointments and visit notes",
-  "Pay published fees and collect numbered receipts",
-  "Read prescriptions and collect at Ridge pharmacy",
-  "Message your named consultant on a secure thread",
+  "See your next visit and the notes from last time",
+  "Pay published fees and keep a numbered receipt",
+  "Read a prescription and collect it at Ridge pharmacy",
+  "Write to your named doctor on a private thread",
 ];
 
 export default function Login() {
@@ -131,7 +131,7 @@ export default function Login() {
           <div className="kb-layer" aria-hidden="true" />
           <div>
             <span className="eyebrow">Secure access</span>
-            <h1>Your Ridge record, on one portal.</h1>
+            <h1>Your Ridge record, kept with care.</h1>
             <ul className="benefit-list">
               {BENEFITS.map((item) => (
                 <li key={item}><Check size={18} /> {item}</li>

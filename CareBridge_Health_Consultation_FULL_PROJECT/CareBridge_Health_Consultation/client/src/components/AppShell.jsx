@@ -213,9 +213,9 @@ export default function AppShell() {
 
   const topMeta = useMemo(() => {
     if (user.role === "doctor") return `${user.department || "Outpatient"} · ${user.clinic || HOSPITAL.campus}`;
-    if (user.role === "admin") return `Hospital operations · ${HOSPITAL.campus}`;
-    if (user.role === "nurse") return `Pharmacy nursing · ${HOSPITAL.campus}`;
-    return `${HOSPITAL.campus} · Patient portal`;
+    if (user.role === "admin") return `Looking after ${HOSPITAL.campus}`;
+    if (user.role === "nurse") return `Pharmacy · ${HOSPITAL.campus}`;
+    return `${HOSPITAL.campus} · you are welcome`;
   }, [user]);
 
   const searchPlaceholder = user.role === "admin" ? "Search staff or patients" : user.role === "doctor" ? "Search patients" : user.role === "nurse" ? "Search pickup patients" : "Find a doctor";
@@ -242,7 +242,7 @@ export default function AppShell() {
     );
   };
 
-  const portalLabel = user.role === "patient" ? "Patient portal" : user.role === "doctor" ? "Clinical" : user.role === "nurse" ? "Pharmacy" : "Operations";
+  const portalLabel = user.role === "patient" ? "Your care" : user.role === "doctor" ? "Clinic" : user.role === "nurse" ? "Pharmacy" : "Hospital";
 
   return (
     <div className={`app-layout portal-app role-${user.role}`} data-role={user.role}>

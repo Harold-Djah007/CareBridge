@@ -54,7 +54,7 @@ export function HospitalFooter() {
             <div className="brand-mark live"><HeartPulse size={20} /></div>
             <div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div>
           </div>
-          <p>Licensed private hospital. Outpatient, teleconsult, pharmacy, records, and admissions on one clinical file.</p>
+          <p>A private hospital in Ridge, Accra. We sit with you through clinic, pharmacy, and a stay if you need one.</p>
         </div>
         <div>
           <h4>Quick links</h4>

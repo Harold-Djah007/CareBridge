@@ -15,11 +15,11 @@ export default function Landing() {
         <SoftOrbs />
         <div className="hero-copy">
           <div className="hero-card">
-            <span className="eyebrow">{HOSPITAL.campus} · Licensed private hospital</span>
-            <h1>Private hospital care on one clinical record.</h1>
+            <span className="eyebrow">{HOSPITAL.campus} · A hospital that knows your name</span>
+            <h1>You are looked after here.</h1>
             <p className="lead">
-              Outpatient clinic, teleconsult, pharmacy, and admissions at {HOSPITAL.name}, {HOSPITAL.city}.
-              Book a visit, then sign in to the patient portal for your file, invoices, and receipts.
+              Clinic, video visits, pharmacy, and a quiet bed when you need one — at {HOSPITAL.name} in {HOSPITAL.city}.
+              Book a time, then sign in. Your file will be waiting.
             </p>
             <div className="hero-actions">
               <Link className="primary-btn cta-pulse" to="/book">Book Appointment <ArrowRight size={18} /></Link>
@@ -54,8 +54,8 @@ export default function Landing() {
       <section id="services" className="service-block light-block">
         <div className="section-head">
           <span className="eyebrow">Our services</span>
-          <h2>How Ridge Campus looks after you</h2>
-          <p className="muted">Each service has a desk on campus and a path in the patient portal. Fees sit on the public tariff before you book.</p>
+          <h2>How we look after you</h2>
+          <p className="muted">Every service has a desk on campus and a place in your portal. Fees are published before you book, so there are no surprises.</p>
         </div>
         <div className="icon-service-grid">
           {SERVICES.slice(0, 6).map((item, i) => {

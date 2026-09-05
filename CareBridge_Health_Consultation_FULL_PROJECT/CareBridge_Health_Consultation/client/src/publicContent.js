@@ -17,27 +17,27 @@ export const HERO_SLIDES = [
   {
     image: "/imagery/hero-campus.jpg",
     eyebrow: `${HOSPITAL.campus} · ${HOSPITAL.city}`,
-    title: "Private hospital care on one clinical record.",
-    copy: "Outpatient clinic, teleconsult, pharmacy, and admissions at CareBridge Medical Centre. Book a visit, then sign in for your file, invoices, and receipts.",
+    title: "You are looked after here.",
+    copy: "Clinic, video visits, pharmacy, and a quiet bed when you need one. Book a time, then sign in — your file will be waiting.",
   },
   {
     image: "/imagery/clinic.jpg",
     eyebrow: "Consultants on campus",
-    title: "Seen by a named Ridge consultant — not a waiting-room lottery.",
-    copy: "General medicine, cardiology, paediatrics, and orthopaedics on a booked clinic list. Walk-ins register at the front desk.",
+    title: "A named doctor, not a waiting-room lottery.",
+    copy: "General medicine, cardiology, children, and bones — on a booked list. Walk-ins are welcomed at the front desk.",
   },
   {
     image: "/imagery/teleconsult.jpg",
     eyebrow: "Telemedicine",
-    title: "Follow up by video without travelling to Accra.",
-    copy: "Share records, get a second opinion, or review after a campus visit on a secure teleconsult.",
+    title: "Follow up from home, without the Accra traffic.",
+    copy: "Share records, ask a second question, or check in after a campus visit — on a quiet video call.",
   },
 ];
 
 export const QUICK_ACTIONS = [
-  { to: "/doctors", icon: Stethoscope, title: "Find a doctor", copy: "Directory of Ridge consultants" },
-  { to: "/tariff", icon: Wallet, title: "Pay bills / tariff", copy: "Published fees before you book" },
-  { to: "/login", icon: UserRound, title: "Patient portal", copy: "File, invoices, and receipts" },
+  { to: "/doctors", icon: Stethoscope, title: "Find a doctor", copy: "People who will sit with you" },
+  { to: "/tariff", icon: Wallet, title: "Fees & tariff", copy: "Published prices, no surprises" },
+  { to: "/login", icon: UserRound, title: "Your portal", copy: "Visits, medicines, and receipts" },
 ];
 
 export const SERVICES = [
