@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ShoppingCart, Plus, Minus, Trash2 } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, Search } from "lucide-react";
 import { io } from "socket.io-client";
 import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { ghs } from "../utils";
 import { loadCart, saveCart, cartTotal, cartCount, invoiceLine, mergePrescription, clampCartToStock } from "../cart";
 import AdminReceipts from "./admin/Receipts";
+import PageHero from "../components/PageHero";
 
 const METHODS = [
   { id: "momo", label: "Mobile money", hint: "MTN, Telecel Cash, or AirtelTigo Money to the hospital merchant wallets" },
@@ -20,6 +21,16 @@ function tabFromParams(params) {
   if (tab === "labs" || tab === "services" || tab === "pharmacy" || tab === "bills") return tab;
   if (params.get("rx") || params.get("fulfill") === "hospital") return "pharmacy";
   return "bills";
+}
+
+function matchesCatalogQuery(kind, row, q) {
+  if (!q) return true;
+  const bits = kind === "med"
+    ? [row.name, row.sku, row.category]
+    : kind === "invoice"
+      ? [row.item]
+      : [row.name];
+  return bits.filter(Boolean).join(" ").toLowerCase().includes(q);
 }
 
 export default function Pay() {
@@ -52,7 +63,9 @@ function PatientShop() {
   const [payment, setPayment] = useState(null);
   const [busy, setBusy] = useState(false);
   const [cart, setCart] = useState(() => loadCart(user.id));
+  const [query, setQuery] = useState("");
   const appliedRx = useRef("");
+  const q = query.trim().toLowerCase();
 
   const persist = (next) => setCart(saveCart(user.id, next));
 
@@ -194,7 +207,8 @@ function PatientShop() {
   }, [stock]);
 
   const grouped = useMemo(() => {
-    const rows = category === "all" ? stock : stock.filter((s) => s.category === category);
+    const rows = (category === "all" ? stock : stock.filter((s) => s.category === category))
+      .filter((s) => matchesCatalogQuery("med", s, q));
     const map = {};
     rows.forEach((s) => {
       const key = s.category || "Other";
@@ -202,7 +216,7 @@ function PatientShop() {
       map[key].push(s);
     });
     return map;
-  }, [stock, category]);
+  }, [stock, category, q]);
 
   const inCart = (kind, id) => cart.find((c) => c.kind === kind && c.id === id);
 
@@ -254,6 +268,9 @@ function PatientShop() {
   const count = cartCount(cart);
   const due = invoices.filter((i) => i.status === "due");
   const paid = invoices.filter((i) => i.status === "paid");
+  const dueVisible = q ? due.filter((i) => matchesCatalogQuery("invoice", i, q)) : due;
+  const visibleLabs = q ? labs.filter((p) => matchesCatalogQuery("lab", p, q)) : labs;
+  const visibleServices = q ? services.filter((p) => matchesCatalogQuery("svc", p, q)) : services;
   const merchant = accounts?.momo?.[form.network] || accounts?.momo?.mtn;
   const pid = user.role === "patient" ? user.id : (cart.find((c) => c.patientId)?.patientId || patientId);
   const payable = billItems.length + labItems.length + svcItems.length + meds.length;
@@ -379,17 +396,34 @@ function PatientShop() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Ridge Campus shop</span>
-          <h1>Shop & pay</h1>
-          <p>Unpaid bills, medicines, and labs share one basket. Switching category does not empty it. The amount you will spend stays in view until you pay or collect at the hospital.</p>
-        </div>
-        <div className="row-actions">
-          <Link className="secondary-btn" to="/billing/tariff">View tariff</Link>
-          <Link className="ghost-btn" to="/prescriptions">My prescriptions</Link>
-        </div>
-      </div>
+      <PageHero
+        scene="billing"
+        eyebrow="Ridge Campus shop"
+        title="Shop & pay"
+        lead="Unpaid bills, medicines, and labs share one basket. Switching category does not empty it. The amount you will spend stays in view until you pay or collect at the hospital."
+        actions={(
+          <div className="row-actions">
+            <Link className="secondary-btn" to="/billing/tariff">View tariff</Link>
+            <Link className="ghost-btn" to="/prescriptions">My prescriptions</Link>
+          </div>
+        )}
+      />
+
+      <label className="shop-search">
+        <Search size={18} aria-hidden="true" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search medicines, SKU, labs, services, or unpaid bills"
+          aria-label="Search the shop catalog"
+        />
+        {query && (
+          <button type="button" className="shop-search-clear" onClick={() => setQuery("")}>
+            Clear
+          </button>
+        )}
+      </label>
 
       <div className="filters">
         {tabs.map((t) => (
@@ -411,8 +445,11 @@ function PatientShop() {
                   </div>
                 </div>
                 <p className="muted">Consults, admissions, and earlier orders. Add them to the same basket as medicines and labs.</p>
-                {due.length === 0 && <p className="muted">Nothing outstanding. Shop medicines, labs, or services if you need a new bill.</p>}
-                {due.map((i) => {
+                {due.length === 0 && !q && <p className="muted">Nothing outstanding. Shop medicines, labs, or services if you need a new bill.</p>}
+                {q && dueVisible.length === 0 && (
+                  <p className="shop-empty-copy">No unpaid bills match “{query.trim()}”.</p>
+                )}
+                {dueVisible.map((i) => {
                   const added = cart.some((c) => c.kind === "invoice" && c.id === i.id);
                   return (
                     <div className={`pay-pick ${added ? "on" : ""}`} key={i.id}>
@@ -428,7 +465,7 @@ function PatientShop() {
                   );
                 })}
               </section>
-              {paid.length > 0 && (
+              {paid.length > 0 && !q && (
                 <section className="card" style={{ marginTop: 16 }}>
                   <div className="card-head"><div><span className="eyebrow">Settled</span><h3>Paid receipts</h3></div></div>
                   {paid.slice(0, 8).map((i) => (
@@ -469,6 +506,13 @@ function PatientShop() {
                   </div>
                 </section>
               ))}
+              {Object.keys(grouped).length === 0 && (
+                <section className="card shop-empty">
+                  <p className="shop-empty-copy">
+                    {q ? `No medicines match “${query.trim()}”.` : "No medicines in this category."}
+                  </p>
+                </section>
+              )}
             </>
           )}
 
@@ -476,8 +520,11 @@ function PatientShop() {
             <section className="card">
               <div className="card-head"><div><span className="eyebrow">Pathology</span><h3>Laboratory tests</h3></div></div>
               <p className="muted">Adding a test does not clear medicines already in the basket.</p>
+              {q && visibleLabs.length === 0 && (
+                <p className="shop-empty-copy">No laboratory tests match “{query.trim()}”.</p>
+              )}
               <div className="pharm-grid">
-                {labs.map((p) => (
+                {visibleLabs.map((p) => (
                   <StockCard key={p.id} product={{ ...p, pack: p.specimen, inStock: true, qty: 99 }} kind="lab" line={inCart("lab", p.id)} onBump={bump} onSet={setQty} hideStock />
                 ))}
               </div>
@@ -487,8 +534,11 @@ function PatientShop() {
           {tab === "services" && (
             <section className="card">
               <div className="card-head"><div><span className="eyebrow">Tariff</span><h3>Other hospital services</h3></div></div>
+              {q && visibleServices.length === 0 && (
+                <p className="shop-empty-copy">No hospital services match “{query.trim()}”.</p>
+              )}
               <div className="pharm-grid">
-                {services.map((p) => (
+                {visibleServices.map((p) => (
                   <StockCard
                     key={p.id}
                     product={{ ...p, pack: p.nhis ? "NHIS eligible" : "Private pay", inStock: true, qty: 99 }}

@@ -328,6 +328,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 }
 .welcome + .tile-grid,
 .identity-strip + .tile-grid,
+.page-hero + .tile-grid,
 .kpi-row + .tile-grid { margin-top: 14px; }
 .tile-card {
   display: flex; flex-direction: column; gap: 10px; min-height: 108px;
@@ -1126,6 +1127,51 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .shop-spend-bar {
   display: none;
 }
+.shop-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--navy);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 0 0 16px;
+  color: var(--muted);
+  box-shadow: var(--shadow);
+}
+.shop-search:focus-within {
+  border-color: var(--teal);
+  border-left-color: var(--teal);
+  box-shadow: 0 0 0 3px var(--teal-soft);
+}
+.shop-search svg { color: var(--navy); flex: 0 0 auto; }
+.shop-search input {
+  border: 0;
+  background: transparent;
+  outline: 0;
+  width: 100%;
+  padding: 0;
+  box-shadow: none;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.shop-search input::placeholder { color: var(--muted); font-weight: 500; }
+.shop-search-clear {
+  border: 0;
+  background: var(--teal-soft);
+  color: var(--navy);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.shop-search-clear:hover { background: #d4f1ec; color: var(--teal-dark); }
+.shop-empty { text-align: center; padding: 28px 20px; }
+.shop-empty-copy { color: var(--muted); margin: 8px 0 0; font-weight: 600; }
 .pharm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 .pharm-card {
   border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff;
@@ -1234,7 +1280,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .rx-sign span { font-size: 12px; color: var(--muted); }
 
 @media print {
-  .no-print, .rx-pad, .filters, .pharm-cats { display: none !important; }
+  .no-print, .rx-pad, .filters, .pharm-cats, .shop-search { display: none !important; }
   .rx-sheet { border: 0; box-shadow: none; }
 }
 
@@ -1512,29 +1558,42 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .benefit-list svg { color: #00a88f; flex: 0 0 auto; margin-top: 2px; }
 
 .atm-photo {
-  position: absolute; inset: -10%;
+  position: absolute; inset: -12%;
   background: url("/imagery/corridor.jpg") center / cover no-repeat;
-  opacity: 0.1; filter: saturate(0.75);
+  opacity: 0.34; filter: saturate(0.88) contrast(1.05);
   animation: ken-burns 40s ease-in-out infinite alternate;
+}
+.atm-wash {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, rgba(248, 249, 250, 0.42) 0%, rgba(248, 249, 250, 0.78) 42%, rgba(248, 249, 250, 0.9) 100%),
+    linear-gradient(90deg, rgba(0, 51, 102, 0.08), rgba(0, 168, 143, 0.06));
 }
 .role-doctor .atm-photo, .scene-clinic .atm-photo { background-image: url("/imagery/clinic.jpg"); }
 .role-nurse .atm-photo, .scene-pharmacy .atm-photo { background-image: url("/imagery/pharmacy.jpg"); }
 .role-admin .atm-photo, .scene-ops .atm-photo { background-image: url("/imagery/login-ops.jpg"); }
-.scene-consult .atm-photo { background-image: url("/imagery/teleconsult.jpg"); }
+.scene-home .atm-photo, .scene-profile .atm-photo { background-image: url("/imagery/login-patient.jpg"); }
+.scene-consult .atm-photo, .scene-messages .atm-photo { background-image: url("/imagery/teleconsult.jpg"); }
 .scene-wards .atm-photo { background-image: url("/imagery/wards.jpg"); }
-.scene-records .atm-photo { background-image: url("/imagery/records.jpg"); }
-.scene-billing .atm-photo { background-image: url("/imagery/corridor.jpg"); }
+.scene-records .atm-photo, .scene-settings .atm-photo, .scene-alerts .atm-photo, .scene-cases .atm-photo { background-image: url("/imagery/records.jpg"); }
+.scene-billing .atm-photo, .scene-directory .atm-photo { background-image: url("/imagery/corridor.jpg"); }
+.scene-schedule .atm-photo, .scene-care .atm-photo { background-image: url("/imagery/clinic.jpg"); }
+.scene-support .atm-photo, .scene-reports .atm-photo { background-image: url("/imagery/login-ops.jpg"); }
 
 .welcome, .identity-strip, .ops-hero { position: relative; overflow: hidden; }
 .welcome::before, .identity-strip::before, .ops-hero::before {
   content: ""; position: absolute; inset: -12%;
   background: url("/imagery/clinic.jpg") center / cover no-repeat;
-  opacity: 0.2; pointer-events: none;
+  opacity: 1; pointer-events: none;
   animation: ken-burns 36s ease-in-out infinite alternate;
 }
-.identity-strip::before { background-image: url("/imagery/corridor.jpg"); opacity: 0.08; }
+.welcome::after, .identity-strip::after, .ops-hero::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, rgba(0, 51, 102, 0.86), rgba(0, 51, 102, 0.58) 52%, rgba(0, 168, 143, 0.36));
+}
+.identity-strip::before { background-image: url("/imagery/login-patient.jpg"); }
 .nurse-welcome::before { background-image: url("/imagery/pharmacy.jpg"); }
-.ops-hero::before { background-image: url("/imagery/login-ops.jpg"); opacity: 0.1; }
+.ops-hero::before { background-image: url("/imagery/login-ops.jpg"); }
 .welcome > *:not(.ecg-ribbon), .identity-strip > *, .ops-hero > * { position: relative; z-index: 1; }
 .identity-strip {
   background-image: linear-gradient(120deg, var(--card) 0%, var(--teal-soft) 50%, var(--card) 100%);
