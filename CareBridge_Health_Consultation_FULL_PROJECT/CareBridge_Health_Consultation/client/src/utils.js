@@ -43,7 +43,7 @@ export const roleLabel = (role) => ({
   admin: "Administrator",
 }[role] || role);
 
-export const BUILD = "2026.09.05-cart";
+export const BUILD = "2026.09.05-cart2";
 
 export function rxOrderQty(line, product) {
   const raw = String(line?.qty || "1");
