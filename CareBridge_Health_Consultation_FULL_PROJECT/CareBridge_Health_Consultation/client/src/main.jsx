@@ -5,6 +5,12 @@ import "./styles.css";
 import { homeFor } from "./utils";
 import { AuthProvider, ToastProvider, useAuth } from "./state";
 import Landing from "./pages/Landing";
+import About from "./pages/About";
+import Services from "./pages/Services";
+import Patients from "./pages/Patients";
+import DoctorsDirectory from "./pages/DoctorsDirectory";
+import Book from "./pages/Book";
+import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -49,6 +55,13 @@ function AppRoutes() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={user ? <Navigate to={homeFor(user)} /> : <Landing />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/services" element={<Services />} />
+        <Route path="/patients" element={<Patients />} />
+        <Route path="/doctors" element={<DoctorsDirectory />} />
+        <Route path="/find-a-doctor" element={<Navigate to="/doctors" replace />} />
+        <Route path="/book" element={<Book />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="/login" element={user ? <Navigate to={homeFor(user)} /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to={homeFor(user)} /> : <Register />} />
         <Route path="/help" element={user ? <Navigate to="/guide" replace /> : <Help />} />

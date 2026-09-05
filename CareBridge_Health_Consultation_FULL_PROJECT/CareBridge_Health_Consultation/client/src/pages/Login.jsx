@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { HeartPulse, ShieldCheck, ArrowRight, UserRound, Stethoscope, Pill, Building2 } from "lucide-react";
+import { HeartPulse, Check, ArrowRight, UserRound, Stethoscope, Pill, Building2 } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { HOSPITAL } from "../utils";
-import { GoldDust } from "../components/LiveFX";
 import { UtilBar } from "../components/PublicChrome";
 
 const DEMOS = {
@@ -19,42 +18,37 @@ const PORTALS = [
     id: "patient",
     tab: "Patient",
     icon: UserRound,
-    eyebrow: "Patient portal",
     title: "Patient sign-in",
-    hero: "Secure access to your record.",
     blurb: `Book visits, pay invoices, collect receipts, and reserve a bed at ${HOSPITAL.name}.`,
-    status: "Patient portal",
   },
   {
     id: "doctor",
     tab: "Clinician",
     icon: Stethoscope,
-    eyebrow: "Staff entry",
     title: "Clinician sign-in",
-    hero: "Clinic board and charts.",
-    blurb: "Doctors use the clinic list, write prescriptions from chat or video, and manage the admission queue.",
-    status: "Clinical access",
+    blurb: "Clinic list, prescriptions from chat or video, and the admission queue.",
   },
   {
     id: "nurse",
     tab: "Nurse",
     icon: Pill,
-    eyebrow: "Pharmacy nursing",
     title: "Nurse sign-in",
-    hero: "Dispensary and stock.",
     blurb: "Pharmacy nurses prepare hospital pickup orders and keep the Ridge cupboard current.",
-    status: "Pharmacy nursing",
   },
   {
     id: "admin",
     tab: "Operations",
     icon: Building2,
-    eyebrow: "Hospital operations",
     title: "Administrator sign-in",
-    hero: "Beds, staff, and accounts.",
-    blurb: "Operations covers the bed board, staff directory, clinic diary, tariff, receipts, and the audit log.",
-    status: "Hospital operations",
+    blurb: "Beds, staff directory, clinic diary, tariff, receipts, and the audit log.",
   },
+];
+
+const BENEFITS = [
+  "View your appointments and visit notes",
+  "Pay published fees and collect numbered receipts",
+  "Read prescriptions and collect at Ridge pharmacy",
+  "Message your named consultant on a secure thread",
 ];
 
 export default function Login() {
@@ -86,32 +80,19 @@ export default function Login() {
   };
 
   return (
-    <div className={`portal-shell ${isStaff ? "staff-login" : ""} ${portal === "nurse" ? "nurse-login" : ""} ${portal === "admin" ? "admin-login" : ""} ${portal === "doctor" ? "doctor-login" : ""}`}>
-      <UtilBar tone="teal" />
-      <div className="login-page">
-        <section className="login-hero">
-          <div className="kb-layer" aria-hidden="true" />
-          <GoldDust count={12} />
-          <Link to="/" className="brand large">
-            <div className="brand-mark live"><HeartPulse size={24} /></div>
-            <div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div>
-          </Link>
-          <div>
-            <div className="status confirmed" style={{ display: "inline-flex", gap: 6, marginBottom: 16 }}>
-              <ShieldCheck size={14} /> {meta.status}
-            </div>
-            <h1>{meta.hero}</h1>
-            <p className="muted">{meta.blurb}</p>
-            <p className="portal-secure">Secure access to your record · Access-controlled</p>
-          </div>
-          <p className="muted">{HOSPITAL.phone} · Records office · Emergency {HOSPITAL.emergency}</p>
-        </section>
+    <div className={`portal-shell split-login ${isStaff ? "staff-login" : ""} ${portal}-login`}>
+      <UtilBar tone="navy" />
+      <div className="login-page login-split">
         <section className="login-panel">
           <form className="login-card" onSubmit={submit}>
+            <Link to="/" className="brand">
+              <div className="brand-mark live"><HeartPulse size={22} /></div>
+              <div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div>
+            </Link>
             <div>
-              <span className="eyebrow">{meta.eyebrow}</span>
+              <span className="eyebrow">Patient portal</span>
               <h2>{meta.title}</h2>
-              <p className="muted">{HOSPITAL.name} · {HOSPITAL.campus}</p>
+              <p className="muted">{meta.blurb}</p>
             </div>
             <div className="portal-chooser" role="tablist" aria-label="Choose a portal">
               {PORTALS.map((p) => {
@@ -145,6 +126,19 @@ export default function Login() {
             {isStaff && <p className="muted">Staff accounts are issued by hospital operations. Patients register separately.</p>}
             <p className="muted"><Link to="/">Back to {HOSPITAL.campus}</Link></p>
           </form>
+        </section>
+        <section className="login-hero login-benefits">
+          <div className="kb-layer" aria-hidden="true" />
+          <div>
+            <span className="eyebrow">Secure access</span>
+            <h1>Your Ridge record, on one portal.</h1>
+            <ul className="benefit-list">
+              {BENEFITS.map((item) => (
+                <li key={item}><Check size={18} /> {item}</li>
+              ))}
+            </ul>
+          </div>
+          <p className="muted">{HOSPITAL.phone} · Emergency {HOSPITAL.emergency}</p>
         </section>
       </div>
     </div>

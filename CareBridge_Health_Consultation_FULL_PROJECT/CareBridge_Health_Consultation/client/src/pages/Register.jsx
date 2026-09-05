@@ -1,17 +1,34 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { HeartPulse, ArrowRight, ShieldCheck } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { HeartPulse, ArrowRight, Check } from "lucide-react";
 import { api } from "../api";
 import PhotoPicker from "../components/PhotoPicker";
 import { useAuth, useToast } from "../state";
 import { HOSPITAL } from "../utils";
-import { GoldDust } from "../components/LiveFX";
 import { UtilBar } from "../components/PublicChrome";
+
+function readIntent(params) {
+  try {
+    const raw = params.get("intent");
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return {
+      name: parsed.name || "",
+      email: parsed.email || "",
+      phone: parsed.phone || "",
+    };
+  } catch {
+    return {};
+  }
+}
 
 export default function Register() {
   const { login } = useAuth();
   const { push } = useToast();
-  const [form, setForm] = useState({ name: "", email: "", password: "", phone: "", city: "", insurance: "", photo: "" });
+  const [params] = useSearchParams();
+  const [form, setForm] = useState(() => ({
+    name: "", email: "", password: "", phone: "", city: "", insurance: "", photo: "", ...readIntent(params),
+  }));
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -32,32 +49,19 @@ export default function Register() {
   };
 
   return (
-    <div className="portal-shell">
-      <UtilBar tone="teal" />
-      <div className="login-page">
-        <section className="login-hero">
-          <div className="kb-layer" aria-hidden="true" />
-          <GoldDust count={12} />
-          <Link to="/" className="brand large">
-            <div className="brand-mark live"><HeartPulse size={24} /></div>
-            <div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div>
-          </Link>
-          <div>
-            <div className="status confirmed" style={{ display: "inline-flex", gap: 6, marginBottom: 16 }}>
-              <ShieldCheck size={14} /> Patient registration
-            </div>
-            <h1>Open a patient file at Ridge Campus.</h1>
-            <p className="muted">Patients only. After registration you can book visits, pay published fees, collect receipts, and reserve a ward.</p>
-            <p className="portal-secure">Secure access to your record · Staff use the portal chooser on sign-in</p>
-          </div>
-          <p className="muted">{HOSPITAL.phone} · {HOSPITAL.email}</p>
-        </section>
+    <div className="portal-shell split-login">
+      <UtilBar tone="navy" />
+      <div className="login-page login-split">
         <section className="login-panel">
           <form className="login-card" onSubmit={submit}>
+            <Link to="/" className="brand">
+              <div className="brand-mark live"><HeartPulse size={22} /></div>
+              <div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div>
+            </Link>
             <div>
               <span className="eyebrow">New patient</span>
               <h2>Create an account</h2>
-              <p className="muted">{HOSPITAL.name} · {HOSPITAL.campus}</p>
+              <p className="muted">Patients only. After registration you can book visits, pay published fees, and reserve a ward.</p>
             </div>
             <PhotoPicker value={form.photo} name={form.name} onChange={(photo) => set("photo", photo)} onError={setError} />
             <label>Full name<input value={form.name} onChange={(e) => set("name", e.target.value)} required /></label>
@@ -73,6 +77,20 @@ export default function Register() {
             <p className="muted">Already registered? <Link to="/login"><b>Sign in to the patient portal</b></Link></p>
             <p className="muted"><Link to="/">Back to {HOSPITAL.campus}</Link></p>
           </form>
+        </section>
+        <section className="login-hero login-benefits">
+          <div className="kb-layer" aria-hidden="true" />
+          <div>
+            <span className="eyebrow">Patient registration</span>
+            <h1>Open a patient file at Ridge Campus.</h1>
+            <ul className="benefit-list">
+              <li><Check size={18} /> Book a named Ridge consultant</li>
+              <li><Check size={18} /> Pay published fees and collect receipts</li>
+              <li><Check size={18} /> Keep labs and prescriptions on one MRN</li>
+              <li><Check size={18} /> Reserve a ward before you travel</li>
+            </ul>
+          </div>
+          <p className="muted">{HOSPITAL.phone} · {HOSPITAL.email}</p>
         </section>
       </div>
     </div>

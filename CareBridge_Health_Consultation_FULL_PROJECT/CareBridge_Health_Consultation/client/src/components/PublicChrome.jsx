@@ -1,25 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { HeartPulse, Phone, MapPin, Clock, Menu, X, ShieldAlert, Mail } from "lucide-react";
-import { HOSPITAL } from "../utils";
+import { HOSPITAL, homeFor } from "../utils";
+import { PUBLIC_NAV } from "../publicContent";
+import { useAuth } from "../state";
 
-const CLINICAL = [
-  { href: "/#services", label: "Clinical services" },
-  { href: "/#consultants", label: "Find a doctor" },
-  { to: "/tariff", label: "Tariff" },
-  { href: "/#teleconsult", label: "Teleconsult" },
-  { href: "/#admissions", label: "Admissions" },
-  { href: "/#contact", label: "Contact" },
-];
-
-export function UtilBar({ tone = "dark" }) {
+export function UtilBar({ tone = "navy" }) {
   const tel = (n) => `tel:${String(n).replace(/\s/g, "")}`;
   return (
     <div className={`util-bar util-${tone}`}>
       <div className="util-inner">
         <span className="util-place"><MapPin size={13} /> {HOSPITAL.address}</span>
-        <span className="util-hours"><Clock size={13} /> Clinic {HOSPITAL.hours}</span>
-        <a href={tel(HOSPITAL.phone)}><Phone size={13} /> Switchboard {HOSPITAL.phone}</a>
+        <a href={tel(HOSPITAL.phone)}><Phone size={13} /> {HOSPITAL.phone}</a>
+        <a href={`mailto:${HOSPITAL.email}`}><Mail size={13} /> {HOSPITAL.email}</a>
+        <span className="util-hours"><Clock size={13} /> {HOSPITAL.hours}</span>
         <a className="util-emerg" href={tel(HOSPITAL.emergency)}><ShieldAlert size={13} /> Emergency {HOSPITAL.emergency}</a>
       </div>
     </div>
@@ -27,17 +21,26 @@ export function UtilBar({ tone = "dark" }) {
 }
 
 function NavLinks({ onNavigate, className = "" }) {
+  const { user } = useAuth();
   return (
     <div className={`public-links ${className}`}>
-      {CLINICAL.map((item) => (
-        item.to
-          ? <Link key={item.label} to={item.to} onClick={onNavigate}>{item.label}</Link>
-          : <a key={item.label} href={item.href} onClick={onNavigate}>{item.label}</a>
+      {PUBLIC_NAV.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.end}
+          onClick={onNavigate}
+          className={({ isActive }) => isActive ? "on" : ""}
+        >
+          {item.label}
+        </NavLink>
       ))}
-      <Link to="/login" onClick={onNavigate}>Patient portal</Link>
-      <Link to="/login?role=doctor" onClick={onNavigate}>Clinician</Link>
-      <Link to="/login?role=admin" onClick={onNavigate}>Operations</Link>
-      <Link className="primary-btn nav-cta" to="/register" onClick={onNavigate}>Book a consultation</Link>
+      {user
+        ? <Link to={homeFor(user)} onClick={onNavigate}>My portal</Link>
+        : <Link to="/login" onClick={onNavigate}>Patient portal</Link>}
+      <Link className="primary-btn nav-cta" to={user?.role === "patient" ? "/appointments" : "/book"} onClick={onNavigate}>
+        Book Appointment
+      </Link>
     </div>
   );
 }
@@ -54,34 +57,28 @@ export function HospitalFooter() {
           <p>Licensed private hospital. Outpatient, teleconsult, pharmacy, records, and admissions on one clinical file.</p>
         </div>
         <div>
-          <h4>Clinical services</h4>
-          <a href="/#teleconsult">Telemedicine</a>
-          <a href="/#services">Outpatient clinic</a>
-          <a href="/#services">Pharmacy</a>
-          <a href="/#admissions">Admissions</a>
-          <a href="/#services">Records office</a>
+          <h4>Quick links</h4>
+          <Link to="/">Home</Link>
+          <Link to="/about">About Us</Link>
+          <Link to="/services">Our Services</Link>
+          <Link to="/doctors">Find a Doctor</Link>
+          <Link to="/contact">Contact</Link>
         </div>
         <div>
-          <h4>For patients</h4>
+          <h4>Patient care</h4>
+          <Link to="/patients">For patients</Link>
           <Link to="/login">Patient portal</Link>
-          <Link to="/register">Register / book</Link>
+          <Link to="/book">Book Appointment</Link>
           <Link to="/tariff">Hospital tariff</Link>
-          <Link to="/help">Help & contact</Link>
+          <Link to="/help">Health information</Link>
           <Link to="/privacy">Privacy & records</Link>
         </div>
         <div>
-          <h4>Staff entry</h4>
-          <Link to="/login?role=doctor">Clinician</Link>
-          <Link to="/login?role=nurse">Nurse / pharmacy</Link>
-          <Link to="/login?role=admin">Hospital operations</Link>
-          <h4 className="foot-sub">Emergency</h4>
-          <p><b>{HOSPITAL.emergency}</b><br />{HOSPITAL.emergencyHours} · Ridge casualty</p>
-        </div>
-        <div>
-          <h4>Contact</h4>
+          <h4>Contact us</h4>
           <p><MapPin size={14} /> {HOSPITAL.address}</p>
           <p><Phone size={14} /> {HOSPITAL.phone}</p>
           <p><Mail size={14} /> {HOSPITAL.email}</p>
+          <p><ShieldAlert size={14} /> Emergency {HOSPITAL.emergency}</p>
           <p><Clock size={14} /> Visiting {HOSPITAL.visiting}</p>
         </div>
       </div>
@@ -90,6 +87,21 @@ export function HospitalFooter() {
         <span>Access-controlled records · Not a substitute for 24-hour emergency services.</span>
       </div>
     </footer>
+  );
+}
+
+export function PageBanner({ eyebrow, title, lead, image = "/imagery/hero-campus.jpg", actions }) {
+  return (
+    <section className="page-banner">
+      <div className="page-banner-photo" style={{ backgroundImage: `url(${image})` }} aria-hidden="true" />
+      <div className="page-banner-shade" aria-hidden="true" />
+      <div className="page-banner-copy">
+        {eyebrow && <span className="eyebrow">{eyebrow}</span>}
+        <h1>{title}</h1>
+        {lead && <p>{lead}</p>}
+        {actions && <div className="hero-actions">{actions}</div>}
+      </div>
+    </section>
   );
 }
 
@@ -108,7 +120,7 @@ export default function PublicChrome({ variant = "page", children }) {
 
   return (
     <div className={`hospital-site ${home ? "landing landing-home" : "landing hospital-page"}`}>
-      <UtilBar tone={home ? "dark" : "teal"} />
+      <UtilBar tone="navy" />
       <header className={`public-nav hospital-nav ${home ? "nav-home" : "nav-page"} ${open ? "nav-open" : ""}`}>
         <Link to="/" className="brand" onClick={close}>
           <div className="brand-mark live"><HeartPulse size={22} /></div>

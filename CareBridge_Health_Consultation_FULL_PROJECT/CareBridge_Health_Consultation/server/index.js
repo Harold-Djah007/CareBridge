@@ -654,6 +654,28 @@ mountPharmacy(app, { readDb, writeDb, safeUser, notify, emailPatient, io, addInv
 mountSupport(app, { readDb, writeDb, safeUser, notify, emailPatient });
 mountCases(app, { readDb, writeDb, safeUser });
 
+app.post("/api/contact", (req, res) => {
+  const name = String(req.body.name || "").trim();
+  const email = String(req.body.email || "").trim();
+  const message = String(req.body.message || "").trim();
+  if (!name || !email || !message) {
+    return res.status(400).json({ message: "Name, email, and message are required." });
+  }
+  const db = readDb();
+  db.contactMessages = db.contactMessages || [];
+  db.contactMessages.push({
+    id: `cm${Date.now()}`,
+    name,
+    email,
+    phone: String(req.body.phone || "").trim(),
+    subject: String(req.body.subject || "").trim() || "Website message",
+    message,
+    createdAt: new Date().toISOString(),
+  });
+  writeDb(db);
+  res.status(201).json({ ok: true });
+});
+
 app.get("/api/admin/users", (_, res) => {
   const db = readDb();
   res.json(db.users.map(safeUser));
