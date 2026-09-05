@@ -186,9 +186,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
   color: #d7e4f0; background: var(--navy); border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 .app-util span + span { position: relative; }
-.role-doctor .app-util { background: #10242b; color: #9db0b6; }
-.role-nurse .app-util { background: #10241c; color: #9ec4ae; }
-.role-admin .app-util { background: #161b26; color: #c5b48a; }
+.role-doctor .app-util { background: #00264d; color: #d7e4f0; }
+.role-nurse .app-util { background: #013326; color: #d7eee6; }
+.role-admin .app-util { background: #001a33; color: #d7e4f0; }
 .chrome-strip {
   position: sticky; top: 0; z-index: 6; display: flex; align-items: center; justify-content: flex-end;
   gap: 8px; padding: 8px 20px; background: transparent;
