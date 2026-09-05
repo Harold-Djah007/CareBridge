@@ -50,7 +50,7 @@ export default function WardBooking() {
       <PageHero
         scene="wards"
         eyebrow={user.role === "patient" ? "Admissions" : "Bed requests"}
-        title={user.role === "patient" ? "Reserve a bed before you arrive" : "Admission queue"}
+        title={user.role === "patient" ? "Admissions" : "Bed queue"}
         lead={user.role === "patient" ? "Nightly ward rates plus room supplement are billed when admissions accept the bed. Pay by MoMo, GCB, NHIS, or cash." : "Accept or decline incoming requests. Occupancy updates automatically."}
         actions={user.role === "patient" ? <button className="primary-btn" onClick={() => setOpen(true)}><Plus size={18} /> Reserve a ward</button> : null}
       />

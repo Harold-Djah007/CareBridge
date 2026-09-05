@@ -105,7 +105,7 @@ export default function Support() {
       <PageHero
         scene="support"
         eyebrow={isAdmin ? "Operations" : "Help desk"}
-        title={isAdmin ? "Support desk" : "Help & support"}
+        title="Support"
         lead={isAdmin
           ? "Tickets from patients and clinicians land here and as a notice on every administrator account. Replies email the requester."
           : "Write to Ridge Campus operations. Every ticket notifies administrators in CareBridge and by email — this is not a static FAQ."}

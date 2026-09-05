@@ -71,7 +71,7 @@ export default function ClinicalRecord() {
   if (!patientId && clinician) {
     return (
       <div>
-        <PageHero scene="records" eyebrow="Chart" title="Open a patient file" lead="Choose a person from Patients, then open their chart." />
+        <PageHero scene="records" eyebrow="Chart" title="Open a file" lead="Choose a person from Patients, then open their chart." />
         <button className="primary-btn" onClick={() => navigate("/care")}>Go to caseload</button>
       </div>
     );

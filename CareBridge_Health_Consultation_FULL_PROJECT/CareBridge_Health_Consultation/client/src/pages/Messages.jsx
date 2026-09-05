@@ -143,8 +143,8 @@ export default function Messages() {
     <div>
       <PageHero
         scene="messages"
-        eyebrow={copy.title}
-        title={copy.heading}
+        eyebrow={copy.heading}
+        title={copy.title}
         lead={copy.blurb}
         actions={user.role === "patient" ? <Link className="primary-btn" to="/care?from=messages"><UserPlus size={16} /> Add a doctor</Link> : null}
       />

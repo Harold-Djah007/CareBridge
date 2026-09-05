@@ -22,7 +22,7 @@ export default function AdminSchedule() {
       <PageHero
         scene="schedule"
         eyebrow="Schedule"
-        title="All appointments"
+        title="Clinic diary"
         lead="Confirm, complete, or cancel any visit. Patients receive an email on status changes."
       />
       <div className="card" style={{ overflow: "auto" }}>

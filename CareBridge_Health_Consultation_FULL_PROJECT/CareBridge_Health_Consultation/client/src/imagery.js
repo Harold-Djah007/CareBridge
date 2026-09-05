@@ -1,4 +1,4 @@
-/** Local FOCOS campus/clinical plates. Reused on login, public pages, and the HIS. */
+/** Local campus/clinical plates. Scene keys follow the page wording. */
 export const IMAGERY = {
   campus: "/imagery/hero-campus.jpg",
   patient: "/imagery/login-patient.jpg",
@@ -16,30 +16,36 @@ export const SCENE_PHOTOS = {
   home: IMAGERY.patient,
   clinic: IMAGERY.clinic,
   pharmacy: IMAGERY.pharmacy,
+  shop: IMAGERY.pharmacy,
   ops: IMAGERY.ops,
-  billing: IMAGERY.corridor,
+  billing: IMAGERY.records,
+  tariff: IMAGERY.campus,
   consult: IMAGERY.consult,
   schedule: IMAGERY.clinic,
   messages: IMAGERY.consult,
   wards: IMAGERY.wards,
   records: IMAGERY.records,
-  settings: IMAGERY.records,
+  settings: IMAGERY.campus,
   support: IMAGERY.ops,
   care: IMAGERY.clinic,
   profile: IMAGERY.patient,
-  alerts: IMAGERY.records,
-  directory: IMAGERY.corridor,
+  alerts: IMAGERY.ops,
+  directory: IMAGERY.campus,
   reports: IMAGERY.ops,
   cases: IMAGERY.records,
+  nurse: IMAGERY.nurse,
 };
 
 export function photoFor(scene) {
-  return SCENE_PHOTOS[scene] || IMAGERY.corridor;
+  return SCENE_PHOTOS[scene] || IMAGERY.campus;
 }
 
 export function sceneFor(pathname = "", role) {
-  if (pathname.startsWith("/pay") || pathname.startsWith("/receipts") || pathname.includes("tariff")) return "billing";
-  if (pathname.startsWith("/pharmacy") || pathname.startsWith("/prescriptions") || (pathname === "/home" && role === "nurse")) return "pharmacy";
+  if (pathname.startsWith("/pay") && role !== "admin") return "shop";
+  if (pathname.startsWith("/pay") || pathname.startsWith("/receipts")) return "billing";
+  if (pathname.includes("tariff")) return "tariff";
+  if (pathname.startsWith("/pharmacy") || pathname.startsWith("/prescriptions")) return "pharmacy";
+  if (pathname === "/home" && role === "nurse") return "nurse";
   if (pathname.startsWith("/video")) return "consult";
   if (pathname.startsWith("/appointments") || pathname.startsWith("/admin/appointments")) return "schedule";
   if (pathname.startsWith("/messages")) return "messages";

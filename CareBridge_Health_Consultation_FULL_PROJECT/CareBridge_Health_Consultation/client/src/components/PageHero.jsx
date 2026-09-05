@@ -25,8 +25,13 @@ export default function PageHero({
         <div className="page-hero-copy">
           {eyebrow && <span className="eyebrow">{eyebrow}</span>}
           {title && <h1>{title}</h1>}
-          {lead && <p>{lead}</p>}
           {children}
+          {lead ? (
+            <details className="page-note">
+              <summary>About this page</summary>
+              <p>{lead}</p>
+            </details>
+          ) : null}
         </div>
         {actions ? <div className="page-hero-actions">{actions}</div> : null}
       </div>
@@ -39,7 +44,7 @@ export function EmptyPlate({ scene = "clinic", image, icon: Icon, title, hint, c
   return (
     <div className={`empty empty-plate ${compact ? "compact" : ""}`}>
       <div className="empty-photo" style={{ backgroundImage: `url(${src})` }} aria-hidden="true" />
-      {Icon ? <Icon size={compact ? 26 : 32} /> : null}
+      {Icon ? <Icon size={compact ? 22 : 28} /> : null}
       {title && <h3>{title}</h3>}
       {hint && <p>{hint}</p>}
       {children}

@@ -154,8 +154,8 @@ export default function PharmacyStock() {
     <div>
       <PageHero
         scene="pharmacy"
-        eyebrow="Ridge pharmacy"
-        title="Medicine cupboard"
+        eyebrow="Pharmacy"
+        title="Stock"
         lead="Toggle in or out of stock, edit the label patients see, restock, or archive a SKU so it leaves the shop. Changes appear live on Shop & pay."
         actions={<button className="primary-btn" type="button" onClick={() => setOpen(true)}><Plus size={16} /> Add SKU</button>}
       />

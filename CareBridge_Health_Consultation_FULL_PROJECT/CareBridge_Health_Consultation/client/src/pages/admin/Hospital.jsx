@@ -36,7 +36,7 @@ export default function AdminHospital() {
       <PageHero
         scene="wards"
         eyebrow="Admissions"
-        title="Hospital wards"
+        title="Bed board"
         lead="Accept beds, decline requests, and keep availability accurate."
       />
       <section className="card" style={{ marginBottom: 18 }}>

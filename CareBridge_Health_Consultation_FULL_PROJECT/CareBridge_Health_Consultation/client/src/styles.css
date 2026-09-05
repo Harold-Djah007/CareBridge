@@ -1578,10 +1578,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .scene-home .atm-photo, .scene-profile .atm-photo { background-image: url("/imagery/login-patient.jpg"); }
 .scene-consult .atm-photo, .scene-messages .atm-photo { background-image: url("/imagery/teleconsult.jpg"); }
 .scene-wards .atm-photo { background-image: url("/imagery/wards.jpg"); }
-.scene-records .atm-photo, .scene-settings .atm-photo, .scene-alerts .atm-photo, .scene-cases .atm-photo { background-image: url("/imagery/records.jpg"); }
-.scene-billing .atm-photo, .scene-directory .atm-photo { background-image: url("/imagery/corridor.jpg"); }
+.scene-records .atm-photo, .scene-billing .atm-photo, .scene-cases .atm-photo { background-image: url("/imagery/records.jpg"); }
+.scene-settings .atm-photo, .scene-directory .atm-photo, .scene-tariff .atm-photo { background-image: url("/imagery/hero-campus.jpg"); }
+.scene-pharmacy .atm-photo, .scene-shop .atm-photo { background-image: url("/imagery/pharmacy.jpg"); }
+.scene-nurse .atm-photo { background-image: url("/imagery/login-nurse.jpg"); }
 .scene-schedule .atm-photo, .scene-care .atm-photo { background-image: url("/imagery/clinic.jpg"); }
-.scene-support .atm-photo, .scene-reports .atm-photo { background-image: url("/imagery/login-ops.jpg"); }
+.scene-support .atm-photo, .scene-reports .atm-photo, .scene-alerts .atm-photo { background-image: url("/imagery/login-ops.jpg"); }
 
 .welcome, .identity-strip, .ops-hero { position: relative; overflow: hidden; }
 .welcome::before, .identity-strip::before, .ops-hero::before {
@@ -2197,9 +2199,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .workspace-chat .bubble { box-shadow: 0 6px 16px rgba(0, 51, 102, 0.06); }
 
 .portal-app .page-hero {
-  border-radius: 18px;
-  min-height: 136px;
-  box-shadow: 0 16px 36px rgba(0, 51, 102, 0.12);
+  border-radius: 12px;
+  min-height: 72px;
+  box-shadow: 0 8px 22px rgba(0, 51, 102, 0.1);
 }
 .portal-app .page-title {
   align-items: center;
@@ -2285,4 +2287,82 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 
 @media (prefers-reduced-motion: reduce) {
   .portal-app .tile-card:hover { transform: none; }
+}
+
+.page-hero.compact { min-height: 72px; }
+.page-hero.compact .page-hero-body { padding: 10px 14px; align-items: center; }
+.portal-app .page-hero h1,
+.page-hero h1 { font-size: 18px; margin: 2px 0 0; font-weight: 700; letter-spacing: -0.02em; }
+.page-hero .eyebrow { font-size: 10px; }
+.page-note { margin-top: 6px; max-width: 52ch; }
+.page-note summary {
+  cursor: pointer; list-style: none; font-size: 11px; font-weight: 700;
+  color: #7ee0d2; letter-spacing: 0.04em;
+}
+.page-note summary::-webkit-details-marker { display: none; }
+.page-note summary::after { content: " ▾"; font-size: 10px; }
+.page-note[open] summary::after { content: " ▴"; }
+.page-note p { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: rgba(255,255,255,0.86); }
+
+.home-stage .stat-strip { gap: 8px; margin-bottom: 12px; }
+.home-stage .stat-chip { padding: 8px 12px; border-radius: 10px; box-shadow: none; }
+.home-stage .stat-chip strong { font-size: 16px; }
+.home-stage .kpi-row.compact { margin-bottom: 12px; }
+.home-stage .kpi { padding: 10px 12px; }
+
+.jump-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  margin: 0 0 16px;
+}
+.jump-menu {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+}
+.jump-menu select {
+  min-width: 220px; padding: 7px 10px; font-weight: 650;
+  text-transform: none; letter-spacing: 0; font-size: 13px;
+}
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border-radius: 999px; background: #fff;
+  border: 1px solid var(--line); font-size: 12px; font-weight: 700; color: var(--navy);
+}
+.chip-link:hover { border-color: var(--teal); color: var(--teal-dark); background: var(--teal-soft); }
+
+.home-feature {
+  display: grid; grid-template-columns: 76px minmax(0, 1fr);
+  padding: 0; overflow: hidden; align-items: stretch;
+}
+.home-rail {
+  background-size: cover; background-position: center;
+  min-height: 100%; position: relative;
+}
+.home-rail::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0, 51, 102, 0.08), rgba(0, 51, 102, 0.28));
+}
+.home-feature-body { padding: 12px 14px 14px; min-width: 0; }
+.home-feature .appointment-feature { padding: 10px 0 0; border: 0; background: transparent; border-radius: 0; }
+.work-wrap { margin-top: 0; }
+.work-wrap .clinic-board, .work-wrap .work-deck { border: 0; box-shadow: none; border-radius: 0; }
+
+.shop-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin: 0 0 14px;
+}
+.shop-toolbar .shop-search {
+  flex: 0 1 260px; margin: 0; padding: 6px 10px; gap: 8px;
+  box-shadow: none; border-left-width: 3px;
+}
+.shop-toolbar .shop-search input { font-size: 13px; }
+.shop-toolbar .shop-search-clear { padding: 4px 8px; font-size: 11px; }
+.shop-toolbar .filters { margin: 0; }
+
+@media (max-width: 720px) {
+  .home-feature, .work-wrap { grid-template-columns: 1fr; }
+  .home-rail { min-height: 56px; }
+  .jump-menu { width: 100%; }
+  .jump-menu select { flex: 1; min-width: 0; }
 }

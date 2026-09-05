@@ -23,7 +23,7 @@ export default function AdminReports() {
       <PageHero
         scene="reports"
         eyebrow="Governance"
-        title="Reports & audit"
+        title="Reports"
         lead="Revenue, clinical volume, and a trail of who changed what."
       />
       <div className="filters">

@@ -71,9 +71,9 @@ export default function Appointments() {
     <div>
       <PageHero
         scene="schedule"
-        eyebrow={user.role === "doctor" ? "Outpatient diary" : "Visits"}
-        title={user.role === "patient" ? "Your appointments" : "Clinic schedule"}
-        lead={user.role === "patient" ? "Book a video or campus visit. The consultant fee is billed to your account and payable by MoMo, GCB, NHIS, or cash." : "Today’s list, plus upcoming and completed encounters."}
+        eyebrow={user.role === "doctor" ? "Outpatient" : "Visits"}
+        title={user.role === "patient" ? "Appointments" : "Schedule"}
+        lead={user.role === "patient" ? "Book a video or campus visit. Fees go to Shop & pay." : "Upcoming and completed encounters."}
         actions={(
           <button className="primary-btn" onClick={() => { setForm({ doctorId: "", patientId: user.role === "patient" ? user.id : "", date: todayISO(), time: "09:00", reason: "", mode: "video" }); setOpen(true); }}><Plus size={18} /> {user.role === "patient" ? "Request a visit" : "Add slot"}</button>
         )}

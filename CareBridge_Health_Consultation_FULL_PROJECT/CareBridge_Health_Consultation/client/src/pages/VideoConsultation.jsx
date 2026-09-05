@@ -136,7 +136,7 @@ export default function VideoConsultation() {
       <PageHero
         scene="consult"
         eyebrow="Telemedicine"
-        title="Video consultation"
+        title="Video"
         lead={peer ? `Private room with ${peer.name}.` : "A private virtual consultation room."}
       />
       <div className="video-shell">

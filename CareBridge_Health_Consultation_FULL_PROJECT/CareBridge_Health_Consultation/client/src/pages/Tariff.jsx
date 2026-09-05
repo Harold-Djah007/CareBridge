@@ -132,7 +132,7 @@ export default function Tariff() {
         <PageHero
           scene="billing"
           eyebrow={`${HOSPITAL.campus} accounts`}
-          title="Hospital tariff"
+          title="Tariff"
           lead={`Published fees in Ghana cedis. Pay by MTN / Telecel / AirtelTigo MoMo, GCB bank transfer, NHIS, or cash at the Ridge cashier. A numbered receipt is issued for every settled bill.${rates.updatedAt ? ` Last updated ${prettyDate(rates.updatedAt)}${rates.updatedBy ? ` by ${rates.updatedBy}` : ""}.` : ""}`}
           actions={(
             <>

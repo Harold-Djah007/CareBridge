@@ -86,7 +86,7 @@ export default function CareTeam() {
       <PageHero
         scene="care"
         eyebrow={user.role === "patient" ? "Hospital directory" : "Caseload"}
-        title={user.role === "patient" ? (fromMessages ? "Add a doctor to your chats" : "Doctors at Ridge Campus") : "Patients under your care"}
+        title={user.role === "patient" ? (fromMessages ? "Add a doctor" : "Doctors") : "Patients"}
         lead={user.role === "patient"
           ? "Photos, specialty, and live available/busy status. Add the consultant you need — nobody is assigned for you."
           : "Open the chart, message, or start a teleconsult."}

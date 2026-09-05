@@ -5,11 +5,11 @@ import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
 import { api, socketUrl } from "../api";
 import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate, prettyDate, ghs } from "../utils";
-import { EcgRibbon, Heartbeat } from "../components/LiveMeter";
+import { Heartbeat } from "../components/LiveMeter";
 import Avatar from "../components/Avatar";
 import Presence from "../components/Presence";
 import DutyToggle from "../components/DutyToggle";
-import TileCard, { TileGrid, StatStrip } from "../components/TileCard";
+import { JumpMenu, StatStrip } from "../components/TileCard";
 import PageHero, { EmptyPlate } from "../components/PageHero";
 import { IMAGERY } from "../imagery";
 
@@ -20,7 +20,7 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
   const chosen = doctors.find((d) => d.id === user.preferredDoctorId);
 
   return (
-    <>
+    <div className="home-stage">
       <PageHero
         scene="home"
         className="identity-hero"
@@ -49,66 +49,72 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
         { label: "Consultant", value: chosen ? chosen.name.replace("Dr. ", "") : "Choose", hint: chosen ? chosen.specialty : "Find a doctor" },
       ]} />
 
-      <TileGrid label="Patient shortcuts">
-        <TileCard photo={IMAGERY.pharmacy} to="/pay" icon={ShoppingBag} title="Shop & pay" subtitle={due.length ? `${ghs(dueTotal)} outstanding` : "Bills, medicines, labs"} />
-        <TileCard photo={IMAGERY.records} to="/prescriptions" icon={ClipboardList} title="Prescriptions" subtitle="Print, buy, or collect at Ridge" />
-        <TileCard photo={IMAGERY.clinic} to="/care" icon={Stethoscope} title="Doctors" subtitle={chosen ? chosen.name : "Find a consultant"} />
-        <TileCard photo={IMAGERY.consult} to="/appointments" icon={CalendarDays} title="Visits" subtitle={next ? `${formatDate(next.date)} · ${formatTime(next.time)}` : "Book a visit"} />
-        <TileCard photo={IMAGERY.records} to="/records" icon={FolderOpen} title="Clinical file" subtitle="Notes, labs, and medicines" />
-        <TileCard photo={IMAGERY.ops} to="/support" icon={LifeBuoy} title="Support" subtitle={emails.length ? `${emails.length} notices on file` : "Help desk"} />
-      </TileGrid>
+      <JumpMenu label="Go to" items={[
+        { to: "/pay", icon: ShoppingBag, title: "Shop & pay", subtitle: due.length ? `${ghs(dueTotal)} outstanding` : "Bills, medicines, labs" },
+        { to: "/prescriptions", icon: ClipboardList, title: "Prescriptions", subtitle: "Print, buy, or collect" },
+        { to: "/care", icon: Stethoscope, title: "Doctors", subtitle: chosen ? chosen.name : "Find a consultant" },
+        { to: "/appointments", icon: CalendarDays, title: "Visits", subtitle: next ? `${formatDate(next.date)} · ${formatTime(next.time)}` : "Book a visit" },
+        { to: "/records", icon: FolderOpen, title: "Clinical file", subtitle: "Notes, labs, medicines" },
+        { to: "/support", icon: LifeBuoy, title: "Support", subtitle: emails.length ? `${emails.length} notices` : "Help desk" },
+      ]} />
 
       <div className="dashboard-grid">
-        <section className="card home-panel">
-          <div className="card-head">
-            <div><span className="eyebrow">Your next visit</span>
-              <h3>{next ? `${formatDate(next.date)} at ${formatTime(next.time)}` : "No visit booked"}</h3>
+        <section className="card home-panel home-feature">
+          <div className="home-rail" style={{ backgroundImage: `url(${next?.mode === "video" ? IMAGERY.consult : IMAGERY.clinic})` }} aria-hidden="true" />
+          <div className="home-feature-body">
+            <div className="card-head">
+              <div><span className="eyebrow">Next visit</span>
+                <h3>{next ? `${formatDate(next.date)} · ${formatTime(next.time)}` : "No visit booked"}</h3>
+              </div>
             </div>
+            {next ? (
+              <div className="appointment-feature">
+                <Avatar person={next.doctor} />
+                <div className="grow">
+                  <strong>{next.doctor.name}</strong>
+                  <span className="muted">{next.doctor.specialty} · {next.mode === "video" ? "Video consultation" : "Ridge Campus clinic"}</span>
+                  <small className="muted">{next.reason}{next.fee ? ` · ${ghs(next.fee)}` : ""}</small>
+                </div>
+                <div className="row-actions">
+                  <Link className="secondary-btn" to={`/messages?with=${next.doctorId}`}>Message</Link>
+                  {next.mode === "video" && <Link className="primary-btn" to={`/video?with=${next.doctorId}`}><Video size={17} /> Join</Link>}
+                </div>
+              </div>
+            ) : chosen ? (
+              <div className="appointment-feature">
+                <Avatar person={chosen} />
+                <div className="grow">
+                  <strong>{chosen.name}</strong>
+                  <span className="muted">{chosen.specialty} · your consultant</span>
+                  <Presence person={chosen} />
+                </div>
+                <div className="row-actions">
+                  <Link className="primary-btn" to="/appointments">Book</Link>
+                </div>
+              </div>
+            ) : (
+              <EmptyPlate scene="clinic" compact title="Choose a consultant, then book." />
+            )}
           </div>
-          {next ? (
-            <div className="appointment-feature">
-              <Avatar person={next.doctor} />
-              <div className="grow">
-                <strong>{next.doctor.name}</strong>
-                <span className="muted">{next.doctor.specialty} · {next.mode === "video" ? "Video consultation" : "Ridge Campus clinic"}</span>
-                <small className="muted">{next.reason}{next.fee ? ` · ${ghs(next.fee)}` : ""}</small>
-              </div>
-              <div className="row-actions">
-                <Link className="secondary-btn" to={`/messages?with=${next.doctorId}`}>Message</Link>
-                {next.mode === "video" && <Link className="primary-btn" to={`/video?with=${next.doctorId}`}><Video size={17} /> Join</Link>}
-              </div>
-            </div>
-          ) : chosen ? (
-            <div className="appointment-feature">
-              <Avatar person={chosen} />
-              <div className="grow">
-                <strong>{chosen.name}</strong>
-                <span className="muted">{chosen.specialty} · your chosen consultant</span>
-                <Presence person={chosen} />
-              </div>
-              <div className="row-actions">
-                <Link className="primary-btn" to="/appointments">Book a visit</Link>
-              </div>
-            </div>
-          ) : (
-            <EmptyPlate scene="clinic" compact title="Choose a Ridge Campus consultant, then book a visit." />
-          )}
         </section>
-        <section className="card home-panel">
-          <div className="card-head"><div><span className="eyebrow">Admission</span><h3>{admission ? admission.ward : "No bed reserved"}</h3></div></div>
-          {admission ? (
-            <div className="appointment-feature">
-              <BedDouble size={20} />
-              <div className="grow">
-                <strong>{admission.roomType}</strong>
-                <span className="muted">Arrive {admission.date}{admission.fee ? ` · ${ghs(admission.fee)}` : ""}</span>
+        <section className="card home-panel home-feature">
+          <div className="home-rail" style={{ backgroundImage: `url(${IMAGERY.wards})` }} aria-hidden="true" />
+          <div className="home-feature-body">
+            <div className="card-head"><div><span className="eyebrow">Admission</span><h3>{admission ? admission.ward : "No bed reserved"}</h3></div></div>
+            {admission ? (
+              <div className="appointment-feature">
+                <BedDouble size={20} />
+                <div className="grow">
+                  <strong>{admission.roomType}</strong>
+                  <span className="muted">Arrive {admission.date}{admission.fee ? ` · ${ghs(admission.fee)}` : ""}</span>
+                </div>
+                <span className={`status ${admission.status}`}>{admission.status}</span>
               </div>
-              <span className={`status ${admission.status}`}>{admission.status}</span>
-            </div>
-          ) : <EmptyPlate scene="wards" compact title="No bed reserved" hint="Request a ward before you travel. Nightly rates are on the hospital tariff." />}
+            ) : <EmptyPlate scene="wards" compact title="No bed reserved" hint="Request a ward before you travel." />}
+          </div>
         </section>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -140,15 +146,15 @@ function DoctorBoard({ user, appointments, wards }) {
   };
 
   return (
-    <>
+    <div className="home-stage">
       <PageHero
         scene="clinic"
         className="welcome doctor-welcome compact"
-        extras={<><EcgRibbon /><Heartbeat /></>}
+        extras={<Heartbeat />}
         eyebrow={`${user.department || "Outpatient"} · ${user.clinic || "Consulting room"}`}
         title={greeting(user.name.replace("Dr. ", "").split(" ")[0])}
-        lead={`${longDate()} · ${user.shift || "Day clinic"} · ${remaining} patient${remaining === 1 ? "" : "s"} remaining${pending > 0 ? ` · ${pending} admission request${pending > 1 ? "s" : ""} waiting` : ""}`}
-        actions={<DutyToggle available={available} disabled={busy} onChange={(on) => toggleAvail(on)} />}
+        lead={`${longDate()} · ${user.shift || "Day clinic"} · ${remaining} remaining${pending > 0 ? ` · ${pending} admission waiting` : ""}`}
+        actions={<DutyToggle available={available} disabled={busy} hint={false} onChange={(on) => toggleAvail(on)} />}
       />
 
       <StatStrip items={[
@@ -157,15 +163,17 @@ function DoctorBoard({ user, appointments, wards }) {
         { label: "Admissions", value: pending, hint: pending ? "Waiting on a bed" : "No pending requests" },
       ]} />
 
-      <TileGrid label="Clinic shortcuts">
-        <TileCard photo={IMAGERY.clinic} to="/care" icon={Users} title="Patients" subtitle="Caseload directory" />
-        <TileCard photo={IMAGERY.records} to="/records" icon={FolderOpen} title="Open chart" subtitle="Notes and letters" />
-        <TileCard photo={IMAGERY.pharmacy} to="/prescriptions" icon={Pill} title="Prescriptions" subtitle="Issued letters" />
-        <TileCard photo={IMAGERY.wards} to="/wards" icon={BedDouble} title="Admissions" subtitle={pending ? `${pending} waiting` : "Ward requests"} />
-        <TileCard photo={IMAGERY.consult} to="/messages" icon={MessageCircle} title="Inbox" subtitle="Clinical messages" />
-      </TileGrid>
+      <JumpMenu label="Clinic pages" items={[
+        { to: "/care", icon: Users, title: "Patients", subtitle: "Caseload directory" },
+        { to: "/records", icon: FolderOpen, title: "Open chart", subtitle: "Notes and letters" },
+        { to: "/prescriptions", icon: Pill, title: "Prescriptions", subtitle: "Issued letters" },
+        { to: "/wards", icon: BedDouble, title: "Admissions", subtitle: pending ? `${pending} waiting` : "Ward requests" },
+        { to: "/messages", icon: MessageCircle, title: "Inbox", subtitle: "Clinical messages" },
+      ]} />
 
-      <div className="clinic-board work-deck">
+      <section className="home-feature work-wrap">
+        <div className="home-rail" style={{ backgroundImage: `url(${IMAGERY.clinic})` }} aria-hidden="true" />
+        <div className="clinic-board work-deck">
         {today.length === 0 && <EmptyPlate scene="clinic" title="No patients on your list" hint="Confirmed visits appear here as a clinic board." />}
         {today.map((a) => (
           <div className={`clinic-row ${a.id === nextId ? "next" : ""}`} key={a.id}>
@@ -183,8 +191,9 @@ function DoctorBoard({ user, appointments, wards }) {
             </div>
           </div>
         ))}
-      </div>
-    </>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -227,9 +236,9 @@ function NurseBoard({ user }) {
   const ready = hospital.filter((o) => o.status === "ready").length;
 
   return (
-    <>
+    <div className="home-stage">
       <PageHero
-        scene="pharmacy"
+        scene="nurse"
         className="welcome doctor-welcome nurse-welcome compact"
         eyebrow={`${user.department || "Ridge Campus pharmacy"} · ${user.shift || "Day dispensary"}`}
         title={greeting(firstName(user.name.replace("Nurse ", "")))}
@@ -240,18 +249,20 @@ function NurseBoard({ user }) {
         { label: "Ready", value: ready, hint: "Awaiting collection" },
         { label: "Hospital packs", value: hospital.length, hint: "Collect at Ridge" },
       ]} />
-      <TileGrid label="Dispensary shortcuts">
-        <TileCard photo={IMAGERY.pharmacy} to="/pharmacy-stock" icon={Pill} title="Stock" subtitle="Cupboard, prices, and restock" />
-        <TileCard photo={IMAGERY.consult} to="/messages" icon={MessageCircle} title="Messages" subtitle="Doctors and operations" />
-      </TileGrid>
+      <JumpMenu label="Dispensary" items={[
+        { to: "/pharmacy-stock", icon: Pill, title: "Stock", subtitle: "Cupboard and restock" },
+        { to: "/messages", icon: MessageCircle, title: "Messages", subtitle: "Doctors and operations" },
+      ]} />
       <div className="filters">
         <button className={filter === "queued" ? "active" : ""} onClick={() => setFilter("queued")}>Queued ({queued})</button>
         <button className={filter === "ready" ? "active" : ""} onClick={() => setFilter("ready")}>Ready ({ready})</button>
         <button className={filter === "collected" ? "active" : ""} onClick={() => setFilter("collected")}>Collected</button>
         <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>All</button>
       </div>
-      <div className="clinic-board work-deck">
-        {visible.length === 0 && <EmptyPlate scene="pharmacy" title="No hospital pickups in this list" hint="Patients who choose “collect at hospital” appear here." />}
+      <section className="home-feature work-wrap">
+        <div className="home-rail" style={{ backgroundImage: `url(${IMAGERY.pharmacy})` }} aria-hidden="true" />
+        <div className="clinic-board work-deck">
+        {visible.length === 0 && <EmptyPlate scene="pharmacy" title="No hospital pickups" hint="Patients who choose “collect at hospital” appear here." />}
         {visible.map((order) => (
           <div className="work-row" key={order.id}>
             <Avatar person={order.patient} />
@@ -275,8 +286,9 @@ function NurseBoard({ user }) {
             </div>
           </div>
         ))}
-      </div>
-    </>
+        </div>
+      </section>
+    </div>
   );
 }
 

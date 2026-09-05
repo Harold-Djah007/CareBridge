@@ -35,8 +35,8 @@ export default function AdminCases() {
     <div>
       <PageHero
         scene="cases"
-        eyebrow="Case management"
-        title="Case workflow"
+        eyebrow="Cases"
+        title="Workflow"
         lead="CommCare-style case list. Each patient file, encounter, admission, bill, and support ticket is a case with properties, a stage, and a form history. Open a row for the case detail."
       />
 

@@ -57,7 +57,7 @@ export default function AdminUsers() {
       <PageHero
         scene="directory"
         eyebrow="Directory"
-        title="People"
+        title="Staff & patients"
         lead="Create patients, doctors, pharmacy nurses, and administrators. Deactivating blocks sign-in."
         actions={<button className="primary-btn" onClick={() => { setEditing(null); setForm(blank); setOpen(true); }}><Plus size={16} /> Add person</button>}
       />

@@ -397,40 +397,41 @@ function PatientShop() {
   return (
     <div>
       <PageHero
-        scene="billing"
-        eyebrow="Ridge Campus shop"
+        scene="shop"
+        eyebrow="Pharmacy & accounts"
         title="Shop & pay"
-        lead="Unpaid bills, medicines, and labs share one basket. Switching category does not empty it. The amount you will spend stays in view until you pay or collect at the hospital."
+        lead="Unpaid bills, medicines, and labs share one basket. Switching category does not empty it."
         actions={(
           <div className="row-actions">
-            <Link className="secondary-btn" to="/billing/tariff">View tariff</Link>
-            <Link className="ghost-btn" to="/prescriptions">My prescriptions</Link>
+            <Link className="secondary-btn" to="/billing/tariff">Tariff</Link>
+            <Link className="ghost-btn" to="/prescriptions">Prescriptions</Link>
           </div>
         )}
       />
 
-      <label className="shop-search">
-        <Search size={18} aria-hidden="true" />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search medicines, SKU, labs, services, or unpaid bills"
-          aria-label="Search the shop catalog"
-        />
-        {query && (
-          <button type="button" className="shop-search-clear" onClick={() => setQuery("")}>
-            Clear
-          </button>
-        )}
-      </label>
-
-      <div className="filters">
-        {tabs.map((t) => (
-          <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => setTab(t.id)}>
-            {t.id === "bills" && due.length ? `${t.label} (${due.length})` : t.label}
-          </button>
-        ))}
+      <div className="shop-toolbar">
+        <label className="shop-search">
+          <Search size={15} aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search catalog"
+            aria-label="Search the shop catalog"
+          />
+          {query && (
+            <button type="button" className="shop-search-clear" onClick={() => setQuery("")}>
+              Clear
+            </button>
+          )}
+        </label>
+        <div className="filters">
+          {tabs.map((t) => (
+            <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => setTab(t.id)}>
+              {t.id === "bills" && due.length ? `${t.label} (${due.length})` : t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="pharmacy-layout shop-layout">

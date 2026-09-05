@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export function TileGrid({ children, label = "Shortcuts" }) {
   return <nav className="tile-grid" aria-label={label}>{children}</nav>;
@@ -17,6 +17,42 @@ export function StatStrip({ items = [] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+export function JumpMenu({ label = "Go to", items = [] }) {
+  const navigate = useNavigate();
+  if (!items.length) return null;
+  return (
+    <div className="jump-bar">
+      <label className="jump-menu">
+        <span>{label}</span>
+        <select
+          defaultValue=""
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next) navigate(next);
+            e.target.value = "";
+          }}
+        >
+          <option value="" disabled>{label}…</option>
+          {items.map((item) => (
+            <option key={item.to} value={item.to}>{item.title}{item.subtitle ? ` — ${item.subtitle}` : ""}</option>
+          ))}
+        </select>
+      </label>
+      <nav className="chip-row" aria-label={label}>
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link key={item.to} className="chip-link" to={item.to}>
+              {Icon ? <Icon size={14} strokeWidth={2.2} /> : null}
+              {item.title}
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
   );
 }
 

@@ -32,12 +32,12 @@ export default function PageAtmosphere({ scene: sceneProp }) {
       <div className="atm-orb o3" />
       <div className="atm-grid" />
       {(scene === "consult" || scene === "clinic" || scene === "home" || scene === "records") && <ConsultMarks />}
-      {scene === "billing" && (
+      {(scene === "billing" || scene === "tariff") && (
         <div className="atm-ledger">
           <span>GHS</span><span>MoMo</span><span>NHIS</span><span>GCB</span><span>RECEIPT</span>
         </div>
       )}
-      {scene === "pharmacy" && (
+      {(scene === "pharmacy" || scene === "shop" || scene === "nurse") && (
         <div className="atm-crosses">
           <i /><i /><i /><i />
         </div>

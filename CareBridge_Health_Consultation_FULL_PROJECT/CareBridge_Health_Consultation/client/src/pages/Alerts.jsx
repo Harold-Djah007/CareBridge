@@ -32,7 +32,7 @@ export default function Alerts() {
       <PageHero
         scene="alerts"
         eyebrow={user.role === "admin" ? "Audit" : "Hospital notices"}
-        title={user.role === "admin" ? "Outbound patient notices" : "Your notifications"}
+        title={user.role === "admin" ? "Patient notices" : "Notifications"}
         lead={user.role === "admin" ? "Every confirmation the hospital has emailed." : "Visit confirmations, bed decisions, and messages from your doctors."}
         actions={user.role === "patient" ? <button className="primary-btn" onClick={test}><Mail size={16} /> Send test alert</button> : null}
       />

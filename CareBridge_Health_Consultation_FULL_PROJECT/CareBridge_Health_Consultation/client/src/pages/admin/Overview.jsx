@@ -5,9 +5,8 @@ import { api } from "../../api";
 import { HOSPITAL } from "../../utils";
 import { OccupancyBars, OpsRadar } from "../../components/LiveMeter";
 import Avatar from "../../components/Avatar";
-import TileCard, { TileGrid } from "../../components/TileCard";
+import { JumpMenu } from "../../components/TileCard";
 import PageHero from "../../components/PageHero";
-import { IMAGERY } from "../../imagery";
 
 export default function AdminOverview() {
   const [stats, setStats] = useState(null);
@@ -31,7 +30,7 @@ export default function AdminOverview() {
   }));
 
   return (
-    <div>
+    <div className="home-stage">
       <PageHero
         scene="ops"
         className="ops-hero"
@@ -46,19 +45,22 @@ export default function AdminOverview() {
         <div className="kpi"><span>Open beds</span><strong>{stats.bedsAvailable}</strong><small>~{occupancy}% occupied</small></div>
         <div className="kpi"><span>Support desk</span><strong>{stats.openTickets || 0}</strong><small><Link to="/support">Open the queue</Link></small></div>
       </div>
-      <TileGrid label="Operations shortcuts">
-        <TileCard photo={IMAGERY.corridor} to="/admin/users" icon={Users} title="Staff directory" subtitle="Patients and clinicians" />
-        <TileCard photo={IMAGERY.wards} to="/admin/hospital" icon={Building2} title="Bed board" subtitle={`${stats.bedsAvailable} beds open`} />
-        <TileCard photo={IMAGERY.clinic} to="/admin/appointments" icon={CalendarDays} title="Clinic diary" subtitle="Confirm and schedule" />
-        <TileCard photo={IMAGERY.ops} to="/admin/reports" icon={ScrollText} title="Reports" subtitle="Revenue and audit" />
-        <TileCard photo={IMAGERY.records} to="/admin/cases" icon={FolderKanban} title="Case workflow" subtitle="Files and encounters" />
-        <TileCard photo={IMAGERY.corridor} to="/pay" icon={Receipt} title="Receipts" subtitle="Paid patient receipts" />
-        <TileCard photo={IMAGERY.campus} to="/billing/tariff" icon={Wallet} title="Tariff" subtitle="Published hospital fees" />
-        <TileCard photo={IMAGERY.ops} to="/support" icon={LifeBuoy} title="Support desk" subtitle={`${stats.openTickets || 0} open tickets`} />
-      </TileGrid>
-      <section className="card" style={{ marginBottom: 18 }}>
-        <div className="card-head"><div><span className="eyebrow">Live occupancy</span><h3>Beds in use · {occupancy}% campus load</h3></div></div>
-        <OccupancyBars items={occItems} />
+      <JumpMenu label="Operations pages" items={[
+        { to: "/admin/users", icon: Users, title: "Staff directory", subtitle: "Patients and clinicians" },
+        { to: "/admin/hospital", icon: Building2, title: "Bed board", subtitle: `${stats.bedsAvailable} beds open` },
+        { to: "/admin/appointments", icon: CalendarDays, title: "Clinic diary", subtitle: "Confirm and schedule" },
+        { to: "/admin/reports", icon: ScrollText, title: "Reports", subtitle: "Revenue and audit" },
+        { to: "/admin/cases", icon: FolderKanban, title: "Cases", subtitle: "Files and encounters" },
+        { to: "/pay", icon: Receipt, title: "Receipts", subtitle: "Paid patient receipts" },
+        { to: "/billing/tariff", icon: Wallet, title: "Tariff", subtitle: "Published fees" },
+        { to: "/support", icon: LifeBuoy, title: "Support desk", subtitle: `${stats.openTickets || 0} open` },
+      ]} />
+      <section className="card home-feature" style={{ marginBottom: 16 }}>
+        <div className="home-rail" style={{ backgroundImage: "url(/imagery/wards.jpg)" }} aria-hidden="true" />
+        <div className="home-feature-body">
+          <div className="card-head"><div><span className="eyebrow">Live occupancy</span><h3>Beds in use · {occupancy}%</h3></div></div>
+          <OccupancyBars items={occItems} />
+        </div>
       </section>
       <div className="dashboard-grid">
         <section className="card">
