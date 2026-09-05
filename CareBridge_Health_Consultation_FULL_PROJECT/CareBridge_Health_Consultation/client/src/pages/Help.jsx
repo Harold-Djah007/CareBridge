@@ -5,18 +5,18 @@ import { HEALTH_TOPICS } from "../publicContent";
 import { useAuth } from "../state";
 import { Reveal } from "../components/LiveFX";
 import PublicChrome, { PageBanner } from "../components/PublicChrome";
+import PageHero from "../components/PageHero";
 
 function GuideBody() {
   return (
     <>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{HOSPITAL.campus}</span>
-          <h1>How CareBridge works</h1>
-          <p>A short map of the hospital system — for patients, clinicians, and operations.</p>
-        </div>
-        <Link className="primary-btn" to="/support">Open help desk</Link>
-      </div>
+      <PageHero
+        scene="support"
+        eyebrow={HOSPITAL.campus}
+        title="How CareBridge works"
+        lead="A short map of the hospital system — for patients, clinicians, and operations."
+        actions={<Link className="primary-btn" to="/support">Open help desk</Link>}
+      />
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Patients</h3>
         <p className="muted">Register, complete a pre-visit form, book a video or campus visit, message your doctor, read labs and visit notes, print prescriptions, and use Shop &amp; pay for unpaid bills, medicines, and labs in one basket — or collect medicines at Ridge pharmacy. Reserve a ward before you travel.</p>

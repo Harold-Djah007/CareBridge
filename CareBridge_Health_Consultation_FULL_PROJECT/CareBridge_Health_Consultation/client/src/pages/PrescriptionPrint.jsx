@@ -4,6 +4,7 @@ import { Printer, ShoppingBag, Hospital, ArrowLeft } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { HOSPITAL, formatDate } from "../utils";
+import PageHero from "../components/PageHero";
 
 export default function PrescriptionPrint() {
   const { id } = useParams();
@@ -22,27 +23,29 @@ export default function PrescriptionPrint() {
 
   return (
     <div>
-      <div className="page-title no-print">
-        <div>
-          <span className="eyebrow">Prescription</span>
-          <h1>{rx.id.toUpperCase()}</h1>
-          <p>Print this page or save it as a PDF from your browser print dialog.</p>
-        </div>
-        <div className="row-actions">
-          <Link className="ghost-btn" to="/prescriptions"><ArrowLeft size={16} /> All prescriptions</Link>
-          <button type="button" className="secondary-btn" onClick={printRx}><Printer size={16} /> Print / save PDF</button>
-          {user.role === "patient" && (
-            <>
-              <Link className="primary-btn" to={`/pay?rx=${rx.id}`}>
-                <ShoppingBag size={16} /> Buy on site
-              </Link>
-              <Link className="ghost-btn" to={`/pay?rx=${rx.id}&fulfill=hospital`}>
-                <Hospital size={16} /> Collect at hospital
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
+      <PageHero
+        className="no-print"
+        scene="pharmacy"
+        eyebrow="Prescription"
+        title={rx.id.toUpperCase()}
+        lead="Print this page or save it as a PDF from your browser print dialog."
+        actions={(
+          <div className="row-actions">
+            <Link className="ghost-btn" to="/prescriptions"><ArrowLeft size={16} /> All prescriptions</Link>
+            <button type="button" className="secondary-btn" onClick={printRx}><Printer size={16} /> Print / save PDF</button>
+            {user.role === "patient" && (
+              <>
+                <Link className="primary-btn" to={`/pay?rx=${rx.id}`}>
+                  <ShoppingBag size={16} /> Buy on site
+                </Link>
+                <Link className="ghost-btn" to={`/pay?rx=${rx.id}&fulfill=hospital`}>
+                  <Hospital size={16} /> Collect at hospital
+                </Link>
+              </>
+            )}
+          </div>
+        )}
+      />
 
       <article className="card rx-sheet">
         <header className="rx-sheet-head">

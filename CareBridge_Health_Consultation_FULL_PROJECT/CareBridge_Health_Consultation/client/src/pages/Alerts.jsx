@@ -3,6 +3,7 @@ import { Mail, CalendarDays, BedDouble, MessageCircle, UserRound } from "lucide-
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { prettyDate } from "../utils";
+import PageHero, { EmptyPlate } from "../components/PageHero";
 
 const icons = { appointment: CalendarDays, ward: BedDouble, message: MessageCircle, account: UserRound, test: Mail };
 
@@ -28,21 +29,20 @@ export default function Alerts() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{user.role === "admin" ? "Audit" : "Hospital notices"}</span>
-          <h1>{user.role === "admin" ? "Outbound patient notices" : "Your notifications"}</h1>
-          <p>{user.role === "admin" ? "Every confirmation the hospital has emailed." : "Visit confirmations, bed decisions, and messages from your doctors."}</p>
-        </div>
-        {user.role === "patient" && <button className="primary-btn" onClick={test}><Mail size={16} /> Send test alert</button>}
-      </div>
+      <PageHero
+        scene="alerts"
+        eyebrow={user.role === "admin" ? "Audit" : "Hospital notices"}
+        title={user.role === "admin" ? "Outbound patient notices" : "Your notifications"}
+        lead={user.role === "admin" ? "Every confirmation the hospital has emailed." : "Visit confirmations, bed decisions, and messages from your doctors."}
+        actions={user.role === "patient" ? <button className="primary-btn" onClick={test}><Mail size={16} /> Send test alert</button> : null}
+      />
       <div className="filters">
         {["all", "appointment", "ward", "message", "account", "support", "test"].map((t) => (
           <button key={t} className={filter === t ? "active" : ""} onClick={() => setFilter(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
         ))}
       </div>
       <div className="email-list">
-        {rows.length === 0 && <div className="empty"><Mail size={36} /><h3>No email alerts yet</h3><p>Book a visit or reserve a ward to generate one.</p></div>}
+        {rows.length === 0 && <EmptyPlate scene="alerts" icon={Mail} title="No email alerts yet" hint="Book a visit or reserve a ward to generate one." />}
         {rows.map((e) => {
           const Icon = icons[e.type] || Mail;
           return (

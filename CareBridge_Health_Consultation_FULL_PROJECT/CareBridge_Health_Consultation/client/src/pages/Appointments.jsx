@@ -6,6 +6,7 @@ import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { formatDate, formatTime, isUpcoming, todayISO, ghs, consultQuote } from "../utils";
 import Avatar from "../components/Avatar";
+import PageHero, { EmptyPlate } from "../components/PageHero";
 
 export default function Appointments() {
   const { user } = useAuth();
@@ -68,14 +69,15 @@ export default function Appointments() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{user.role === "doctor" ? "Outpatient diary" : "Visits"}</span>
-          <h1>{user.role === "patient" ? "Your appointments" : "Clinic schedule"}</h1>
-          <p>{user.role === "patient" ? "Book a video or campus visit. The consultant fee is billed to your account and payable by MoMo, GCB, NHIS, or cash." : "Today’s list, plus upcoming and completed encounters."}</p>
-        </div>
-        <button className="primary-btn" onClick={() => { setForm({ doctorId: "", patientId: user.role === "patient" ? user.id : "", date: todayISO(), time: "09:00", reason: "", mode: "video" }); setOpen(true); }}><Plus size={18} /> {user.role === "patient" ? "Request a visit" : "Add slot"}</button>
-      </div>
+      <PageHero
+        scene="schedule"
+        eyebrow={user.role === "doctor" ? "Outpatient diary" : "Visits"}
+        title={user.role === "patient" ? "Your appointments" : "Clinic schedule"}
+        lead={user.role === "patient" ? "Book a video or campus visit. The consultant fee is billed to your account and payable by MoMo, GCB, NHIS, or cash." : "Today’s list, plus upcoming and completed encounters."}
+        actions={(
+          <button className="primary-btn" onClick={() => { setForm({ doctorId: "", patientId: user.role === "patient" ? user.id : "", date: todayISO(), time: "09:00", reason: "", mode: "video" }); setOpen(true); }}><Plus size={18} /> {user.role === "patient" ? "Request a visit" : "Add slot"}</button>
+        )}
+      />
       <div className="filters">
         {["upcoming", "past", "all"].map((t) => (
           <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
@@ -84,7 +86,7 @@ export default function Appointments() {
       {user.role === "doctor" ? (
         <div className="clinic-board">
           {rows.length === 0 ? (
-            <div className="empty"><h3>No encounters in this view</h3></div>
+            <EmptyPlate scene="schedule" title="No encounters in this view" />
           ) : rows.map((a) => (
             <div className="clinic-row" key={a.id}>
               <div className="time">{formatTime(a.time)}<div className="muted" style={{ fontSize: 11 }}>{formatDate(a.date)}</div></div>
@@ -105,7 +107,7 @@ export default function Appointments() {
       ) : (
         <div className="list-card">
           {rows.length === 0 ? (
-            <div className="empty"><CalendarDays size={38} /><h3>No appointments in this view</h3><p>Book a visit and it will appear here.</p></div>
+            <EmptyPlate scene="schedule" icon={CalendarDays} title="No appointments in this view" hint="Book a visit and it will appear here." />
           ) : rows.map((a) => (
             <div className="appointment-row" key={a.id}>
               <div className="date-box"><span>{new Date(a.date + "T00:00").toLocaleDateString(undefined, { month: "short" })}</span><b>{new Date(a.date + "T00:00").getDate()}</b></div>

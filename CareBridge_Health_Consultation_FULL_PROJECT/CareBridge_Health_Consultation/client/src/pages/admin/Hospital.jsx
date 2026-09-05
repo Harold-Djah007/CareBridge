@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { api } from "../../api";
 import { useToast } from "../../state";
 import { OccupancyBars } from "../../components/LiveMeter";
+import PageHero from "../../components/PageHero";
 
 export default function AdminHospital() {
   const { push } = useToast();
@@ -32,13 +33,12 @@ export default function AdminHospital() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Admissions</span>
-          <h1>Hospital wards</h1>
-          <p>Accept beds, decline requests, and keep availability accurate.</p>
-        </div>
-      </div>
+      <PageHero
+        scene="wards"
+        eyebrow="Admissions"
+        title="Hospital wards"
+        lead="Accept beds, decline requests, and keep availability accurate."
+      />
       <section className="card" style={{ marginBottom: 18 }}>
         <div className="card-head"><div><span className="eyebrow">Live occupancy</span><h3>Campus bed load</h3></div></div>
         <OccupancyBars items={wards.map((w) => ({

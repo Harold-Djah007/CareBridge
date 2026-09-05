@@ -7,6 +7,7 @@ import { useAuth, useToast } from "../state";
 import { todayISO, ghs, consultQuote } from "../utils";
 import Avatar from "../components/Avatar";
 import Presence from "../components/Presence";
+import PageHero, { EmptyPlate } from "../components/PageHero";
 
 export default function CareTeam() {
   const { user, updateUser } = useAuth();
@@ -82,16 +83,15 @@ export default function CareTeam() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{user.role === "patient" ? "Hospital directory" : "Caseload"}</span>
-          <h1>{user.role === "patient" ? (fromMessages ? "Add a doctor to your chats" : "Doctors at Ridge Campus") : "Patients under your care"}</h1>
-          <p>{user.role === "patient"
-            ? "Photos, specialty, and live available/busy status. Add the consultant you need — nobody is assigned for you."
-            : "Open the chart, message, or start a teleconsult."}</p>
-        </div>
-        {user.role === "patient" && fromMessages && <Link className="ghost-btn" to="/messages">Back to messages</Link>}
-      </div>
+      <PageHero
+        scene="care"
+        eyebrow={user.role === "patient" ? "Hospital directory" : "Caseload"}
+        title={user.role === "patient" ? (fromMessages ? "Add a doctor to your chats" : "Doctors at Ridge Campus") : "Patients under your care"}
+        lead={user.role === "patient"
+          ? "Photos, specialty, and live available/busy status. Add the consultant you need — nobody is assigned for you."
+          : "Open the chart, message, or start a teleconsult."}
+        actions={user.role === "patient" && fromMessages ? <Link className="ghost-btn" to="/messages">Back to messages</Link> : null}
+      />
       {user.role === "patient" && (
         <>
           <div className="filters">
@@ -152,7 +152,7 @@ export default function CareTeam() {
             </div>
           </article>
         ))}
-        {visible.length === 0 && <div className="empty"><h3>No consultants match that search</h3></div>}
+        {visible.length === 0 && <EmptyPlate scene="care" title="No consultants match that search" />}
       </div>
 
       {booking && (

@@ -1,29 +1,9 @@
 import React from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../state";
+import { photoFor, sceneFor } from "../imagery";
 
 const ECG = "M0 40 L24 40 L32 40 L38 18 L44 62 L52 40 L72 40 L80 40 L86 28 L92 40 L120 40 L128 40 L134 16 L140 64 L148 40 L200 40 L208 40 L214 22 L220 40 L280 40";
-
-function sceneFor(pathname, role) {
-  if (pathname.startsWith("/pay") || pathname.startsWith("/receipts") || pathname.includes("tariff")) return "billing";
-  if (pathname.startsWith("/pharmacy") || pathname.startsWith("/prescriptions") || (pathname === "/home" && role === "nurse")) return "pharmacy";
-  if (pathname.startsWith("/video")) return "consult";
-  if (pathname.startsWith("/appointments") || pathname.startsWith("/admin/appointments")) return "schedule";
-  if (pathname.startsWith("/messages")) return "messages";
-  if (pathname.startsWith("/wards") || pathname.startsWith("/admin/hospital")) return "wards";
-  if (pathname.startsWith("/records")) return "records";
-  if (pathname.startsWith("/settings")) return "settings";
-  if (pathname.startsWith("/support") || pathname.startsWith("/admin/support") || pathname.startsWith("/guide")) return "support";
-  if (pathname.startsWith("/care")) return "care";
-  if (pathname.startsWith("/profile")) return "profile";
-  if (pathname.startsWith("/alerts")) return "alerts";
-  if (pathname.startsWith("/admin/users")) return "directory";
-  if (pathname.startsWith("/admin/reports")) return "reports";
-  if (pathname.startsWith("/admin/cases")) return "cases";
-  if (pathname.startsWith("/admin")) return "ops";
-  if (pathname === "/home" && role === "doctor") return "clinic";
-  return role === "admin" ? "ops" : "home";
-}
 
 function ConsultMarks() {
   return (
@@ -38,14 +18,15 @@ function ConsultMarks() {
   );
 }
 
-export default function PageAtmosphere() {
+export default function PageAtmosphere({ scene: sceneProp }) {
   const { pathname } = useLocation();
   const { user } = useAuth();
-  const scene = sceneFor(pathname, user?.role);
+  const scene = sceneProp || sceneFor(pathname, user?.role);
 
   return (
     <div className={`page-atmosphere scene-${scene}`} aria-hidden="true">
-      <div className="atm-photo" />
+      <div className="atm-photo kb-layer" style={{ backgroundImage: `url(${photoFor(scene)})` }} />
+      <div className="atm-wash" />
       <div className="atm-orb o1" />
       <div className="atm-orb o2" />
       <div className="atm-orb o3" />

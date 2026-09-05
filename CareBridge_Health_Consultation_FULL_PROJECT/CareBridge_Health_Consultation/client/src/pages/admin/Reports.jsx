@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api";
 import { prettyDate } from "../../utils";
+import PageHero from "../../components/PageHero";
 
 export default function AdminReports() {
   const [stats, setStats] = useState(null);
@@ -19,13 +20,12 @@ export default function AdminReports() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Governance</span>
-          <h1>Reports & audit</h1>
-          <p>Revenue, clinical volume, and a trail of who changed what.</p>
-        </div>
-      </div>
+      <PageHero
+        scene="reports"
+        eyebrow="Governance"
+        title="Reports & audit"
+        lead="Revenue, clinical volume, and a trail of who changed what."
+      />
       <div className="filters">
         <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Reports</button>
         <button className={tab === "payments" ? "active" : ""} onClick={() => setTab("payments")}>Payments</button>

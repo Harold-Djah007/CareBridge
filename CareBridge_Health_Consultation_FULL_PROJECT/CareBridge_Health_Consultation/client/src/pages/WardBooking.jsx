@@ -6,6 +6,7 @@ import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { todayISO, ghs, wardQuote } from "../utils";
 import { OccupancyBars } from "../components/LiveMeter";
+import PageHero from "../components/PageHero";
 
 export default function WardBooking() {
   const { user } = useAuth();
@@ -46,14 +47,13 @@ export default function WardBooking() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{user.role === "patient" ? "Admissions" : "Bed requests"}</span>
-          <h1>{user.role === "patient" ? "Reserve a bed before you arrive" : "Admission queue"}</h1>
-          <p>{user.role === "patient" ? "Nightly ward rates plus room supplement are billed when admissions accept the bed. Pay by MoMo, GCB, NHIS, or cash." : "Accept or decline incoming requests. Occupancy updates automatically."}</p>
-        </div>
-        {user.role === "patient" && <button className="primary-btn" onClick={() => setOpen(true)}><Plus size={18} /> Reserve a ward</button>}
-      </div>
+      <PageHero
+        scene="wards"
+        eyebrow={user.role === "patient" ? "Admissions" : "Bed requests"}
+        title={user.role === "patient" ? "Reserve a bed before you arrive" : "Admission queue"}
+        lead={user.role === "patient" ? "Nightly ward rates plus room supplement are billed when admissions accept the bed. Pay by MoMo, GCB, NHIS, or cash." : "Accept or decline incoming requests. Occupancy updates automatically."}
+        actions={user.role === "patient" ? <button className="primary-btn" onClick={() => setOpen(true)}><Plus size={18} /> Reserve a ward</button> : null}
+      />
       {user.role !== "patient" && (
         <section className="card" style={{ marginBottom: 18 }}>
           <div className="card-head"><div><span className="eyebrow">Live occupancy</span><h3>Beds currently occupied</h3></div></div>

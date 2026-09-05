@@ -10,6 +10,7 @@ import Avatar from "../components/Avatar";
 import Presence from "../components/Presence";
 import DutyToggle from "../components/DutyToggle";
 import TileCard, { TileGrid } from "../components/TileCard";
+import PageHero, { EmptyPlate } from "../components/PageHero";
 
 function PatientHome({ user, appointments, wards, emails, due, doctors }) {
   const next = appointments.find(isUpcoming);
@@ -19,23 +20,26 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
 
   return (
     <>
-      <div className="identity-strip compact">
-        <Avatar person={user} className="large" />
-        <div>
-          <span className="eyebrow">Patient record</span>
-          <h1>{greeting(firstName(user.name))}</h1>
-          <div className="identity-meta">
-            <span>MRN <b>{user.mrn || "Pending"}</b></span>
-            <span>DOB <b>{user.dob || "—"}</b></span>
-            <span>Blood <b>{user.bloodType || "—"}</b></span>
-            <span>Cover <b>{user.insurance || "Self-pay"}</b></span>
+      <PageHero
+        scene="home"
+        className="identity-hero"
+        leading={<Avatar person={user} className="large" />}
+        eyebrow="Patient record"
+        title={greeting(firstName(user.name))}
+        actions={(
+          <div className="identity-aside">
+            <Link className="secondary-btn" to="/profile">My details</Link>
+            {due.length > 0 && <span className="muted">{ghs(dueTotal)} outstanding</span>}
           </div>
+        )}
+      >
+        <div className="identity-meta">
+          <span>MRN <b>{user.mrn || "Pending"}</b></span>
+          <span>DOB <b>{user.dob || "—"}</b></span>
+          <span>Blood <b>{user.bloodType || "—"}</b></span>
+          <span>Cover <b>{user.insurance || "Self-pay"}</b></span>
         </div>
-        <div className="identity-aside">
-          <Link className="secondary-btn" to="/profile">My details</Link>
-          {due.length > 0 && <span className="muted">{ghs(dueTotal)} outstanding</span>}
-        </div>
-      </div>
+      </PageHero>
 
       <TileGrid label="Patient shortcuts">
         <TileCard to="/pay" icon={ShoppingBag} title="Shop & pay" subtitle={due.length ? `${ghs(dueTotal)} outstanding` : "Bills, medicines, labs"} />
@@ -79,7 +83,7 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
               </div>
             </div>
           ) : (
-            <p className="muted">Choose a Ridge Campus consultant, then book a visit.</p>
+            <EmptyPlate scene="clinic" compact title="Choose a Ridge Campus consultant, then book a visit." />
           )}
         </section>
         <section className="card home-panel">
@@ -93,7 +97,7 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
               </div>
               <span className={`status ${admission.status}`}>{admission.status}</span>
             </div>
-          ) : <p className="muted">Request a ward before you travel. Nightly rates are on the hospital tariff.</p>}
+          ) : <EmptyPlate scene="wards" compact title="No bed reserved" hint="Request a ward before you travel. Nightly rates are on the hospital tariff." />}
         </section>
       </div>
     </>
@@ -129,17 +133,15 @@ function DoctorBoard({ user, appointments, wards }) {
 
   return (
     <>
-      <section className="welcome doctor-welcome compact">
-        <EcgRibbon />
-        <div>
-          <span className="eyebrow">{user.department || "Outpatient"} · {user.clinic || "Consulting room"}</span>
-          <h1>{greeting(user.name.replace("Dr. ", "").split(" ")[0])}</h1>
-          <p>{longDate()} · {user.shift || "Day clinic"} · {remaining} patient{remaining === 1 ? "" : "s"} remaining</p>
-          {pending > 0 && <p style={{ marginTop: 10 }}>{pending} admission request{pending > 1 ? "s" : ""} waiting</p>}
-        </div>
-        <DutyToggle available={available} disabled={busy} onChange={(on) => toggleAvail(on)} />
-        <Heartbeat />
-      </section>
+      <PageHero
+        scene="clinic"
+        className="welcome doctor-welcome compact"
+        extras={<><EcgRibbon /><Heartbeat /></>}
+        eyebrow={`${user.department || "Outpatient"} · ${user.clinic || "Consulting room"}`}
+        title={greeting(user.name.replace("Dr. ", "").split(" ")[0])}
+        lead={`${longDate()} · ${user.shift || "Day clinic"} · ${remaining} patient${remaining === 1 ? "" : "s"} remaining${pending > 0 ? ` · ${pending} admission request${pending > 1 ? "s" : ""} waiting` : ""}`}
+        actions={<DutyToggle available={available} disabled={busy} onChange={(on) => toggleAvail(on)} />}
+      />
 
       <TileGrid label="Clinic shortcuts">
         <TileCard to="/care" icon={Users} title="Patients" subtitle="Caseload directory" />
@@ -150,7 +152,7 @@ function DoctorBoard({ user, appointments, wards }) {
       </TileGrid>
 
       <div className="clinic-board">
-        {today.length === 0 && <div className="empty"><h3>No patients on your list</h3></div>}
+        {today.length === 0 && <EmptyPlate scene="clinic" title="No patients on your list" hint="Confirmed visits appear here as a clinic board." />}
         {today.map((a) => (
           <div className={`clinic-row ${a.id === nextId ? "next" : ""}`} key={a.id}>
             <div className="time">{formatTime(a.time)}<div className="muted" style={{ fontSize: 11 }}>{formatDate(a.date)}</div></div>
@@ -212,13 +214,13 @@ function NurseBoard({ user }) {
 
   return (
     <>
-      <section className="welcome doctor-welcome nurse-welcome compact">
-        <div>
-          <span className="eyebrow">{user.department || "Ridge Campus pharmacy"} · {user.shift || "Day dispensary"}</span>
-          <h1>{greeting(firstName(user.name.replace("Nurse ", "")))}</h1>
-          <p>{longDate()} · {queued} waiting for prep · {ready} ready for collection</p>
-        </div>
-      </section>
+      <PageHero
+        scene="pharmacy"
+        className="welcome doctor-welcome nurse-welcome compact"
+        eyebrow={`${user.department || "Ridge Campus pharmacy"} · ${user.shift || "Day dispensary"}`}
+        title={greeting(firstName(user.name.replace("Nurse ", "")))}
+        lead={`${longDate()} · ${queued} waiting for prep · ${ready} ready for collection`}
+      />
       <TileGrid label="Dispensary shortcuts">
         <TileCard to="/pharmacy-stock" icon={Pill} title="Stock" subtitle="Cupboard, prices, and restock" />
         <TileCard to="/messages" icon={MessageCircle} title="Messages" subtitle="Doctors and operations" />
@@ -230,7 +232,7 @@ function NurseBoard({ user }) {
         <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>All</button>
       </div>
       <div className="clinic-board">
-        {visible.length === 0 && <div className="empty"><h3>No hospital pickups in this list</h3><p>Patients who choose “collect at hospital” appear here.</p></div>}
+        {visible.length === 0 && <EmptyPlate scene="pharmacy" title="No hospital pickups in this list" hint="Patients who choose “collect at hospital” appear here." />}
         {visible.map((order) => (
           <div className="clinic-row" key={order.id}>
             <Avatar person={order.patient} />

@@ -4,6 +4,7 @@ import { io } from "socket.io-client";
 import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { ghs } from "../utils";
+import PageHero from "../components/PageHero";
 
 const blank = { name: "", sku: "", pack: "30 tablets", form: "Tablet", category: "Vitamins", price: 20, qty: 12, nhis: true, available: true };
 
@@ -151,14 +152,13 @@ export default function PharmacyStock() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Ridge pharmacy</span>
-          <h1>Medicine cupboard</h1>
-          <p>Toggle in or out of stock, edit the label patients see, restock, or archive a SKU so it leaves the shop. Changes appear live on Shop & pay.</p>
-        </div>
-        <button className="primary-btn" type="button" onClick={() => setOpen(true)}><Plus size={16} /> Add SKU</button>
-      </div>
+      <PageHero
+        scene="pharmacy"
+        eyebrow="Ridge pharmacy"
+        title="Medicine cupboard"
+        lead="Toggle in or out of stock, edit the label patients see, restock, or archive a SKU so it leaves the shop. Changes appear live on Shop & pay."
+        actions={<button className="primary-btn" type="button" onClick={() => setOpen(true)}><Plus size={16} /> Add SKU</button>}
+      />
 
       <div className="filters">
         <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>On the books ({stock.filter((s) => !s.archived).length})</button>

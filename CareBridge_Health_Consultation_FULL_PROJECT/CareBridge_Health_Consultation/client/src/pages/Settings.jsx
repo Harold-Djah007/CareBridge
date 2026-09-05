@@ -6,6 +6,7 @@ import { useAuth, useToast } from "../state";
 import { useTopbar } from "../chrome";
 import PhotoPicker from "../components/PhotoPicker";
 import DutyToggle from "../components/DutyToggle";
+import PageHero from "../components/PageHero";
 
 export default function Settings() {
   const { user, updateUser, logout } = useAuth();
@@ -116,16 +117,17 @@ export default function Settings() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Account</span>
-          <h1>Settings</h1>
-          <p>These controls write to your hospital file. Nothing here is decorative — each save is stored and used on the next visit, bill, or alert.</p>
-        </div>
-        <button className="secondary-btn" type="button" onClick={() => { logout(); navigate("/login"); }}>
-          <LogOut size={16} /> Sign out
-        </button>
-      </div>
+      <PageHero
+        scene="settings"
+        eyebrow="Account"
+        title="Settings"
+        lead="These controls write to your hospital file. Nothing here is decorative — each save is stored and used on the next visit, bill, or alert."
+        actions={(
+          <button className="secondary-btn" type="button" onClick={() => { logout(); navigate("/login"); }}>
+            <LogOut size={16} /> Sign out
+          </button>
+        )}
+      />
 
       <form className="card settings-card" onSubmit={saveAccount}>
         <div className="card-head">

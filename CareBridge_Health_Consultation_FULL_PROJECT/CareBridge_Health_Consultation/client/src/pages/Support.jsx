@@ -3,6 +3,7 @@ import { LifeBuoy, Send } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { prettyDate } from "../utils";
+import PageHero from "../components/PageHero";
 
 const CATEGORIES = [
   { id: "billing", label: "Billing & receipts" },
@@ -101,17 +102,14 @@ export default function Support() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{isAdmin ? "Operations" : "Help desk"}</span>
-          <h1>{isAdmin ? "Support desk" : "Help & support"}</h1>
-          <p>
-            {isAdmin
-              ? "Tickets from patients and clinicians land here and as a notice on every administrator account. Replies email the requester."
-              : "Write to Ridge Campus operations. Every ticket notifies administrators in CareBridge and by email — this is not a static FAQ."}
-          </p>
-        </div>
-      </div>
+      <PageHero
+        scene="support"
+        eyebrow={isAdmin ? "Operations" : "Help desk"}
+        title={isAdmin ? "Support desk" : "Help & support"}
+        lead={isAdmin
+          ? "Tickets from patients and clinicians land here and as a notice on every administrator account. Replies email the requester."
+          : "Write to Ridge Campus operations. Every ticket notifies administrators in CareBridge and by email — this is not a static FAQ."}
+      />
 
       <div className="filters">
         {["open", "in_progress", "resolved", "all"].map((s) => (

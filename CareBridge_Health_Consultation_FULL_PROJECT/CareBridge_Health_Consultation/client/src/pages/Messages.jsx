@@ -8,6 +8,7 @@ import { roomIdFor } from "../utils";
 import Avatar from "../components/Avatar";
 import Presence from "../components/Presence";
 import RxPad from "../components/RxPad";
+import PageHero, { EmptyPlate } from "../components/PageHero";
 
 const prettyTime = (iso) => {
   if (!iso) return "";
@@ -140,16 +141,13 @@ export default function Messages() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{copy.title}</span>
-          <h1>{copy.heading}</h1>
-          <p>{copy.blurb}</p>
-        </div>
-        {user.role === "patient" && (
-          <Link className="primary-btn" to="/care?from=messages"><UserPlus size={16} /> Add a doctor</Link>
-        )}
-      </div>
+      <PageHero
+        scene="messages"
+        eyebrow={copy.title}
+        title={copy.heading}
+        lead={copy.blurb}
+        actions={user.role === "patient" ? <Link className="primary-btn" to="/care?from=messages"><UserPlus size={16} /> Add a doctor</Link> : null}
+      />
       <div className="chat-layout">
         <aside className="contact-panel">
           <div className="search-box"><Search size={17} /><input placeholder="Search chats" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
@@ -173,11 +171,7 @@ export default function Messages() {
             </button>
           ))}
           {visible.length === 0 && (
-            <div className="empty compact">
-              <MessageCircle size={28} />
-              <h3>{copy.emptyList}</h3>
-              <p>{copy.emptyListHint}</p>
-            </div>
+            <EmptyPlate compact scene="messages" icon={MessageCircle} title={copy.emptyList} hint={copy.emptyListHint} />
           )}
         </aside>
         <section className="chat-panel">
@@ -205,11 +199,13 @@ export default function Messages() {
               </div>
               <div className="messages">
                 {messages.length === 0 && (
-                  <div className="empty compact">
-                    <MessageCircle size={32} />
-                    <h3>No messages yet</h3>
-                    <p>Say hello. {selected.name.split(" ")[0]} will see this instantly{user.role === "patient" ? ", and by email if alerts are on" : ""}.</p>
-                  </div>
+                  <EmptyPlate
+                    compact
+                    scene="messages"
+                    icon={MessageCircle}
+                    title="No messages yet"
+                    hint={`Say hello. ${selected.name.split(" ")[0]} will see this instantly${user.role === "patient" ? ", and by email if alerts are on" : ""}.`}
+                  />
                 )}
                 {messages.map((m) => (
                   <div key={m.id} className={`bubble-wrap ${m.senderId === user.id ? "mine" : ""}`}>
@@ -226,11 +222,9 @@ export default function Messages() {
               </form>
             </>
           ) : (
-            <div className="empty">
-              <MessageCircle />
-              <h3>{copy.emptyChat}</h3>
+            <EmptyPlate scene="messages" icon={MessageCircle} title={copy.emptyChat}>
               {user.role === "patient" && <Link className="primary-btn" to="/care?from=messages"><UserPlus size={16} /> View available doctors</Link>}
-            </div>
+            </EmptyPlate>
           )}
         </section>
       </div>

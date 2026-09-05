@@ -6,6 +6,7 @@ import { HOSPITAL } from "../../utils";
 import { OccupancyBars, OpsRadar } from "../../components/LiveMeter";
 import Avatar from "../../components/Avatar";
 import TileCard, { TileGrid } from "../../components/TileCard";
+import PageHero from "../../components/PageHero";
 
 export default function AdminOverview() {
   const [stats, setStats] = useState(null);
@@ -30,14 +31,14 @@ export default function AdminOverview() {
 
   return (
     <div>
-      <div className="page-title ops-hero">
-        <div>
-          <span className="eyebrow">{HOSPITAL.campus} operations</span>
-          <h1>Operations</h1>
-          <p>Beds, clinic load, support desk, and outbound notices. Paid invoices are under Receipts — operations does not check out for patients.</p>
-        </div>
-        <OpsRadar occupancy={occupancy} pending={stats.pendingWards} beds={stats.bedsAvailable} />
-      </div>
+      <PageHero
+        scene="ops"
+        className="ops-hero"
+        eyebrow={`${HOSPITAL.campus} operations`}
+        title="Operations"
+        lead="Beds, clinic load, support desk, and outbound notices. Paid invoices are under Receipts — operations does not check out for patients."
+        actions={<OpsRadar occupancy={occupancy} pending={stats.pendingWards} beds={stats.bedsAvailable} />}
+      />
       <div className="kpi-row compact">
         <div className="kpi"><span>Registered patients</span><strong>{stats.patients}</strong><small>{stats.doctors} consultants on staff</small></div>
         <div className="kpi"><span>Clinic book</span><strong>{stats.appointments}</strong><small>{stats.pendingAppointments} awaiting confirmation</small></div>

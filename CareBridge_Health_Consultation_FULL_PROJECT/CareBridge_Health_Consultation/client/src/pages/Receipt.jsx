@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { HOSPITAL, prettyDate } from "../utils";
 import { useAuth } from "../state";
+import PageHero from "../components/PageHero";
 
 const ghs = (n) => `GHS ${Number(n || 0).toLocaleString()}`;
 
@@ -23,17 +24,19 @@ export default function Receipt() {
   const { payment, invoice, patient, hospital, lines } = data;
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Official receipt</span>
-          <h1>{payment.receiptNo}</h1>
-          <p>{HOSPITAL.name} · {HOSPITAL.campus}, {HOSPITAL.city}</p>
-        </div>
-        <div className="row-actions">
-          <Link className="ghost-btn" to="/pay">{user?.role === "admin" ? "Back to receipts" : "Back to shop"}</Link>
-          <button className="secondary-btn" type="button" onClick={() => window.print()}>Print / save PDF</button>
-        </div>
-      </div>
+      <PageHero
+        className="no-print"
+        scene="billing"
+        eyebrow="Official receipt"
+        title={payment.receiptNo}
+        lead={`${HOSPITAL.name} · ${HOSPITAL.campus}, ${HOSPITAL.city}`}
+        actions={(
+          <div className="row-actions">
+            <Link className="ghost-btn" to="/pay">{user?.role === "admin" ? "Back to receipts" : "Back to shop"}</Link>
+            <button className="secondary-btn" type="button" onClick={() => window.print()}>Print / save PDF</button>
+          </div>
+        )}
+      />
       <section className="card receipt-sheet">
         <div className="receipt-head">
           <div>

@@ -4,6 +4,7 @@ import { Pill, Printer, ShoppingBag, Hospital } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../state";
 import { formatDate } from "../utils";
+import PageHero, { EmptyPlate } from "../components/PageHero";
 
 export default function Prescriptions() {
   const { user } = useAuth();
@@ -15,23 +16,23 @@ export default function Prescriptions() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{user.role === "doctor" ? "Clinic" : "Your file"}</span>
-          <h1>Prescriptions</h1>
-          <p>{user.role === "doctor"
-            ? "Prescriptions you have issued. Patients can print them, buy on CareBridge, or collect at Ridge pharmacy."
-            : "Print or save a copy, buy the medicines on CareBridge, or collect them at Ridge Campus pharmacy."}</p>
-        </div>
-        {user.role === "patient" && <Link className="secondary-btn" to="/pay?tab=pharmacy">Open shop</Link>}
-      </div>
+      <PageHero
+        scene="pharmacy"
+        eyebrow={user.role === "doctor" ? "Clinic" : "Your file"}
+        title="Prescriptions"
+        lead={user.role === "doctor"
+          ? "Prescriptions you have issued. Patients can print them, buy on CareBridge, or collect at Ridge pharmacy."
+          : "Print or save a copy, buy the medicines on CareBridge, or collect them at Ridge Campus pharmacy."}
+        actions={user.role === "patient" ? <Link className="secondary-btn" to="/pay?tab=pharmacy">Open shop</Link> : null}
+      />
 
       {rows.length === 0 && (
-        <div className="empty">
-          <Pill size={32} />
-          <h3>No prescriptions yet</h3>
-          <p>{user.role === "doctor" ? "Issue one from Messages, the video room, or a chart." : "When a doctor writes a prescription it will appear here."}</p>
-        </div>
+        <EmptyPlate
+          scene="pharmacy"
+          icon={Pill}
+          title="No prescriptions yet"
+          hint={user.role === "doctor" ? "Issue one from Messages, the video room, or a chart." : "When a doctor writes a prescription it will appear here."}
+        />
       )}
 
       {rows.map((rx) => (

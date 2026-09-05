@@ -6,6 +6,7 @@ import { useToast } from "../../state";
 import { roleLabel } from "../../utils";
 import PhotoPicker from "../../components/PhotoPicker";
 import Avatar from "../../components/Avatar";
+import PageHero from "../../components/PageHero";
 
 const blank = { name: "", email: "", password: "care123", role: "patient", phone: "", city: "", specialty: "", photo: "" };
 
@@ -53,14 +54,13 @@ export default function AdminUsers() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Directory</span>
-          <h1>People</h1>
-          <p>Create patients, doctors, pharmacy nurses, and administrators. Deactivating blocks sign-in.</p>
-        </div>
-        <button className="primary-btn" onClick={() => { setEditing(null); setForm(blank); setOpen(true); }}><Plus size={16} /> Add person</button>
-      </div>
+      <PageHero
+        scene="directory"
+        eyebrow="Directory"
+        title="People"
+        lead="Create patients, doctors, pharmacy nurses, and administrators. Deactivating blocks sign-in."
+        actions={<button className="primary-btn" onClick={() => { setEditing(null); setForm(blank); setOpen(true); }}><Plus size={16} /> Add person</button>}
+      />
       <div className="search-box" style={{ maxWidth: 360, marginBottom: 16 }}><input placeholder="Search people" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
       <div className="card" style={{ overflow: "auto" }}>
         <table className="table">

@@ -7,6 +7,7 @@ import { api, socketUrl } from "../api";
 import { roomIdFor } from "../utils";
 import Avatar from "../components/Avatar";
 import RxPad from "../components/RxPad";
+import PageHero from "../components/PageHero";
 
 export default function VideoConsultation() {
   const { user } = useAuth();
@@ -132,13 +133,12 @@ export default function VideoConsultation() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Telemedicine</span>
-          <h1>Video consultation</h1>
-          <p>{peer ? `Private room with ${peer.name}.` : "A private virtual consultation room."}</p>
-        </div>
-      </div>
+      <PageHero
+        scene="consult"
+        eyebrow="Telemedicine"
+        title="Video consultation"
+        lead={peer ? `Private room with ${peer.name}.` : "A private virtual consultation room."}
+      />
       <div className="video-shell">
         <div className="video-stage">
           <video ref={remoteRef} autoPlay playsInline className="remote-video" />

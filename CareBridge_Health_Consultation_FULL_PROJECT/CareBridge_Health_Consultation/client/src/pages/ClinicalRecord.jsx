@@ -5,6 +5,7 @@ import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { prettyDate } from "../utils";
 import RxPad from "../components/RxPad";
+import PageHero from "../components/PageHero";
 
 const TABS = [
   ["overview", "Overview"],
@@ -70,7 +71,7 @@ export default function ClinicalRecord() {
   if (!patientId && clinician) {
     return (
       <div>
-        <div className="page-title"><div><span className="eyebrow">Chart</span><h1>Open a patient file</h1><p>Choose a person from Patients, then open their chart.</p></div></div>
+        <PageHero scene="records" eyebrow="Chart" title="Open a patient file" lead="Choose a person from Patients, then open their chart." />
         <button className="primary-btn" onClick={() => navigate("/care")}>Go to caseload</button>
       </div>
     );
@@ -81,13 +82,12 @@ export default function ClinicalRecord() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Electronic record · {p.mrn}</span>
-          <h1>{user.role === "patient" ? "My clinical file" : p.name}</h1>
-          <p>{p.dob || "DOB —"} · Blood {p.bloodType || "—"} · {p.insurance || "No insurer on file"}</p>
-        </div>
-      </div>
+      <PageHero
+        scene="records"
+        eyebrow={`Electronic record · ${p.mrn}`}
+        title={user.role === "patient" ? "My clinical file" : p.name}
+        lead={`${p.dob || "DOB —"} · Blood ${p.bloodType || "—"} · ${p.insurance || "No insurer on file"}`}
+      />
 
       {p.allergies && p.allergies !== "None recorded" && (
         <div className="allergy-banner"><AlertTriangle size={18} /><b>Allergy:</b> {p.allergies} · Emergency {p.emergencyContact || "not listed"}</div>

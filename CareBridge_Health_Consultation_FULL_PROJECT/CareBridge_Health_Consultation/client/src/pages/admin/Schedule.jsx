@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../api";
 import { useToast } from "../../state";
 import { formatDate, formatTime } from "../../utils";
+import PageHero from "../../components/PageHero";
 
 export default function AdminSchedule() {
   const toast = useToast();
@@ -18,13 +19,12 @@ export default function AdminSchedule() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Schedule</span>
-          <h1>All appointments</h1>
-          <p>Confirm, complete, or cancel any visit. Patients receive an email on status changes.</p>
-        </div>
-      </div>
+      <PageHero
+        scene="schedule"
+        eyebrow="Schedule"
+        title="All appointments"
+        lead="Confirm, complete, or cancel any visit. Patients receive an email on status changes."
+      />
       <div className="card" style={{ overflow: "auto" }}>
         <table className="table">
           <thead><tr><th>When</th><th>Patient</th><th>Doctor</th><th>Mode</th><th>Status</th><th></th></tr></thead>

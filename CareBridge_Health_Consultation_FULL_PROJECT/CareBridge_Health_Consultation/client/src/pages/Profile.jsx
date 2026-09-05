@@ -5,6 +5,7 @@ import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import PhotoPicker from "../components/PhotoPicker";
 import Avatar from "../components/Avatar";
+import PageHero from "../components/PageHero";
 
 export default function Profile() {
   const { user, updateUser } = useAuth();
@@ -57,13 +58,12 @@ export default function Profile() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{user.role === "patient" ? "Your file" : user.role === "doctor" ? "Credentials" : "Account"}</span>
-          <h1>{user.role === "patient" ? "My details" : user.role === "doctor" ? "Practice profile" : "Administrator account"}</h1>
-          <p>{user.role === "patient" ? "Contact details and which hospital notices we may email you." : "Used on letters, the clinic board, and the staff directory."}</p>
-        </div>
-      </div>
+      <PageHero
+        scene="profile"
+        eyebrow={user.role === "patient" ? "Your file" : user.role === "doctor" ? "Credentials" : "Account"}
+        title={user.role === "patient" ? "My details" : user.role === "doctor" ? "Practice profile" : "Administrator account"}
+        lead={user.role === "patient" ? "Contact details and which hospital notices we may email you." : "Used on letters, the clinic board, and the staff directory."}
+      />
       <form className="card" onSubmit={save} style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 14 }}>
         <div className="appointment-feature">
           <Avatar person={{ ...user, photo: form.photo }} className="large" />

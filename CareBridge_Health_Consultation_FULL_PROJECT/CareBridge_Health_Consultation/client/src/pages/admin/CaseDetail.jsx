@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api";
 import { useAuth, useToast } from "../../state";
 import { prettyDate } from "../../utils";
+import PageHero from "../../components/PageHero";
 
 export default function AdminCaseDetail() {
   const { id } = useParams();
@@ -54,17 +55,18 @@ export default function AdminCaseDetail() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Case detail · {row.typeLabel}</span>
-          <h1>{row.caseName}</h1>
-          <p>Case ID {row.externalId} · Owner {row.ownerName || "—"} · {row.status}</p>
-        </div>
-        <div className="row-actions">
-          <Link className="ghost-btn" to="/admin/cases">Back to case list</Link>
-          {row.link && <Link className="secondary-btn" to={row.link}>Open hospital record</Link>}
-        </div>
-      </div>
+      <PageHero
+        scene="cases"
+        eyebrow={`Case detail · ${row.typeLabel}`}
+        title={row.caseName}
+        lead={`Case ID ${row.externalId} · Owner ${row.ownerName || "—"} · ${row.status}`}
+        actions={(
+          <div className="row-actions">
+            <Link className="ghost-btn" to="/admin/cases">Back to case list</Link>
+            {row.link && <Link className="secondary-btn" to={row.link}>Open hospital record</Link>}
+          </div>
+        )}
+      />
 
       <section className="card" style={{ marginBottom: 16 }}>
         <span className="eyebrow">Workflow</span>

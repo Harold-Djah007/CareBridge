@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Search } from "lucide-react";
 import { api } from "../../api";
 import { ghs, prettyDate } from "../../utils";
+import PageHero from "../../components/PageHero";
 
 function receiptKey(row) {
   return row.paymentId || row.receiptNo || row.id;
@@ -66,14 +67,13 @@ export default function AdminReceipts() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Accounts</span>
-          <h1>Receipts</h1>
-          <p>Search and open paid patient receipts. Operations reviews accounts only — patients complete payment in Shop &amp; pay.</p>
-        </div>
-        <Link className="secondary-btn" to="/billing/tariff">Hospital tariff</Link>
-      </div>
+      <PageHero
+        scene="billing"
+        eyebrow="Accounts"
+        title="Receipts"
+        lead="Search and open paid patient receipts. Operations reviews accounts only — patients complete payment in Shop & pay."
+        actions={<Link className="secondary-btn" to="/billing/tariff">Hospital tariff</Link>}
+      />
 
       <label className="search-box receipt-search">
         <Search size={16} />

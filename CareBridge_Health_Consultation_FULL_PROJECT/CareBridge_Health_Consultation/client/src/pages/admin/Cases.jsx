@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, FolderKanban } from "lucide-react";
 import { api } from "../../api";
 import { prettyDate } from "../../utils";
+import PageHero from "../../components/PageHero";
 
 export default function AdminCases() {
   const navigate = useNavigate();
@@ -32,13 +33,12 @@ export default function AdminCases() {
 
   return (
     <div>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">Case management</span>
-          <h1>Case workflow</h1>
-          <p>CommCare-style case list. Each patient file, encounter, admission, bill, and support ticket is a case with properties, a stage, and a form history. Open a row for the case detail.</p>
-        </div>
-      </div>
+      <PageHero
+        scene="cases"
+        eyebrow="Case management"
+        title="Case workflow"
+        lead="CommCare-style case list. Each patient file, encounter, admission, bill, and support ticket is a case with properties, a stage, and a form history. Open a row for the case detail."
+      />
 
       <div className="filters">
         <button className={type === "all" ? "active" : ""} onClick={() => setFilter("type", "all")}>All types</button>

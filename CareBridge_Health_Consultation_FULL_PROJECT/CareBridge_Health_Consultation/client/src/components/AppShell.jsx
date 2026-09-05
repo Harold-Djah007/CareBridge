@@ -11,6 +11,7 @@ import { api, socketUrl } from "../api";
 import { HOSPITAL, BUILD } from "../utils";
 import { LiveClock } from "./LiveMeter";
 import PageAtmosphere from "./PageAtmosphere";
+import { sceneFor } from "../imagery";
 import { useTopbar } from "../chrome";
 import Avatar from "./Avatar";
 
@@ -184,6 +185,7 @@ export default function AppShell() {
 
   const groups = NAV[user.role] || NAV.patient;
   const mobileItems = groups.flatMap((g) => g.items).filter((i) => i.primary).slice(0, 5);
+  const scene = sceneFor(location.pathname, user.role);
 
   const loadNotes = () => api(`/notifications/${user.id}`).then(setNotes).catch(() => {});
   const loadBadges = () => api(`/badges?userId=${user.id}&role=${user.role}`).then(setBadges).catch(() => {});
@@ -354,8 +356,8 @@ export default function AppShell() {
             ))}
           </div>
         )}
-        <div className="page-stage">
-          <PageAtmosphere />
+        <div className={`page-stage scene-${scene}`}>
+          <PageAtmosphere scene={scene} />
           <div className="page-wrap"><Outlet /></div>
         </div>
       </main>
