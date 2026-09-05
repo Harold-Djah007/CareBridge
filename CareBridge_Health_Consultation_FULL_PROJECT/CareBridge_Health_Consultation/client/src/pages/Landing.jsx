@@ -2,13 +2,26 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { HeartPulse, Video, MessageCircle, BedDouble, ShieldCheck, ArrowRight, Phone, Building2, Stethoscope, FolderOpen, Wallet } from "lucide-react";
 import { HOSPITAL } from "../utils";
-import { CarePath } from "../components/LiveMeter";
+import { CarePath, EcgRibbon } from "../components/LiveMeter";
+import { CountStat, GoldDust, Reveal, SoftOrbs } from "../components/LiveFX";
+
+const SERVICES = [
+  { icon: Video, title: "Consultant visits", copy: "Video or campus. Cardiology, paediatrics, orthopaedics, and general medicine — each with a listed fee." },
+  { icon: FolderOpen, title: "Clinical file", copy: "Problems, vitals, labs, visit notes, prescriptions, invoices, and receipts stay on the same record." },
+  { icon: BedDouble, title: "Admissions", copy: "Request a ward and room type. Accounts invoice the nightly rate when the bed is accepted." },
+  { icon: Stethoscope, title: "Clinician workspace", copy: "Clinic list, chart, prescriptions from chat or video, teleconsult room, and admission queue." },
+  { icon: Building2, title: "Hospital operations", copy: "Beds, staff directory, clinic diary, live tariff, revenue, patient notices, and an audit trail." },
+  { icon: MessageCircle, title: "Pharmacy nursing", copy: "Doctors issue prescriptions from chat or video. Patients buy on site or collect at Ridge. Nurses keep stock live." },
+];
 
 export default function Landing() {
   return (
-    <div className="landing">
+    <div className="landing landing-home">
       <nav className="public-nav">
-        <div className="brand"><div className="brand-mark live"><HeartPulse size={22} /></div><div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div></div>
+        <div className="brand">
+          <div className="brand-mark live"><HeartPulse size={22} /></div>
+          <div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div>
+        </div>
         <div className="links">
           <a href="#services">Clinical services</a>
           <Link to="/tariff">Tariff</Link>
@@ -16,23 +29,30 @@ export default function Landing() {
           <Link to="/login?role=doctor">Clinician</Link>
           <Link to="/login?role=nurse">Nurse</Link>
           <Link to="/login?role=admin">Operations</Link>
-          <Link className="primary-btn" to="/register">Register</Link>
+          <Link className="primary-btn cta-pulse" to="/register">Register</Link>
         </div>
       </nav>
       <section className="hero">
-        <div>
+        <div className="hero-photo" aria-hidden="true">
+          <div className="kb-photo" />
+          <div className="hero-shade" />
+          <GoldDust />
+          <SoftOrbs />
+        </div>
+        <div className="hero-copy">
           <span className="eyebrow">{HOSPITAL.campus} · Licensed private hospital</span>
-          <h1>Outpatient, teleconsult, pharmacy, and admissions on one clinical record.</h1>
-          <p className="lead">Patients book a consultant, pay published fees, and collect a receipt. Doctors work a clinic list and the chart. Pharmacy nurses prepare hospital pickups and keep the cupboard current. Operations run beds, staff, and accounts.</p>
+          <h1>Exceptional care on one clinical record.</h1>
+          <p className="lead">Outpatient, teleconsult, pharmacy, and admissions — billed at published fees, with a receipt for every settlement. Your health, our priority at Ridge Campus, Accra.</p>
           <div className="hero-actions">
-            <Link className="primary-btn" to="/login">Patient portal <ArrowRight size={18} /></Link>
+            <Link className="primary-btn cta-pulse" to="/login">Patient portal <ArrowRight size={18} /></Link>
             <Link className="secondary-btn" to="/login?role=doctor">Clinician sign-in</Link>
             <Link className="secondary-btn" to="/login?role=nurse">Nurse sign-in</Link>
             <Link className="secondary-btn" to="/login?role=admin">Hospital operations</Link>
           </div>
-          <p className="muted" style={{ display: "flex", gap: 8, alignItems: "center" }}><Phone size={16} /> Switchboard {HOSPITAL.phone} · Emergency {HOSPITAL.emergency}</p>
+          <p className="muted hero-phone"><Phone size={16} /> Switchboard {HOSPITAL.phone} · Emergency {HOSPITAL.emergency}</p>
         </div>
         <aside className="hero-panel">
+          <div className="hero-panel-ecg" aria-hidden="true"><EcgRibbon /></div>
           <CarePath caption="Home → visit → consult → ward" />
           <span className="eyebrow">Ridge Campus</span>
           <h3>How a visit is billed</h3>
@@ -47,14 +67,25 @@ export default function Landing() {
           </div>
           <Link className="ghost-btn" to="/tariff" style={{ marginTop: 12 }}>Open full tariff</Link>
         </aside>
+        <div className="hero-ecg" aria-hidden="true"><EcgRibbon /></div>
+      </section>
+      <section className="trust-band" aria-label="Hospital figures">
+        <CountStat value={4} label="Consultants on staff" />
+        <CountStat value={44} label="Ward beds on campus" />
+        <CountStat value={6} label="Clinical services" />
+        <CountStat value={24} suffix="/7" label="Emergency line" />
       </section>
       <section id="services" className="feature-grid">
-        <div className="feature-card"><Video /><h3>Consultant visits</h3><p className="muted">Video or campus. Cardiology, paediatrics, orthopaedics, and general medicine — each with a listed fee.</p></div>
-        <div className="feature-card"><FolderOpen /><h3>Clinical file</h3><p className="muted">Problems, vitals, labs, visit notes, prescriptions, invoices, and receipts stay on the same record.</p></div>
-        <div className="feature-card"><BedDouble /><h3>Admissions</h3><p className="muted">Request a ward and room type. Accounts invoice the nightly rate when the bed is accepted.</p></div>
-        <div className="feature-card"><Stethoscope /><h3>Clinician workspace</h3><p className="muted">Clinic list, chart, prescriptions from chat or video, teleconsult room, and admission queue.</p></div>
-        <div className="feature-card"><Building2 /><h3>Hospital operations</h3><p className="muted">Beds, staff directory, clinic diary, live tariff, revenue, patient notices, and an audit trail.</p></div>
-        <div className="feature-card"><MessageCircle /><h3>Pharmacy nursing</h3><p className="muted">Doctors issue prescriptions from chat or video. Patients buy on site or collect at Ridge. Nurses keep stock live.</p></div>
+        {SERVICES.map((item, i) => {
+          const Icon = item.icon;
+          return (
+            <Reveal className="feature-card" delay={i * 70} key={item.title}>
+              <Icon />
+              <h3>{item.title}</h3>
+              <p className="muted">{item.copy}</p>
+            </Reveal>
+          );
+        })}
       </section>
       <footer className="landing-foot">
         <span>{HOSPITAL.name}</span>

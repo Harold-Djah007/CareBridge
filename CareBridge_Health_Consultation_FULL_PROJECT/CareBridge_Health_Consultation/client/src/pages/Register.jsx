@@ -4,6 +4,7 @@ import { HeartPulse, ArrowRight } from "lucide-react";
 import { api } from "../api";
 import PhotoPicker from "../components/PhotoPicker";
 import { useAuth, useToast } from "../state";
+import { GoldDust } from "../components/LiveFX";
 
 export default function Register() {
   const { login } = useAuth();
@@ -31,6 +32,8 @@ export default function Register() {
   return (
     <div className="login-page">
       <section className="login-hero">
+        <div className="kb-layer" aria-hidden="true" />
+        <GoldDust count={12} />
         <Link to="/" className="brand large"><div className="brand-mark live"><HeartPulse size={24} /></div><div><b>CareBridge</b><span>Health</span></div></Link>
         <div>
           <h1>Create your patient portal.</h1>
@@ -50,7 +53,7 @@ export default function Register() {
           </div>
           <label>NHIS / insurance number<input value={form.insurance} onChange={(e) => set("insurance", e.target.value)} placeholder="Leave blank for self-pay" /></label>
           {error && <div className="error-box">{error}</div>}
-          <button className="primary-btn full" disabled={loading}>{loading ? "Creating..." : <>Create account <ArrowRight size={18} /></>}</button>
+          <button className="primary-btn full cta-pulse" disabled={loading}>{loading ? "Creating..." : <>Create account <ArrowRight size={18} /></>}</button>
           <p className="muted">Already registered? <Link to="/login"><b>Sign in</b></Link></p>
         </form>
       </section>

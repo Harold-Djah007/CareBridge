@@ -45,6 +45,7 @@ export default function PageAtmosphere() {
 
   return (
     <div className={`page-atmosphere scene-${scene}`} aria-hidden="true">
+      <div className="atm-photo" />
       <div className="atm-orb o1" />
       <div className="atm-orb o2" />
       <div className="atm-orb o3" />

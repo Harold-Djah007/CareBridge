@@ -8,6 +8,7 @@ export function TileGrid({ children, label = "Shortcuts" }) {
 export default function TileCard({ to, icon: Icon, title, subtitle }) {
   return (
     <Link className="tile-card" to={to}>
+      <span className="tile-shimmer" aria-hidden="true" />
       <span className="tile-icon" aria-hidden="true">
         {Icon ? <Icon size={16} strokeWidth={2.1} /> : null}
       </span>

@@ -4,6 +4,7 @@ import { HeartPulse, ShieldCheck, ArrowRight } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { HOSPITAL } from "../utils";
+import { GoldDust } from "../components/LiveFX";
 
 const DEMOS = {
   patient: { email: "patient@carebridge.test", password: "patient123", label: "Fill patient login" },
@@ -48,8 +49,10 @@ export default function Login() {
   };
 
   return (
-    <div className={`login-page ${isStaff ? "staff-login" : ""} ${portal === "nurse" ? "nurse-login" : ""}`}>
+    <div className={`login-page ${isStaff ? "staff-login" : ""} ${portal === "nurse" ? "nurse-login" : ""} ${portal === "admin" ? "admin-login" : ""} ${portal === "doctor" ? "doctor-login" : ""}`}>
       <section className="login-hero">
+        <div className="kb-layer" aria-hidden="true" />
+        <GoldDust count={12} />
         <Link to="/" className="brand large"><div className="brand-mark live"><HeartPulse size={24} /></div><div><b>{HOSPITAL.short}</b><span>{HOSPITAL.campus}</span></div></Link>
         <div>
           <div className="status confirmed" style={{ display: "inline-flex", gap: 6, marginBottom: 16 }}><ShieldCheck size={14} /> {meta.status}</div>
@@ -80,7 +83,7 @@ export default function Login() {
           <label>{isStaff ? "Staff email" : "Email used at registration"}<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required /></label>
           <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
           {error && <div className="error-box">{error}</div>}
-          <button className="primary-btn full" disabled={loading}>{loading ? "Signing in..." : <>Sign in <ArrowRight size={18} /></>}</button>
+          <button className="primary-btn full cta-pulse" disabled={loading}>{loading ? "Signing in..." : <>Sign in <ArrowRight size={18} /></>}</button>
           <details className="demo-box">
             <summary className="muted" style={{ cursor: "pointer" }}>Demonstration credentials for this hospital build</summary>
             <div style={{ marginTop: 10 }}>
