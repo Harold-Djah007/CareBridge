@@ -238,7 +238,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 }
 .topbar-link:hover { color: var(--teal); background: var(--teal-soft); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(21, 94, 117, 0.08); }
 .topbar-link:hover::after { transform: scaleX(1); }
-.top-search { display: flex; align-items: center; gap: 8px; flex: 1; max-width: 360px; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; color: var(--muted); }
+.top-search { display: flex; align-items: center; gap: 8px; flex: 0 1 220px; max-width: 220px; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; color: var(--muted); }
 .top-search input { border: 0; padding: 0; box-shadow: none; background: transparent; }
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 .notice-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
@@ -1177,14 +1177,15 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .basket-grand { font-size: 16px; padding-top: 8px; border-top: 1px solid var(--line); }
 .chat-panel .rx-pad { border-top: 1px solid var(--line); padding: 12px; max-height: 280px; overflow: auto; background: #f8fafb; }
 .call-sidebar .rx-pad { margin-top: 12px; max-height: 340px; overflow: auto; background: rgba(255,255,255,0.08); border-radius: 10px; padding: 10px; }
-.pharm-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 0 0 16px; }
-.pharm-cats button {
-  text-align: left; border: 1px solid var(--line); background: var(--card); border-radius: 12px;
-  padding: 12px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 4px;
+.pharm-cats, .shelf-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  margin: 0 0 14px;
 }
-.pharm-cats button b { font-size: 14px; }
-.pharm-cats button small { color: var(--muted); font-weight: 600; }
-.pharm-cats button.on { border-color: var(--teal); background: var(--teal-soft); box-shadow: 0 0 0 3px rgba(21, 94, 117, 0.12); }
+.pharm-cats button, .shelf-bar .chip-link {
+  border: 1px solid var(--line); background: var(--card);
+}
+.shelf-bar .chip-link { cursor: pointer; font: inherit; }
+.shelf-bar .jump-menu select { min-width: 240px; }
 .pharmacy-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); gap: 16px; align-items: start; }
 .pharmacy-basket { max-height: calc(100vh - 24px); overflow: auto; }
 .shop-spend-bar {
@@ -2039,7 +2040,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 }
 .portal-meta em { font-style: normal; color: #7ee0d2; font-weight: 700; }
 .portal-search {
-  max-width: 420px;
+  flex: 0 1 200px;
+  max-width: 200px;
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.14);
   color: #d7e4f0;

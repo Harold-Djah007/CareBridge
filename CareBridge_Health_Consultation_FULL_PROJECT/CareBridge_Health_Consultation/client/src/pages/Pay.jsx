@@ -482,17 +482,24 @@ function PatientShop() {
 
           {tab === "pharmacy" && (
             <>
-              <div className="pharm-cats">
-                <button type="button" className={category === "all" ? "on" : ""} onClick={() => setCategory("all")}>
-                  <b>All categories</b>
-                  <small>{stock.filter((p) => p.inStock !== false && Number(p.qty) > 0).length} in stock · {stock.filter((p) => p.inStock === false || Number(p.qty) <= 0).length} out</small>
-                </button>
-                {categories.filter((c) => c !== "all").map((c) => (
-                  <button type="button" key={c} className={category === c ? "on" : ""} onClick={() => setCategory(c)}>
-                    <b>{c}</b>
-                    <small>{counts[c]?.in || 0} in stock · {counts[c]?.out || 0} out</small>
-                  </button>
-                ))}
+              <div className="shelf-bar">
+                <label className="jump-menu">
+                  <span>Cupboard</span>
+                  <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                    <option value="all">
+                      All shelves · {stock.filter((p) => p.inStock !== false && Number(p.qty) > 0).length} in · {stock.filter((p) => p.inStock === false || Number(p.qty) <= 0).length} out
+                    </option>
+                    {categories.filter((c) => c !== "all").map((c) => (
+                      <option key={c} value={c}>{c} · {counts[c]?.in || 0} in · {counts[c]?.out || 0} out</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="chip-row" aria-label="Medicine shelves">
+                  <button type="button" className={`chip-link ${category === "all" ? "on" : ""}`} onClick={() => setCategory("all")}>All</button>
+                  {categories.filter((c) => c !== "all").map((c) => (
+                    <button type="button" key={c} className={`chip-link ${category === c ? "on" : ""}`} onClick={() => setCategory(c)}>{c}</button>
+                  ))}
+                </div>
               </div>
               {Object.entries(grouped).map(([cat, rows]) => (
                 <section className="card pharm-cat" key={cat}>
