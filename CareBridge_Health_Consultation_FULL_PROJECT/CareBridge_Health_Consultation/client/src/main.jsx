@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./styles.css";
 import { homeFor } from "./utils";
 import { AuthProvider, ToastProvider, useAuth } from "./state";
+import { CartProvider } from "./ShopCart";
 import Landing from "./pages/Landing";
 import About from "./pages/About";
 import Services from "./pages/Services";
@@ -19,7 +20,6 @@ import Messages from "./pages/Messages";
 import WardBooking from "./pages/WardBooking";
 import VideoConsultation from "./pages/VideoConsultation";
 import CareTeam from "./pages/CareTeam";
-import Profile from "./pages/Profile";
 import Alerts from "./pages/Alerts";
 import ClinicalRecord from "./pages/ClinicalRecord";
 import Help from "./pages/Help";
@@ -53,6 +53,7 @@ function AppRoutes() {
   const { user } = useAuth();
   return (
     <BrowserRouter>
+      <CartProvider>
       <Routes>
         <Route path="/" element={user ? <Navigate to={homeFor(user)} /> : <Landing />} />
         <Route path="/about" element={<About />} />
@@ -75,7 +76,7 @@ function AppRoutes() {
           <Route path="/video" element={<RoleRoute roles={["patient", "doctor"]}><VideoConsultation /></RoleRoute>} />
           <Route path="/wards" element={<WardBooking />} />
           <Route path="/alerts" element={<RoleRoute roles={["patient", "admin"]}><Alerts /></RoleRoute>} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/profile" element={<Navigate to="/settings" replace />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/support" element={<Support />} />
           <Route path="/guide" element={<Help />} />
@@ -100,6 +101,7 @@ function AppRoutes() {
         </Route>
         <Route path="*" element={<Navigate to={user ? homeFor(user) : "/"} />} />
       </Routes>
+      </CartProvider>
     </BrowserRouter>
   );
 }

@@ -51,10 +51,9 @@ export function sceneFor(pathname = "", role) {
   if (pathname.startsWith("/messages")) return "messages";
   if (pathname.startsWith("/wards") || pathname.startsWith("/admin/hospital")) return "wards";
   if (pathname.startsWith("/records")) return "records";
-  if (pathname.startsWith("/settings")) return "settings";
+  if (pathname.startsWith("/settings") || pathname.startsWith("/profile")) return "settings";
   if (pathname.startsWith("/support") || pathname.startsWith("/admin/support") || pathname.startsWith("/guide")) return "support";
   if (pathname.startsWith("/care")) return "care";
-  if (pathname.startsWith("/profile")) return "profile";
   if (pathname.startsWith("/alerts")) return "alerts";
   if (pathname.startsWith("/admin/users")) return "directory";
   if (pathname.startsWith("/admin/reports")) return "reports";

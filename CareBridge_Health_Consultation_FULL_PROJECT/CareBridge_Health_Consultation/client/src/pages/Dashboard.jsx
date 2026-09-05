@@ -29,7 +29,7 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
         title={greeting(firstName(user.name))}
         actions={(
           <div className="identity-aside">
-            <Link className="secondary-btn" to="/profile">My details</Link>
+            <Link className="secondary-btn" to="/settings">Account</Link>
             {due.length > 0 && <span className="muted">{ghs(dueTotal)} outstanding</span>}
           </div>
         )}

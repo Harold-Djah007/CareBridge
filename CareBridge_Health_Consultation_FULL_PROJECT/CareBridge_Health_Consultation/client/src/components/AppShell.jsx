@@ -3,8 +3,9 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   CalendarDays, LayoutDashboard, MessageCircle, BedDouble, Video, LogOut, HeartPulse,
   Bell, Users, Mail, UserRound, Stethoscope, ClipboardList, Building2, Search, Inbox,
-  FolderOpen, ScrollText, Pill, Receipt, ShoppingBag, Settings, LifeBuoy, FolderKanban,
+  FolderOpen, ScrollText, Pill, Receipt, ShoppingBag, LifeBuoy, FolderKanban,
 } from "lucide-react";
+import { CartMastButton, useCart } from "../ShopCart";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
 import { api, socketUrl } from "../api";
@@ -33,14 +34,13 @@ const NAV = {
         { to: "/records", icon: FolderOpen, label: "Clinical file", primary: true },
         { to: "/care", icon: Stethoscope, label: "Find a doctor" },
         { to: "/alerts", icon: Inbox, label: "Notifications" },
-        { to: "/profile", icon: UserRound, label: "My details" },
+        { to: "/settings", icon: UserRound, label: "Account" },
       ],
     },
     {
       group: "Hospital",
       items: [
         { to: "/support", icon: LifeBuoy, label: "Help & support", badge: "tickets" },
-        { to: "/settings", icon: Settings, label: "Settings" },
       ],
     },
   ],
@@ -61,7 +61,7 @@ const NAV = {
         { to: "/care", icon: Users, label: "Patients", primary: true },
         { to: "/records", icon: FolderOpen, label: "Open chart", primary: true },
         { to: "/wards", icon: BedDouble, label: "Admissions", primary: true, badge: "wards" },
-        { to: "/profile", icon: UserRound, label: "Credentials" },
+        { to: "/settings", icon: UserRound, label: "Account" },
       ],
     },
     {
@@ -69,7 +69,6 @@ const NAV = {
       items: [
         { to: "/support", icon: LifeBuoy, label: "Help & support", badge: "tickets" },
         { to: "/billing/tariff", icon: ScrollText, label: "Tariff" },
-        { to: "/settings", icon: Settings, label: "Settings" },
       ],
     },
   ],
@@ -93,8 +92,7 @@ const NAV = {
         { to: "/support", icon: LifeBuoy, label: "Support desk", primary: true, badge: "tickets" },
         { to: "/messages", icon: MessageCircle, label: "Switchboard", badge: "messages" },
         { to: "/alerts", icon: Mail, label: "Patient notices", primary: true },
-        { to: "/settings", icon: Settings, label: "Settings" },
-        { to: "/profile", icon: UserRound, label: "My account" },
+        { to: "/settings", icon: UserRound, label: "Account" },
       ],
     },
   ],
@@ -110,8 +108,7 @@ const NAV = {
     {
       group: "Hospital",
       items: [
-        { to: "/settings", icon: Settings, label: "Settings", primary: true },
-        { to: "/profile", icon: UserRound, label: "My account" },
+        { to: "/settings", icon: UserRound, label: "Account", primary: true },
       ],
     },
   ],
@@ -174,6 +171,7 @@ function NavRail({ children }) {
 export default function AppShell() {
   const { user, logout } = useAuth();
   const { push } = useToast();
+  const cart = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const [notes, setNotes] = useState([]);
@@ -233,11 +231,13 @@ export default function AppShell() {
   const renderLink = (item) => {
     const Icon = item.icon;
     const count = item.badge ? badgeFor(item.badge) : 0;
+    const cartItems = user.role === "patient" && item.to === "/pay" ? Number(cart?.count || 0) : 0;
+    const shown = count || cartItems;
     return (
       <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
         <Icon size={18} />
         <span>{item.label}</span>
-        {count > 0 && <em className="nav-badge">{count}</em>}
+        {shown > 0 && <em className="nav-badge">{shown > 99 ? "99+" : shown}</em>}
       </NavLink>
     );
   };
@@ -261,6 +261,7 @@ export default function AppShell() {
         </form>
         <div className="portal-tools">
           <LiveClock />
+          {user.role === "patient" && <CartMastButton />}
           <button className="icon-btn bell-btn" type="button" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications" aria-label={unread ? `${unread} unread notices` : "Notifications"}>
             <Bell size={18} />
             {unread > 0 && <em className="bell-count">{unread > 99 ? "99+" : unread}</em>}

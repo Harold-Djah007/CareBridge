@@ -914,6 +914,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
   color: #fff;
   border-color: var(--teal);
 }
+.settings-jacket-note { margin: 4px 0 0; font-size: 12px; line-height: 1.4; }
 .chip-link.on { background: var(--teal); color: #fff; border-color: var(--teal); }
 @media (max-width: 800px) {
   .settings-layout { grid-template-columns: 1fr; }
@@ -1187,10 +1188,31 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .shelf-bar .chip-link { cursor: pointer; font: inherit; }
 .shelf-bar .jump-menu select { min-width: 240px; }
 .pharmacy-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); gap: 16px; align-items: start; }
+.pharmacy-layout.shop-layout { display: block; grid-template-columns: minmax(0, 1fr); }
 .pharmacy-basket { max-height: calc(100vh - 24px); overflow: auto; }
 .shop-spend-bar {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  bottom: 16px;
+  z-index: 6;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--navy);
+  border-radius: 12px;
+  background: #fffdf9;
+  color: var(--navy);
+  box-shadow: 0 12px 28px rgba(47, 38, 32, 0.12);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
 }
+.shop-spend-bar:hover { border-color: var(--teal); border-left-color: var(--teal); background: var(--teal-soft); }
 .shop-search {
   display: flex;
   align-items: center;
@@ -1344,7 +1366,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .rx-sign span { font-size: 12px; color: var(--muted); }
 
 @media print {
-  .no-print, .rx-pad, .filters, .pharm-cats, .shop-search { display: none !important; }
+  .no-print, .rx-pad, .filters, .pharm-cats, .shelf-bar, .shop-search { display: none !important; }
   .rx-sheet { border: 0; box-shadow: none; }
 }
 
@@ -1353,22 +1375,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
   .duty-toggle, .duty-pill { min-width: 0; width: 100%; }
   .pharmacy-basket { position: static; max-height: none; }
   .shop-spend-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    position: sticky;
     bottom: 72px;
-    z-index: 6;
-    background: #fff;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 12px 14px;
     margin-top: 12px;
-    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
-    color: inherit;
-    text-decoration: none;
-    font-weight: 700;
+    padding: 12px 14px;
   }
 }
 
@@ -2422,6 +2431,128 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .shop-toolbar .shop-search input { font-size: 13px; }
 .shop-toolbar .shop-search-clear { padding: 4px 8px; font-size: 11px; }
 .shop-toolbar .filters { margin: 0; }
+.shop-toolbar .shop-cart-chip { margin-left: auto; }
+.shop-cart-chip.on { border-color: var(--teal); background: var(--teal-soft); color: var(--teal-dark); }
+
+.add-cart-btn {
+  margin-top: auto;
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-weight: 700;
+  background: var(--navy);
+  color: #fffdf9;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+.add-cart-btn:hover { background: var(--navy-deep); }
+.add-cart-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.pay-pick .add-cart-btn, .pay-pick .in-cart-bill { margin-top: 0; padding: 8px 12px; }
+.in-cart-bill { font-weight: 800; color: var(--teal-dark); }
+.in-cart-ctrl { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+.in-cart-tag {
+  font-size: 11px; font-weight: 800; font-style: normal;
+  color: var(--teal-dark); letter-spacing: 0.04em; text-transform: uppercase;
+}
+.pharm-card.in-cart { border-color: var(--teal); background: #f7fbf9; box-shadow: 0 0 0 3px var(--teal-soft); }
+
+.cart-scrim {
+  position: fixed; inset: 0; z-index: 40;
+  border: 0; padding: 0; margin: 0;
+  background: rgba(36, 51, 68, 0.42);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.cart-scrim.on { opacity: 1; pointer-events: auto; cursor: pointer; }
+.cart-drawer {
+  position: fixed; top: 0; right: 0; z-index: 41;
+  width: min(420px, 100vw); height: 100vh;
+  display: flex; flex-direction: column;
+  background: #fffdf9;
+  border-left: 1px solid var(--line);
+  box-shadow: -18px 0 40px rgba(47, 38, 32, 0.16);
+  transform: translateX(100%);
+  transition: transform 0.24s ease;
+}
+.cart-drawer.open { transform: translateX(0); }
+.cart-drawer-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; padding: 18px 18px 12px;
+  background: #f6f1ea; border-bottom: 1px solid var(--line);
+}
+.cart-drawer-head h3 { display: flex; align-items: center; gap: 8px; color: var(--navy); }
+.cart-drawer-head .running-total { display: none; }
+.cart-drawer > .running-total {
+  margin: 0; padding: 10px 18px;
+  background: var(--teal-soft);
+  border-bottom: 1px solid var(--line);
+  display: flex; justify-content: space-between; align-items: center;
+  color: var(--navy);
+}
+.cart-drawer-body { overflow: auto; padding: 12px 18px 28px; flex: 1; background: #fffdf9; }
+.cart-empty {
+  text-align: center; padding: 40px 16px 24px; color: var(--muted);
+}
+.cart-empty svg { color: var(--navy); margin-bottom: 10px; }
+.cart-empty p { color: var(--navy); font-weight: 700; margin: 0 0 8px; }
+.cart-empty small { display: block; margin: 0 0 16px; line-height: 1.45; }
+.cart-pending { padding: 8px 0 12px; }
+.cart-mast-btn { position: relative; color: var(--navy); }
+.cart-mast-btn.has-items { color: var(--teal-dark); background: var(--teal-soft); }
+.cart-mast-btn .cart-count { box-shadow: 0 0 0 2px #fff; }
+
+@media print {
+  .cart-drawer, .cart-scrim, .cart-mast-btn, .shop-spend-bar, .shop-cart-chip, .add-cart-btn { display: none !important; }
+}
+.shop-layout { grid-template-columns: minmax(0, 1fr); }
+.shop-cart-chip { margin-left: auto; }
+.add-cart-btn {
+  border: 0; background: var(--navy); color: #fff; border-radius: 8px;
+  padding: 8px 12px; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.add-cart-btn:hover { background: var(--teal-dark); }
+.add-cart-btn:disabled, .in-cart-bill { opacity: 0.85; }
+.in-cart-ctrl { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+.in-cart-tag { font-size: 11px; font-weight: 800; font-style: normal; color: var(--teal-dark); }
+.shop-spend-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  position: sticky; bottom: 16px; z-index: 6;
+  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; margin-top: 12px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  color: inherit; font: inherit; font-weight: 700; cursor: pointer; width: 100%;
+}
+
+.cart-scrim {
+  position: fixed; inset: 0; border: 0; padding: 0; background: rgba(20, 28, 36, 0.42);
+  opacity: 0; pointer-events: none; z-index: 38; transition: opacity 0.2s ease;
+}
+.cart-scrim.on { opacity: 1; pointer-events: auto; }
+.cart-drawer {
+  position: fixed; top: var(--mast-h, 68px); right: 0; bottom: 0;
+  width: min(420px, 100vw); z-index: 40;
+  background: #fffdf9; border-left: 1px solid var(--line);
+  box-shadow: -16px 0 40px rgba(15, 23, 42, 0.16);
+  transform: translateX(104%); transition: transform 0.22s ease;
+  display: flex; flex-direction: column; min-height: 0;
+}
+.cart-drawer.open { transform: translateX(0); }
+.cart-drawer-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; padding: 16px 16px 8px; border-bottom: 1px solid var(--line);
+}
+.cart-drawer-head h3 { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; }
+.cart-drawer-body { padding: 8px 16px 24px; overflow: auto; flex: 1; }
+.cart-empty { text-align: center; padding: 28px 12px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.cart-empty p { margin: 0; font-weight: 700; color: var(--ink); }
+.cart-pending { margin-top: 12px; }
+.cart-mast-btn.has-items { color: #7ee0d2; }
+.portal-app .cart-count { box-shadow: 0 0 0 2px var(--sidebar-bg); }
+
+@media print {
+  .cart-drawer, .cart-scrim, .shop-spend-bar, .cart-mast-btn { display: none !important; }
+}
 
 @media (max-width: 720px) {
   .home-feature, .work-wrap { grid-template-columns: 1fr; }

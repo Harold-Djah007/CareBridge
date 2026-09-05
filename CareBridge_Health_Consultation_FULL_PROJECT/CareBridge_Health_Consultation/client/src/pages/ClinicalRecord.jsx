@@ -125,7 +125,7 @@ export default function ClinicalRecord() {
                 <div className="mini-kpi"><span>SpO₂</span><strong>{latest.spo2}%</strong></div>
               </div>
             ) : <p className="muted">No vitals on file.</p>}
-            <p className="muted" style={{ marginTop: 14 }}>Emergency contact: {p.emergencyContact || "Add one under My details."}</p>
+            <p className="muted" style={{ marginTop: 14 }}>Emergency contact: {p.emergencyContact || "Add one under Account."}</p>
           </section>
         </div>
       )}

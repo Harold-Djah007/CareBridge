@@ -56,10 +56,22 @@ export function loadCart(userId) {
   return next;
 }
 
+export const CART_EVENT = "carebridge-cart";
+export const BILLS_EVENT = "carebridge-bills";
+
+export function emitCartChange(userId, items) {
+  if (typeof window === "undefined") return;
+  const next = items || [];
+  window.dispatchEvent(new CustomEvent(CART_EVENT, {
+    detail: { userId, count: cartCount(next), total: cartTotal(next) },
+  }));
+}
+
 export function saveCart(userId, items) {
   const next = (items || []).map(normalizeLine);
-  sessionStorage.setItem(cartKey(userId), JSON.stringify(next));
-  sessionStorage.removeItem(pharmacyKey(userId));
+  if (userId) sessionStorage.setItem(cartKey(userId), JSON.stringify(next));
+  if (userId) sessionStorage.removeItem(pharmacyKey(userId));
+  emitCartChange(userId, next);
   return next;
 }
 

@@ -19,7 +19,7 @@ function GuideBody() {
       />
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Patients</h3>
-        <p className="muted">Register, complete a pre-visit form, book a video or campus visit, message your doctor, read labs and visit notes, print prescriptions, and use Shop &amp; pay for unpaid bills, medicines, and labs in one basket — or collect medicines at Ridge pharmacy. Reserve a ward before you travel.</p>
+        <p className="muted">Register, complete a pre-visit form, book a video or campus visit, message your doctor, read labs and visit notes, print prescriptions, and use Shop &amp; pay for unpaid bills, medicines, and labs in one cart — or collect medicines at Ridge pharmacy. Reserve a ward before you travel.</p>
       </section>
       <section className="card" style={{ marginBottom: 14 }}>
         <h3>Doctors</h3>

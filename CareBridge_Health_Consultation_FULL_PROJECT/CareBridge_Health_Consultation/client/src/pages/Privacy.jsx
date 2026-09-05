@@ -15,7 +15,7 @@ export default function Privacy() {
         </div>
         <section className="card">
           <p>Patient files include identity, visits, messages, ward stays, medicines, labs, notes, invoices, and email notices. Doctors see people on their caseload. Administrators see operational data and the audit trail. Passwords are stored for this training build only — a live hospital would use hashed credentials, signed sessions, and Ghana Data Protection Act controls.</p>
-          <p>You can turn email alerts off under My details. For a live deployment, request a records export from the records office at {HOSPITAL.phone}.</p>
+          <p>You can turn email alerts off under Account. For a live deployment, request a records export from the records office at {HOSPITAL.phone}.</p>
           <p className="muted">Telehealth consent is collected before a video consult. Version 2026.1.</p>
         </section>
       </div>

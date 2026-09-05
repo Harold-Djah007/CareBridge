@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { LogOut, Shield, Wallet, Bell, UserRound, Building2, IdCard } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { LogOut, Shield, Wallet, Bell, UserRound, Building2, IdCard, HeartPulse } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { HOSPITAL, roleLabel } from "../utils";
@@ -10,24 +10,34 @@ import Avatar from "../components/Avatar";
 import PageHero from "../components/PageHero";
 
 const FILE_NOTE = {
-  patient: "Printed on receipts, letters, and the ward board. Clinical facts stay on My details.",
+  patient: "Printed on receipts, letters, and the ward board. Clinical facts on this same file are what the care team reads.",
   doctor: "Used on prescriptions, the clinic board, and the staff directory.",
   nurse: "Used on the dispensary queue and the staff directory.",
   admin: "Used on operations notices and the staff directory.",
 };
 
+function tabFromParams(params, role) {
+  const tab = params.get("tab");
+  if (tab === "account" || tab === "identity") return "account";
+  if (tab === "signin" || tab === "password") return "signin";
+  if (tab === "pay" && role === "patient") return "pay";
+  if (tab === "notices" || tab === "alerts") return "notices";
+  return "account";
+}
+
 export default function Settings() {
   const { user, updateUser, logout } = useAuth();
   const { push } = useToast();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const prefs = user.paymentPrefs || {};
   const tabs = [
-    { id: "identity", label: "Identity" },
-    { id: "signin", label: "Sign-in" },
+    { id: "account", label: "Account" },
+    { id: "signin", label: "Password" },
     ...(user.role === "patient" ? [{ id: "pay", label: "How you pay" }] : []),
     { id: "notices", label: "Notices" },
   ];
-  const [tab, setTab] = useState("identity");
+  const [tab, setTab] = useState(() => tabFromParams(params, user.role));
   const [account, setAccount] = useState({
     name: user.name || "",
     email: user.email || "",
@@ -37,6 +47,10 @@ export default function Settings() {
     specialty: user.specialty || "",
     available: user.available !== false,
     photo: user.photo || "",
+    emergencyContact: user.emergencyContact || "",
+    allergies: user.allergies || "",
+    insurance: user.insurance || "",
+    bloodType: user.bloodType || "",
   });
   const [security, setSecurity] = useState({ currentPassword: "", password: "", confirm: "" });
   const [pay, setPay] = useState({
@@ -58,7 +72,14 @@ export default function Settings() {
   const [busy, setBusy] = useState("");
 
   const fileNo = user.role === "patient" ? (user.mrn || "Pending MRN") : (user.employeeId || "Staff file");
-  const desk = user.role === "patient" ? (user.insurance || "Self-pay") : (user.department || user.specialty || roleLabel(user.role));
+  const desk = user.role === "patient" ? (account.insurance || user.insurance || "Self-pay") : (user.department || account.specialty || user.specialty || roleLabel(user.role));
+
+  const goTab = (id) => {
+    setTab(id);
+    const next = new URLSearchParams(params);
+    next.set("tab", id);
+    setParams(next, { replace: true });
+  };
 
   const patch = async (body, ok) => {
     const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -71,7 +92,21 @@ export default function Settings() {
     e.preventDefault();
     setBusy("account");
     try {
-      await patch(account, "Account details saved to your hospital file.");
+      await patch({
+        name: account.name,
+        email: account.email,
+        phone: account.phone,
+        city: account.city,
+        about: account.about,
+        specialty: account.specialty,
+        photo: account.photo,
+        ...(user.role === "patient" ? {
+          emergencyContact: account.emergencyContact,
+          allergies: account.allergies,
+          insurance: account.insurance,
+          bloodType: account.bloodType,
+        } : {}),
+      }, "Account details saved to your hospital file.");
     } catch (err) {
       push(err.message, "error");
     } finally {
@@ -137,8 +172,8 @@ export default function Settings() {
       <PageHero
         scene="records"
         eyebrow={`${HOSPITAL.campus} · hospital file`}
-        title="Settings"
-        lead="Each save writes to your CareBridge file and is used on the next visit, bill, or notice. Nothing here is decorative."
+        title="Account"
+        lead="Your hospital file, password, and notices live here. Each save is used on the next visit, bill, or letter."
         actions={(
           <button className="secondary-btn" type="button" onClick={() => { logout(); navigate("/login"); }}>
             <LogOut size={16} /> Sign out
@@ -159,33 +194,32 @@ export default function Settings() {
               <li><Building2 size={14} /> {HOSPITAL.campus}</li>
               <li>{desk}</li>
             </ul>
-            {user.role === "patient" && <Link className="ghost-btn" to="/profile">Open clinical details</Link>}
-            {user.role === "doctor" && <Link className="ghost-btn" to="/profile">Open credentials</Link>}
+            <p className="muted settings-jacket-note">Password, notices{user.role === "patient" ? ", and how you pay" : ""} are on this same page.</p>
           </div>
         </aside>
 
         <div className="settings-work">
-          <div className="settings-tabs" role="tablist" aria-label="Settings sections">
+          <div className="settings-tabs" role="tablist" aria-label="Account sections">
             <label className="jump-menu">
               <span>Section</span>
-              <select value={tab} onChange={(e) => setTab(e.target.value)}>
+              <select value={tab} onChange={(e) => goTab(e.target.value)}>
                 {tabs.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
             </label>
             <div className="chip-row">
               {tabs.map((t) => (
-                <button key={t.id} type="button" className={`chip-link ${tab === t.id ? "on" : ""}`} onClick={() => setTab(t.id)}>
+                <button key={t.id} type="button" className={`chip-link ${tab === t.id ? "on" : ""}`} onClick={() => goTab(t.id)}>
                   {t.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {tab === "identity" && (
+          {tab === "account" && (
             <form className="card settings-card" onSubmit={saveAccount}>
               <div className="card-head">
                 <div>
-                  <span className="eyebrow">Identity</span>
+                  <span className="eyebrow">Hospital file</span>
                   <h3><UserRound size={16} /> Name and contact</h3>
                 </div>
               </div>
@@ -199,6 +233,25 @@ export default function Settings() {
                 <label>Phone<input value={account.phone} onChange={(e) => setAccount({ ...account, phone: e.target.value })} /></label>
                 <label>City<input value={account.city} onChange={(e) => setAccount({ ...account, city: e.target.value })} /></label>
               </div>
+              {user.role === "patient" && (
+                <>
+                  <div className="card-head" style={{ marginTop: 8 }}>
+                    <div>
+                      <span className="eyebrow">Clinical facts</span>
+                      <h3><HeartPulse size={16} /> On your record</h3>
+                    </div>
+                  </div>
+                  <p className="muted">Shown on the clinical file and the ward board. Staff read these before they treat or dispense.</p>
+                  <div className="form-grid">
+                    <label>Emergency contact<input value={account.emergencyContact} onChange={(e) => setAccount({ ...account, emergencyContact: e.target.value })} /></label>
+                    <label>Allergies<input value={account.allergies} onChange={(e) => setAccount({ ...account, allergies: e.target.value })} /></label>
+                  </div>
+                  <div className="form-grid">
+                    <label>Insurance / NHIS<input value={account.insurance} onChange={(e) => setAccount({ ...account, insurance: e.target.value })} /></label>
+                    <label>Blood type<input value={account.bloodType} onChange={(e) => setAccount({ ...account, bloodType: e.target.value })} /></label>
+                  </div>
+                </>
+              )}
               {(user.role === "doctor" || user.role === "admin" || user.role === "nurse") && (
                 <label>Title / specialty<input value={account.specialty} onChange={(e) => setAccount({ ...account, specialty: e.target.value })} /></label>
               )}

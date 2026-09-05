@@ -1,20 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ShoppingCart, Plus, Minus, Trash2, Search } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { ShoppingCart, Plus, Minus, Search } from "lucide-react";
 import { io } from "socket.io-client";
 import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
+import { useCart } from "../ShopCart";
 import { ghs } from "../utils";
-import { loadCart, saveCart, cartTotal, cartCount, invoiceLine, mergePrescription, clampCartToStock } from "../cart";
+import { BILLS_EVENT, loadCart, cartTotal, invoiceLine, mergePrescription, clampCartToStock } from "../cart";
 import AdminReceipts from "./admin/Receipts";
 import PageHero from "../components/PageHero";
-
-const METHODS = [
-  { id: "momo", label: "Mobile money", hint: "MTN, Telecel Cash, or AirtelTigo Money to the hospital merchant wallets" },
-  { id: "bank", label: "GCB bank transfer", hint: "CareBridge Medical Centre Ltd, Ridge branch — use the payment reference as narration" },
-  { id: "nhis", label: "NHIS / insurance", hint: "Claim against the policy number on the patient file" },
-  { id: "cash", label: "Cash at cashier", hint: "Ridge Campus accounts desk, ground floor — receipt issued immediately" },
-];
 
 function tabFromParams(params) {
   const tab = params.get("tab");
@@ -42,7 +36,7 @@ export default function Pay() {
 function PatientShop() {
   const { user } = useAuth();
   const { push } = useToast();
-  const navigate = useNavigate();
+  const shop = useCart();
   const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState(() => tabFromParams(params));
   const [category, setCategory] = useState("all");
@@ -50,24 +44,11 @@ function PatientShop() {
   const [labs, setLabs] = useState([]);
   const [services, setServices] = useState([]);
   const [invoices, setInvoices] = useState([]);
-  const [accounts, setAccounts] = useState(null);
-  const patientId = user.id;
-  const prefs = user.paymentPrefs || {};
-  const [method, setMethod] = useState(prefs.method || "momo");
-  const [form, setForm] = useState({
-    network: prefs.momoNetwork || "mtn",
-    phone: prefs.momoNumber || user.phone || "",
-    payerName: user.name,
-    nhisNumber: prefs.nhisNumber || user.insurance || "",
-  });
-  const [payment, setPayment] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [cart, setCart] = useState(() => loadCart(user.id));
   const [query, setQuery] = useState("");
   const appliedRx = useRef("");
   const q = query.trim().toLowerCase();
-
-  const persist = (next) => setCart(saveCart(user.id, next));
+  const cart = shop?.items || [];
+  const persist = shop?.persist || ((next) => next);
 
   const loadBills = async () => {
     const rows = await api(`/billing?userId=${user.id}&role=${user.role}`);
@@ -77,7 +58,6 @@ function PatientShop() {
 
   useEffect(() => {
     loadBills();
-    api("/finance/accounts").then(setAccounts);
     api("/finance/rates").then((r) => {
       setServices(r.services || []);
       if (r.labs) setLabs(r.labs);
@@ -99,19 +79,13 @@ function PatientShop() {
       if (rates?.labs) setLabs(rates.labs);
       if (rates?.services) setServices(rates.services);
     });
-    return () => socket.disconnect();
-  }, [user.id, user.role]);
-
-  useEffect(() => {
-    const hydrate = () => setCart(loadCart(user.id));
-    const onVis = () => { if (document.visibilityState === "visible") hydrate(); };
-    window.addEventListener("pageshow", hydrate);
-    document.addEventListener("visibilitychange", onVis);
+    const onBills = () => loadBills();
+    window.addEventListener(BILLS_EVENT, onBills);
     return () => {
-      window.removeEventListener("pageshow", hydrate);
-      document.removeEventListener("visibilitychange", onVis);
+      socket.disconnect();
+      window.removeEventListener(BILLS_EVENT, onBills);
     };
-  }, [user.id]);
+  }, [user.id, user.role]);
 
   useEffect(() => {
     const invoiceId = params.get("invoice");
@@ -127,7 +101,8 @@ function PatientShop() {
           const current = loadCart(user.id);
           if (!current.some((c) => c.kind === "invoice" && c.id === row.id)) {
             persist([...current, invoiceLine(row, user.id)]);
-            push(`${row.item} added to your basket.`);
+            push(`${row.item} added to your cart.`);
+            shop?.openDrawer();
           }
         }
       }
@@ -161,7 +136,7 @@ function PatientShop() {
       if (result.added.length) {
         bits.push(fulfill === "hospital"
           ? "Prescription medicines added. Collect at Ridge pharmacy or pay the combined total."
-          : "Prescription medicines added to your basket.");
+          : "Prescription medicines added to your cart.");
       }
       if (result.skipped.length) {
         const names = result.skipped.map((s) => s.name).join(", ");
@@ -173,17 +148,13 @@ function PatientShop() {
       if (!result.added.length && !result.skipped.length) {
         bits.push("No medicines from that prescription could be added.");
       }
-      bits.push(`Basket ${ghs(totalNow)}.`);
+      bits.push(`Cart ${ghs(totalNow)}.`);
       push(bits.join(" "), result.added.length ? "ok" : "error");
       const clean = new URLSearchParams(params);
       clean.delete("rx");
       clean.delete("fulfill");
       setParams(clean, { replace: true });
-      if (fulfill === "hospital") {
-        requestAnimationFrame(() => {
-          document.getElementById("shop-basket")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        });
-      }
+      if (result.added.length) shop?.openDrawer();
     }).catch(() => {
       appliedRx.current = "";
     });
@@ -219,173 +190,11 @@ function PatientShop() {
   }, [stock, category, q]);
 
   const inCart = (kind, id) => cart.find((c) => c.kind === kind && c.id === id);
-
-  const setQty = (kind, product, qty) => {
-    const max = kind === "med" ? Math.max(0, Number(product.qty ?? product.max ?? 0)) : 99;
-    const n = Math.max(0, Math.min(max || 99, Number(qty) || 0));
-    const rest = cart.filter((c) => !(c.kind === kind && c.id === product.id));
-    if (n === 0) {
-      persist(rest);
-      return;
-    }
-    persist([...rest, {
-      kind,
-      id: product.id,
-      name: product.name,
-      item: product.name,
-      price: Number(product.price || 0),
-      qty: n,
-      pack: product.pack || product.specimen || "",
-      max: kind === "med" ? Number(product.qty || n) : 99,
-      category: product.category || (kind === "lab" ? "Laboratory" : "Service"),
-      nhis: Boolean(product.nhis),
-    }]);
-  };
-
-  const bump = (kind, product, delta) => {
-    const current = inCart(kind, product.id)?.qty || 0;
-    setQty(kind, product, current + delta);
-  };
-
-  const addInvoice = (row) => {
-    if (cart.some((c) => c.kind === "invoice" && c.id === row.id)) {
-      push("That bill is already in your basket.");
-      return;
-    }
-    persist([...cart, invoiceLine(row, user.id)]);
-    push("Added to basket");
-  };
-
-  const meds = cart.filter((c) => c.kind === "med");
-  const labItems = cart.filter((c) => c.kind === "lab");
-  const svcItems = cart.filter((c) => c.kind === "svc");
-  const billItems = cart.filter((c) => c.kind === "invoice");
-  const medTotal = meds.reduce((s, i) => s + i.price * i.qty, 0);
-  const labTotal = labItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const svcTotal = svcItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const billTotal = billItems.reduce((s, i) => s + Number(i.amount || i.price || 0), 0);
-  const total = cartTotal(cart);
-  const count = cartCount(cart);
   const due = invoices.filter((i) => i.status === "due");
   const paid = invoices.filter((i) => i.status === "paid");
   const dueVisible = q ? due.filter((i) => matchesCatalogQuery("invoice", i, q)) : due;
   const visibleLabs = q ? labs.filter((p) => matchesCatalogQuery("lab", p, q)) : labs;
   const visibleServices = q ? services.filter((p) => matchesCatalogQuery("svc", p, q)) : services;
-  const merchant = accounts?.momo?.[form.network] || accounts?.momo?.mtn;
-  const pid = user.role === "patient" ? user.id : (cart.find((c) => c.patientId)?.patientId || patientId);
-  const payable = billItems.length + labItems.length + svcItems.length + meds.length;
-
-  const startPayment = async (invoiceIds, servicesToBill) => {
-    const r = await api("/finance/checkout-cart", {
-      method: "POST",
-      body: JSON.stringify({
-        patientId: pid,
-        actorId: user.id,
-        invoiceIds,
-        services: servicesToBill,
-        method,
-        ...form,
-      }),
-    });
-    setPayment(r.payment);
-    persist([]);
-    await loadBills();
-    if (r.payment.status === "paid") {
-      push("Cash posted. Receipt issued.");
-      navigate(`/receipts/${r.payment.id}`);
-    }
-  };
-
-  const checkout = async (fulfill, e) => {
-    e?.preventDefault();
-    if (!cart.length) {
-      push("Add unpaid bills, medicines, or labs to the basket first.", "error");
-      return;
-    }
-    if ((fulfill === "online" || billItems.length || labItems.length || svcItems.length) && !pid) {
-      push("Choose a patient first.", "error");
-      return;
-    }
-    setBusy(true);
-    try {
-      let next = [...cart];
-      const invoiceIds = next.filter((c) => c.kind === "invoice").map((c) => c.id);
-
-      if (meds.length) {
-        const r = await api("/pharmacy/orders", {
-          method: "POST",
-          body: JSON.stringify({
-            patientId: pid || user.id,
-            actorId: user.id,
-            fulfill,
-            items: meds.map((i) => ({ id: i.id, qty: i.qty })),
-          }),
-        });
-        next = next.filter((c) => c.kind !== "med");
-        if (r.invoice?.id && !invoiceIds.includes(r.invoice.id)) {
-          invoiceIds.push(r.invoice.id);
-          next.push(invoiceLine(r.invoice, pid || user.id));
-        }
-        persist(next);
-      }
-
-      if (fulfill === "hospital") {
-        persist(next);
-        if (!next.length) {
-          push("The dispensary has your list. Collect at Ridge Campus pharmacy when the nurse marks it ready.");
-        } else {
-          push("Medicines queued at Ridge pharmacy. Pay bills, labs, and services in the basket.");
-        }
-        await loadBills();
-        return;
-      }
-
-      if (labItems.length) {
-        const inv = await api("/finance/labs/order", {
-          method: "POST",
-          body: JSON.stringify({
-            patientId: pid || user.id,
-            actorId: user.id,
-            items: labItems.map((i) => ({ id: i.id, qty: i.qty })),
-          }),
-        });
-        next = next.filter((c) => c.kind !== "lab");
-        if (inv?.id && !invoiceIds.includes(inv.id)) {
-          invoiceIds.push(inv.id);
-          next.push(invoiceLine(inv, pid || user.id));
-        }
-        persist(next);
-      }
-
-      const servicesToBill = next.filter((c) => c.kind === "svc").map((c) => ({ id: c.id, qty: c.qty }));
-
-      if (!invoiceIds.length && !servicesToBill.length) {
-        persist([]);
-        push("Basket updated.");
-        return;
-      }
-
-      await startPayment(invoiceIds, servicesToBill);
-    } catch (err) {
-      push(err.message, "error");
-      loadBills();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const confirm = async () => {
-    setBusy(true);
-    try {
-      const r = await api("/finance/confirm", { method: "POST", body: JSON.stringify({ paymentId: payment.id, actorId: user.id }) });
-      push("Accounts posted the payment and emailed the receipt.");
-      navigate(`/receipts/${r.payment.id}`);
-    } catch (err) {
-      push(err.message, "error");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const tabs = [
     { id: "bills", label: "Unpaid bills" },
@@ -400,7 +209,7 @@ function PatientShop() {
         scene="shop"
         eyebrow="Pharmacy & accounts"
         title="Shop & pay"
-        lead="Unpaid bills, medicines, and labs share one basket. Switching category does not empty it."
+        lead="Unpaid bills, medicines, and labs share one cart. Switching category does not empty it."
         actions={(
           <div className="row-actions">
             <Link className="secondary-btn" to="/billing/tariff">Tariff</Link>
@@ -432,6 +241,14 @@ function PatientShop() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          className={`chip-link shop-cart-chip ${shop?.count ? "on" : ""}`}
+          onClick={() => shop?.openDrawer()}
+        >
+          <ShoppingCart size={14} aria-hidden="true" />
+          {shop?.count ? `View cart · ${shop.count} · ${ghs(shop.total)}` : "View cart"}
+        </button>
       </div>
 
       <div className="pharmacy-layout shop-layout">
@@ -445,7 +262,7 @@ function PatientShop() {
                     <h3>Unpaid bills</h3>
                   </div>
                 </div>
-                <p className="muted">Consults, admissions, and earlier orders. Add them to the same basket as medicines and labs.</p>
+                <p className="muted">Consults, admissions, and earlier orders. Add them to the same cart as medicines and labs.</p>
                 {due.length === 0 && !q && <p className="muted">Nothing outstanding. Shop medicines, labs, or services if you need a new bill.</p>}
                 {q && dueVisible.length === 0 && (
                   <p className="shop-empty-copy">No unpaid bills match “{query.trim()}”.</p>
@@ -459,8 +276,13 @@ function PatientShop() {
                         <small>{i.date}</small>
                       </span>
                       <strong>{ghs(i.amount)}</strong>
-                      <button type="button" className={added ? "ghost-btn" : "secondary-btn"} disabled={added} onClick={() => addInvoice(i)}>
-                        {added ? "In basket" : "Add to basket"}
+                      <button
+                        type="button"
+                        className={added ? "ghost-btn in-cart-bill" : "add-cart-btn"}
+                        disabled={added}
+                        onClick={() => shop?.addInvoice(i)}
+                      >
+                        {added ? "In cart" : "Add to cart"}
                       </button>
                     </div>
                   );
@@ -509,7 +331,15 @@ function PatientShop() {
                   </div>
                   <div className="pharm-grid">
                     {rows.map((p) => (
-                      <StockCard key={p.id} product={p} kind="med" line={inCart("med", p.id)} onBump={bump} onSet={setQty} />
+                      <StockCard
+                        key={p.id}
+                        product={p}
+                        kind="med"
+                        line={inCart("med", p.id)}
+                        onAdd={shop?.addProduct}
+                        onBump={shop?.bump}
+                        onSet={shop?.setQty}
+                      />
                     ))}
                   </div>
                 </section>
@@ -527,13 +357,22 @@ function PatientShop() {
           {tab === "labs" && (
             <section className="card">
               <div className="card-head"><div><span className="eyebrow">Pathology</span><h3>Laboratory tests</h3></div></div>
-              <p className="muted">Adding a test does not clear medicines already in the basket.</p>
+              <p className="muted">Adding a test does not clear medicines already in the cart.</p>
               {q && visibleLabs.length === 0 && (
                 <p className="shop-empty-copy">No laboratory tests match “{query.trim()}”.</p>
               )}
               <div className="pharm-grid">
                 {visibleLabs.map((p) => (
-                  <StockCard key={p.id} product={{ ...p, pack: p.specimen, inStock: true, qty: 99 }} kind="lab" line={inCart("lab", p.id)} onBump={bump} onSet={setQty} hideStock />
+                  <StockCard
+                    key={p.id}
+                    product={{ ...p, pack: p.specimen, inStock: true, qty: 99 }}
+                    kind="lab"
+                    line={inCart("lab", p.id)}
+                    onAdd={shop?.addProduct}
+                    onBump={shop?.bump}
+                    onSet={shop?.setQty}
+                    hideStock
+                  />
                 ))}
               </div>
             </section>
@@ -552,8 +391,9 @@ function PatientShop() {
                     product={{ ...p, pack: p.nhis ? "NHIS eligible" : "Private pay", inStock: true, qty: 99 }}
                     kind="svc"
                     line={inCart("svc", p.id)}
-                    onBump={bump}
-                    onSet={setQty}
+                    onAdd={shop?.addProduct}
+                    onBump={shop?.bump}
+                    onSet={shop?.setQty}
                     hideStock
                   />
                 ))}
@@ -561,154 +401,19 @@ function PatientShop() {
             </section>
           )}
         </div>
-
-        <aside className="card pharmacy-basket" id="shop-basket">
-          <div className="card-head">
-            <div>
-              <span className="eyebrow">Your basket</span>
-              <h3><ShoppingCart size={16} /> {count ? `${count} item${count === 1 ? "" : "s"}` : "Empty"}</h3>
-            </div>
-            {cart.length > 0 && !payment && <button type="button" className="ghost-btn" onClick={() => persist([])}>Clear</button>}
-          </div>
-          <p className="basket-grand running-total">
-            <span>Running total</span>
-            <b>{ghs(payment ? payment.amount : total)}</b>
-          </p>
-          {cart.length === 0 && !payment && (
-            <p className="muted">Add unpaid bills, medicines, or labs. Changing tab or leaving this page does not empty this basket. Buy on site adds to the total already here.</p>
-          )}
-          {billItems.length > 0 && (
-            <BasketGroup
-              title="Unpaid bills"
-              items={billItems}
-              kind="invoice"
-              onRemove={(id) => persist(cart.filter((c) => !(c.kind === "invoice" && c.id === id)))}
-            />
-          )}
-          {meds.length > 0 && (
-            <BasketGroup
-              title="Medicines"
-              items={meds}
-              stock={stock}
-              kind="med"
-              onBump={bump}
-              onRemove={(id) => persist(cart.filter((c) => !(c.kind === "med" && c.id === id)))}
-            />
-          )}
-          {labItems.length > 0 && (
-            <BasketGroup
-              title="Laboratory"
-              items={labItems}
-              stock={labs}
-              kind="lab"
-              onBump={bump}
-              onRemove={(id) => persist(cart.filter((c) => !(c.kind === "lab" && c.id === id)))}
-            />
-          )}
-          {svcItems.length > 0 && (
-            <BasketGroup
-              title="Services"
-              items={svcItems}
-              stock={services}
-              kind="svc"
-              onBump={bump}
-              onRemove={(id) => persist(cart.filter((c) => !(c.kind === "svc" && c.id === id)))}
-            />
-          )}
-
-          {(cart.length > 0 || payment) && (
-            <div className="basket-totals">
-              {billItems.length > 0 && <p><span>Unpaid bills</span><b>{ghs(billTotal)}</b></p>}
-              {meds.length > 0 && <p><span>Medicines</span><b>{ghs(medTotal)}</b></p>}
-              {labItems.length > 0 && <p><span>Laboratory</span><b>{ghs(labTotal)}</b></p>}
-              {svcItems.length > 0 && <p><span>Services</span><b>{ghs(svcTotal)}</b></p>}
-              <p className="basket-grand"><span>Amount you will spend</span><b>{ghs(payment ? payment.amount : total)}</b></p>
-            </div>
-          )}
-
-          {cart.length > 0 && !payment && (
-            <form onSubmit={(e) => checkout("online", e)} className="pay-form">
-              <p className="eyebrow">Checkout</p>
-              {METHODS.map((m) => (
-                <label className="check-row" key={m.id}>
-                  <input type="radio" name="method" checked={method === m.id} onChange={() => setMethod(m.id)} />
-                  <span><b>{m.label}</b><small className="muted"> — {m.hint}</small></span>
-                </label>
-              ))}
-              {method === "momo" && (
-                <>
-                  <label>Network
-                    <select value={form.network} onChange={(e) => setForm({ ...form, network: e.target.value })}>
-                      <option value="mtn">MTN MoMo</option>
-                      <option value="telecel">Telecel Cash</option>
-                      <option value="at">AirtelTigo Money</option>
-                    </select>
-                  </label>
-                  <label>Payer MoMo number<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required /></label>
-                  <div className="bank-box">
-                    <p><b>Send to hospital merchant</b></p>
-                    <p>{accounts?.momo.name}<br />Merchant ID {accounts?.momo.merchantId}<br />{form.network.toUpperCase()} {merchant}</p>
-                    <p className="muted">MTN: *170# → Send Money → Mobile Number → {merchant}.</p>
-                  </div>
-                </>
-              )}
-              {method === "bank" && accounts && (
-                <div className="bank-box">
-                  <p><b>{accounts.bank.bank}</b></p>
-                  <p>{accounts.bank.accountName}<br />A/C {accounts.bank.accountNumber}<br />{accounts.bank.branch}</p>
-                  <label>Account name used for the transfer<input value={form.payerName} onChange={(e) => setForm({ ...form, payerName: e.target.value })} required /></label>
-                </div>
-              )}
-              {method === "nhis" && (
-                <label>NHIS / policy number<input value={form.nhisNumber} onChange={(e) => setForm({ ...form, nhisNumber: e.target.value })} required /></label>
-              )}
-              {method === "cash" && (
-                <p className="muted">{accounts?.cashier.desk}. {accounts?.cashier.hours}.</p>
-              )}
-              <button className="primary-btn full" disabled={busy || !payable}>
-                {busy ? "Posting…" : method === "cash" ? `Pay ${ghs(total)} cash` : `Pay ${ghs(total)}`}
-              </button>
-            </form>
-          )}
-
-          {meds.length > 0 && !payment && (
-            <button className="secondary-btn full" type="button" disabled={busy} onClick={() => checkout("hospital")}>
-              Collect medicines at hospital{labItems.length || svcItems.length || billItems.length ? " · pay the rest" : ""}
-            </button>
-          )}
-
-          {payment && payment.status === "pending" && (
-            <div>
-              <p className="eyebrow">Reference {payment.reference}</p>
-              <h3>Complete this transfer</h3>
-              {payment.method === "momo" && (
-                <p>Pay <b>{ghs(payment.amount)}</b> from <b>{payment.phone}</b> to merchant <b>{payment.destination?.number}</b>. Use reference {payment.reference}.</p>
-              )}
-              {payment.method === "bank" && (
-                <p>Transfer <b>{ghs(payment.amount)}</b> to GCB {accounts?.bank.accountNumber}. Narration must be <b>{payment.reference}</b>.</p>
-              )}
-              {payment.method === "nhis" && (
-                <p>Claim for policy <b>{payment.nhisNumber}</b> is lodged. Confirm when NHIS authorises.</p>
-              )}
-              <div className="modal-actions" style={{ marginTop: 16 }}>
-                <button className="primary-btn full" type="button" disabled={busy} onClick={confirm}>Payment sent — issue receipt</button>
-              </div>
-            </div>
-          )}
-        </aside>
       </div>
 
-      {cart.length > 0 && !payment && (
-        <a className="shop-spend-bar" href="#shop-basket">
-          <span>Amount you will spend</span>
-          <b>{ghs(total)}</b>
-        </a>
+      {cart.length > 0 && (
+        <button type="button" className="shop-spend-bar" onClick={() => shop?.openDrawer()}>
+          <span>Amount you will spend · {shop?.count || cart.length} in cart</span>
+          <b>{ghs(shop?.total || 0)}</b>
+        </button>
       )}
     </div>
   );
 }
 
-function StockCard({ product, kind, line, onBump, onSet, hideStock }) {
+function StockCard({ product, kind, line, onAdd, onBump, onSet, hideStock }) {
   const out = !hideStock && (product.inStock === false || Number(product.qty) <= 0);
   const qty = line?.qty || 0;
   const max = hideStock ? 99 : Number(product.qty || 0);
@@ -726,49 +431,27 @@ function StockCard({ product, kind, line, onBump, onSet, hideStock }) {
       <b>{ghs(product.price)}</b>
       {out ? (
         <button className="secondary-btn" type="button" disabled>Unavailable</button>
+      ) : qty < 1 ? (
+        <button type="button" className="add-cart-btn" onClick={() => onAdd?.(kind, product)}>
+          Add to cart
+        </button>
       ) : (
-        <div className="qty-ctrl shop">
-          <button type="button" onClick={() => onBump(kind, product, -1)} disabled={qty < 1}><Minus size={14} /></button>
-          <input
-            type="number"
-            min="0"
-            max={max}
-            value={qty}
-            onChange={(e) => onSet(kind, product, e.target.value)}
-            aria-label={`Quantity for ${product.name}`}
-          />
-          <button type="button" onClick={() => onBump(kind, product, 1)} disabled={qty >= max}><Plus size={14} /></button>
+        <div className="in-cart-ctrl">
+          <div className="qty-ctrl shop">
+            <button type="button" onClick={() => onBump?.(kind, product, -1)} disabled={qty < 1} aria-label={`Fewer ${product.name}`}><Minus size={14} /></button>
+            <input
+              type="number"
+              min="0"
+              max={max}
+              value={qty}
+              onChange={(e) => onSet?.(kind, product, e.target.value)}
+              aria-label={`Quantity for ${product.name}`}
+            />
+            <button type="button" onClick={() => onBump?.(kind, product, 1)} disabled={qty >= max} aria-label={`More ${product.name}`}><Plus size={14} /></button>
+          </div>
+          <em className="in-cart-tag">In cart</em>
         </div>
       )}
     </article>
-  );
-}
-
-function BasketGroup({ title, items, stock = [], kind, onBump, onRemove }) {
-  return (
-    <div className="basket-group">
-      <span className="eyebrow">{title}</span>
-      {items.map((i) => {
-        const product = stock.find((s) => s.id === i.id) || i;
-        const label = i.name || i.item;
-        return (
-          <div className="basket-row" key={`${kind}-${i.id}`}>
-            <div className="grow">
-              <strong>{label}</strong>
-              <span className="muted">{kind === "invoice" ? (i.date || "On file") : `${ghs(i.price)} each`}</span>
-            </div>
-            {kind !== "invoice" && onBump && (
-              <div className="qty-ctrl">
-                <button type="button" onClick={() => onBump(kind, product, -1)}><Minus size={14} /></button>
-                <span>{i.qty}</span>
-                <button type="button" onClick={() => onBump(kind, product, 1)}><Plus size={14} /></button>
-              </div>
-            )}
-            <b>{ghs(kind === "invoice" ? i.amount : i.price * i.qty)}</b>
-            <button type="button" className="icon-btn" onClick={() => onRemove(i.id)}><Trash2 size={15} /></button>
-          </div>
-        );
-      })}
-    </div>
   );
 }
