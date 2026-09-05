@@ -173,12 +173,14 @@ export function addInvoice(db, row) {
 }
 
 function orderFromCatalog(catalog, items, label) {
-  const lines = items.map((row) => {
-    const product = catalog.find((p) => p.id === row.id);
-    if (!product) return null;
+  const lines = [];
+  for (const row of items || []) {
+    const product = catalog.find((p) => p.id === row.id || p.id === row.productId);
+    if (!product) return { error: "Unknown catalog item.", status: 400 };
     const qty = Math.max(1, Number(row.qty || 1));
-    return { ...product, qty, lineTotal: product.price * qty };
-  }).filter(Boolean);
+    const price = Number(product.price || 0);
+    lines.push({ ...product, price, qty, lineTotal: price * qty });
+  }
   const amount = lines.reduce((s, l) => s + l.lineTotal, 0);
   return { lines, amount, label };
 }
@@ -192,7 +194,7 @@ function receiptPayload(db, payment, invoice) {
   return { payment, invoice: invoices[0] || invoice, invoices, lines, patient: safe, hospital: ACCOUNTS };
 }
 
-export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient, io }) {
+export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient, io, clearUserCart, removeCartKinds }) {
   app.get("/api/finance/accounts", (_, res) => res.json(ACCOUNTS));
   app.get("/api/finance/pharmacy", (_, res) => {
     const db = readDb();
@@ -282,15 +284,18 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     const catalog = kind === "lab" ? t.labs : (db.pharmacyStock || PHARMACY);
     if (kind === "pharmacy") {
       for (const row of items) {
-        const product = catalog.find((p) => p.id === row.id);
+        const product = catalog.find((p) => p.id === row.id || p.id === row.productId);
         const qty = Math.max(1, Number(row.qty || 1));
         if (!product) return res.status(400).json({ message: "Unknown medicine." });
-        if (!isSellable(product) || Number(product.qty || 0) < qty) {
-          return res.status(400).json({ message: `${product.name} is ${!isSellable(product) || Number(product.qty || 0) === 0 ? "out of stock" : `short — only ${product.qty} left`}.` });
+        const available = Number(product.qty || 0);
+        if (!isSellable(product) || available < qty) {
+          return res.status(409).json({ message: `Only ${Math.max(0, available)} units are currently available.`, available: Math.max(0, available) });
         }
       }
     }
-    const { lines, amount } = orderFromCatalog(catalog, items, kind);
+    const built = orderFromCatalog(catalog, items, kind);
+    if (built.error) return res.status(built.status || 400).json({ message: built.error });
+    const { lines, amount } = built;
     if (!lines.length) return res.status(400).json({ message: "Choose at least one item." });
     if (kind === "pharmacy") {
       lines.forEach((line) => {
@@ -307,6 +312,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     });
     audit(db, { actorId, action: `${kind}.order`, entity: "invoice", entityId: invoice.id, detail: invoice.item });
     notify(db, patientId, kind === "lab" ? "Lab request" : "Pharmacy order", `GHS ${amount} is due. Pay to proceed.`);
+    removeCartKinds?.(db, patientId, [kind === "lab" ? "lab" : "med"]);
     writeDb(db);
     if (kind === "pharmacy") io?.emit("pharmacy-stock", catalogStock(db.pharmacyStock || PHARMACY));
     res.status(201).json(invoice);
@@ -362,18 +368,21 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
       if (inv && !invoices.some((x) => x.id === inv.id)) invoices.push(inv);
     }
     for (const svc of req.body.services || []) {
-      const service = tariffOf(db).services.find((s) => s.id === svc.id);
-      if (!service) continue;
+      const service = tariffOf(db).services.find((s) => s.id === svc.id || s.id === svc.productId);
+      if (!service) return res.status(400).json({ message: "That hospital service is not on the tariff." });
       const qty = Math.max(1, Number(svc.qty || 1));
+      const price = Number(service.price || 0);
       invoices.push(addInvoice(db, {
         patientId: pid,
         item: qty > 1 ? `${service.name} ×${qty}` : service.name,
-        amount: service.price * qty,
+        amount: price * qty,
         category: "service",
         nhis: service.nhis,
+        lines: [{ ...service, price, qty, lineTotal: price * qty }],
       }));
     }
     if (!invoices.length) return res.status(400).json({ message: "Your cart is empty. Add a bill or a hospital service first." });
+    clearUserCart?.(db, pid);
     return startPayment(req, res, db, invoices);
   });
 
@@ -419,6 +428,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
         inv.paymentId = payment.id;
       });
       markPharmacyPaid(db, invoices);
+      clearUserCart?.(db, invoices[0].patientId);
     }
     audit(db, { actorId: req.body.actorId, action: "payment.start", entity: "payment", entityId: payment.id, detail: `${method} GHS ${amount}` });
     writeDb(db);
@@ -450,6 +460,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
       row.method = methodLabel;
     });
     markPharmacyPaid(db, invoices);
+    clearUserCart?.(db, payment.patientId);
     audit(db, { actorId: req.body.actorId, action: "payment.confirm", entity: "payment", entityId: payment.id, detail: payment.receiptNo });
     notify(db, payment.patientId, "Payment received", `Receipt ${payment.receiptNo} · GHS ${payment.amount}`);
     await emailPatient(db, payment.patientId, {

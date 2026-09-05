@@ -11,6 +11,7 @@ import { addInvoice, consultFee, ensureTariff, mountFinance, wardFee } from "./f
 import { mountSupport } from "./support.js";
 import { mountCases } from "./cases.js";
 import { ensurePharmacy, mountPharmacy } from "./pharmacy.js";
+import { ensureCarts, mountCart, clearUserCart, removeCartKinds } from "./cart.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,7 +25,7 @@ const readDb = () => {
   db.tickets = db.tickets || [];
   db.messageReads = db.messageReads || {};
   ensureClinical(db);
-  const dirty = ensurePharmacy(db) | ensureTariff(db);
+  const dirty = ensurePharmacy(db) | ensureTariff(db) | ensureCarts(db);
   if (dirty) fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
   return db;
 };
@@ -649,8 +650,9 @@ app.get("/api/admin/overview", (_, res) => {
 });
 
 mountClinical(app, { readDb, writeDb, safeUser, notify, emailPatient });
-mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient, io });
-mountPharmacy(app, { readDb, writeDb, safeUser, notify, emailPatient, io, addInvoice });
+mountFinance(app, { readDb, writeDb, safeUser, notify, emailPatient, io, clearUserCart, removeCartKinds });
+mountPharmacy(app, { readDb, writeDb, safeUser, notify, emailPatient, io, addInvoice, removeCartKinds });
+mountCart(app, { readDb, writeDb });
 mountSupport(app, { readDb, writeDb, safeUser, notify, emailPatient });
 mountCases(app, { readDb, writeDb, safeUser });
 

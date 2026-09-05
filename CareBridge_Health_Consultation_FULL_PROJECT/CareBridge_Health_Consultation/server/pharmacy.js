@@ -151,7 +151,7 @@ function takeStock(db, items) {
     const qty = Math.max(1, Number(row.qty || 1));
     const available = Number(product.qty || 0);
     if (product.available === false || available < qty) {
-      return { error: `${product.name} is ${product.available === false || available === 0 ? "out of stock" : `short — only ${available} left`}.` };
+      return { error: `Only ${available} units are currently available.`, status: 409, available };
     }
     lines.push({
       id: product.id,
@@ -201,7 +201,7 @@ export function markPharmacyPaid(db, invoices = []) {
 }
 
 export function mountPharmacy(app, ctx) {
-  const { readDb, writeDb, notify, emailPatient, io, addInvoice } = ctx;
+  const { readDb, writeDb, notify, emailPatient, io, addInvoice, removeCartKinds } = ctx;
 
   const broadcastStock = (db) => {
     io.emit("pharmacy-stock", catalogStock(db));
@@ -328,7 +328,7 @@ export function mountPharmacy(app, ctx) {
     if (!patient) return res.status(400).json({ message: "Patient is required." });
     const fulfill = req.body.fulfill === "hospital" ? "hospital" : "online";
     const taken = takeStock(db, req.body.items);
-    if (taken.error) return res.status(400).json({ message: taken.error });
+    if (taken.error) return res.status(taken.status || 400).json({ message: taken.error, available: taken.available });
     const order = {
       id: nid("po"),
       patientId,
@@ -370,6 +370,7 @@ export function mountPharmacy(app, ctx) {
     } else {
       notify(db, patientId, "Pharmacy billed", `GHS ${taken.amount} is due. Pay to complete the purchase.`);
     }
+    removeCartKinds?.(db, patientId, ["med"]);
     writeDb(db);
     broadcastStock(db);
     io.emit("pharmacy-order", enrichOrder(db, order));

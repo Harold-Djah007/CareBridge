@@ -28,6 +28,21 @@ export function normalizeLine(item) {
   };
 }
 
+export function mergeCarts(base, extra) {
+  return mergeLines(base, extra);
+}
+
+export function toServerItem(item) {
+  const kind = lineKind(item);
+  return {
+    kind,
+    productId: item.productId || item.id,
+    id: item.id || item.productId,
+    qty: kind === "invoice" ? 1 : Number(item.qty || 1),
+    itemId: item.itemId,
+  };
+}
+
 function mergeLines(base, extra) {
   const next = base.map(normalizeLine);
   extra.map(normalizeLine).forEach((item) => {

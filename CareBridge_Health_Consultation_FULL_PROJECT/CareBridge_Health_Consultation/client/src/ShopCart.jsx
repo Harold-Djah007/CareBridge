@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 import { useNavigate } from "react-router-dom";
 import { Minus, Plus, ShoppingCart, Trash2, X } from "lucide-react";
 import { api } from "./api";
-import { BILLS_EVENT, cartCount, cartTotal, invoiceLine, loadCart, saveCart } from "./cart";
+import { BILLS_EVENT, cartCount, cartTotal, clampCartToStock, invoiceLine, loadCart, mergeCarts, saveCart, toServerItem } from "./cart";
 import { useAuth, useToast } from "./state";
 import { ghs } from "./utils";
 
@@ -43,13 +43,84 @@ export function CartProvider({ children }) {
   const { push } = useToast();
   const [items, setItems] = useState(() => loadCart(user?.id));
   const [open, setOpen] = useState(false);
+  const canShop = user?.role === "patient" && Boolean(user?.id);
 
-  const reload = () => setItems(loadCart(user?.id));
+  const applyRemote = (payload) => {
+    const saved = saveCart(user?.id, payload?.items || []);
+    setItems(saved);
+    return saved;
+  };
+
+  const persistLocal = (next) => {
+    const saved = saveCart(user?.id, next);
+    setItems(saved);
+    return saved;
+  };
+
+  const replaceRemote = async (next) => {
+    if (!canShop) return persistLocal(next);
+    try {
+      const remote = await api("/cart", {
+        method: "PUT",
+        body: JSON.stringify({ userId: user.id, items: (next || []).map(toServerItem) }),
+      });
+      return applyRemote(remote);
+    } catch (err) {
+      if (err.message?.startsWith("Only ")) push(err.message, "error");
+      try {
+        return applyRemote(await api(`/cart?userId=${user.id}`));
+      } catch {
+        return persistLocal(next);
+      }
+    }
+  };
+
+  const persist = (next) => {
+    const saved = persistLocal(next);
+    if (canShop) replaceRemote(saved);
+    return saved;
+  };
+
+  const reload = async () => {
+    if (!canShop) {
+      setItems(loadCart(user?.id));
+      return;
+    }
+    try {
+      applyRemote(await api(`/cart?userId=${user.id}`));
+    } catch {
+      setItems(loadCart(user.id));
+    }
+  };
 
   useEffect(() => {
-    setItems(loadCart(user?.id));
     setOpen(false);
-  }, [user?.id]);
+    if (!canShop) {
+      setItems([]);
+      return undefined;
+    }
+    const session = loadCart(user.id);
+    setItems(session);
+    let cancelled = false;
+    (async () => {
+      try {
+        const remote = await api(`/cart?userId=${user.id}`);
+        if (cancelled) return;
+        const merged = mergeCarts(remote.items || [], session);
+        persistLocal(merged);
+        const fingerprint = (rows) => (rows || [])
+          .map((i) => `${i.kind}:${i.id || i.productId}:${i.qty}`)
+          .sort()
+          .join("|");
+        if (session.length && fingerprint(merged) !== fingerprint(remote.items)) {
+          await replaceRemote(merged);
+        }
+      } catch {
+        if (!cancelled) persistLocal(session);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     const hydrate = () => setItems(loadCart(user?.id));
@@ -64,21 +135,24 @@ export function CartProvider({ children }) {
     };
   }, [user?.id]);
 
-  const persist = (next) => {
-    const saved = saveCart(user?.id, next);
-    setItems(saved);
-    return saved;
-  };
-
   const inCart = (kind, id) => items.find((c) => c.kind === kind && c.id === id);
 
   const setQty = (kind, product, qty) => {
-    setItems((current) => {
-      const max = stockCap(kind, product);
-      const n = Math.max(0, Math.min(max || 99, Number(qty) || 0));
-      const rest = current.filter((c) => !(c.kind === kind && c.id === product.id));
-      const next = n === 0 ? rest : [...rest, { ...lineProduct(kind, product), qty: n }];
-      return saveCart(user?.id, next);
+    const max = stockCap(kind, product);
+    const n = Math.max(0, Math.min(max || 99, Number(qty) || 0));
+    const rest = items.filter((c) => !(c.kind === kind && c.id === product.id));
+    const next = n === 0 ? rest : [...rest, { ...lineProduct(kind, product), qty: n }];
+    persistLocal(next);
+    if (!canShop) return;
+    const itemId = encodeURIComponent(`${kind}:${product.id}`);
+    const req = n === 0
+      ? api(`/cart/items/${itemId}?userId=${user.id}`, { method: "DELETE" })
+      : inCart(kind, product.id)
+        ? api(`/cart/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ userId: user.id, qty: n }) })
+        : api("/cart/items", { method: "POST", body: JSON.stringify({ userId: user.id, kind, productId: product.id, id: product.id, qty: n, replace: true }) });
+    req.then(applyRemote).catch((err) => {
+      push(err.message, "error");
+      reload();
     });
   };
 
@@ -94,11 +168,21 @@ export function CartProvider({ children }) {
       push("That is all we have on the shelf.", "error");
       return;
     }
-    setQty(kind, product, current + qty);
+    const nextQty = current + qty;
+    const rest = items.filter((c) => !(c.kind === kind && c.id === product.id));
+    persistLocal([...rest, { ...lineProduct(kind, product), qty: nextQty }]);
     if (current === 0) {
       push(`${product.name} added to cart`);
       setOpen(true);
     }
+    if (!canShop) return;
+    api("/cart/items", {
+      method: "POST",
+      body: JSON.stringify({ userId: user.id, kind, productId: product.id, id: product.id, qty: nextQty, replace: true }),
+    }).then(applyRemote).catch((err) => {
+      push(err.message, "error");
+      reload();
+    });
   };
 
   const addInvoice = (row) => {
@@ -106,18 +190,49 @@ export function CartProvider({ children }) {
       push("That bill is already in your cart.");
       return false;
     }
-    persist([...items, invoiceLine(row, user.id)]);
+    persistLocal([...items, invoiceLine(row, user.id)]);
     push(`${row.item} added to cart`);
     setOpen(true);
+    if (canShop) {
+      api("/cart/items", {
+        method: "POST",
+        body: JSON.stringify({ userId: user.id, kind: "invoice", productId: row.id, id: row.id, qty: 1 }),
+      }).then(applyRemote).catch((err) => {
+        push(err.message, "error");
+        reload();
+      });
+    }
     return true;
   };
 
-  const remove = (kind, id) => persist(items.filter((c) => !(c.kind === kind && c.id === id)));
-  const clear = () => persist([]);
+  const remove = (kind, id) => {
+    persistLocal(items.filter((c) => !(c.kind === kind && c.id === id)));
+    if (!canShop) return;
+    api(`/cart/items/${encodeURIComponent(`${kind}:${id}`)}?userId=${user.id}`, { method: "DELETE" })
+      .then(applyRemote)
+      .catch(() => reload());
+  };
+
+  const clear = () => {
+    persistLocal([]);
+    if (!canShop) return;
+    api(`/cart?userId=${user.id}`, { method: "DELETE" }).then(applyRemote).catch(() => reload());
+  };
+
+  const applyStock = (stock) => {
+    setItems((current) => {
+      const next = clampCartToStock(current, stock);
+      if (JSON.stringify(next) === JSON.stringify(current)) return current;
+      saveCart(user?.id, next);
+      if (canShop) replaceRemote(next);
+      return next;
+    });
+  };
 
   const value = useMemo(() => ({
     items,
     count: cartCount(items),
+    subtotal: cartTotal(items),
     total: cartTotal(items),
     persist,
     reload,
@@ -128,12 +243,13 @@ export function CartProvider({ children }) {
     addInvoice,
     remove,
     clear,
+    applyStock,
     open,
     setOpen,
     openDrawer: () => setOpen(true),
     closeDrawer: () => setOpen(false),
     toggleDrawer: () => setOpen((v) => !v),
-  }), [items, open, user?.id]);
+  }), [items, open, user?.id, canShop]);
 
   return (
     <CartContext.Provider value={value}>

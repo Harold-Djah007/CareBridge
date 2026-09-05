@@ -6,7 +6,7 @@ import { api, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { useCart } from "../ShopCart";
 import { ghs } from "../utils";
-import { BILLS_EVENT, loadCart, cartTotal, invoiceLine, mergePrescription, clampCartToStock } from "../cart";
+import { BILLS_EVENT, cartTotal, mergePrescription } from "../cart";
 import AdminReceipts from "./admin/Receipts";
 import PageHero from "../components/PageHero";
 
@@ -64,16 +64,16 @@ function PatientShop() {
     });
     api("/pharmacy/stock").then((rows) => {
       setStock(rows);
-      persist(clampCartToStock(loadCart(user.id), rows));
+      shop?.applyStock?.(rows);
     }).catch(() => api("/finance/pharmacy").then((rows) => {
       setStock(rows);
-      persist(clampCartToStock(loadCart(user.id), rows));
+      shop?.applyStock?.(rows);
     }));
     api("/finance/labs").then(setLabs);
     const socket = io(socketUrl, { autoConnect: true });
     socket.on("pharmacy-stock", (rows) => {
       setStock(rows);
-      persist(clampCartToStock(loadCart(user.id), rows));
+      shop?.applyStock?.(rows);
     });
     socket.on("tariff-updated", (rates) => {
       if (rates?.labs) setLabs(rates.labs);
@@ -97,14 +97,7 @@ function PatientShop() {
       if (cancelled) return;
       if (invoiceId) {
         const row = rows.find((r) => r.id === invoiceId && r.status === "due");
-        if (row) {
-          const current = loadCart(user.id);
-          if (!current.some((c) => c.kind === "invoice" && c.id === row.id)) {
-            persist([...current, invoiceLine(row, user.id)]);
-            push(`${row.item} added to your cart.`);
-            shop?.openDrawer();
-          }
-        }
+        if (row) shop?.addInvoice(row);
       }
       setTab("bills");
       const clean = new URLSearchParams(params);
@@ -128,7 +121,7 @@ function PatientShop() {
     api(`/prescriptions/${rxId}`).then((rx) => {
       if (cancelled) return;
       appliedRx.current = rxId;
-      const result = mergePrescription(loadCart(user.id), rx, stock);
+      const result = mergePrescription(shop?.items || cart, rx, stock);
       persist(result.cart);
       setTab("pharmacy");
       const totalNow = cartTotal(result.cart);
