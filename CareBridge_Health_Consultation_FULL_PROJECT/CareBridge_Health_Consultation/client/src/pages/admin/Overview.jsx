@@ -7,6 +7,7 @@ import { OccupancyBars, OpsRadar } from "../../components/LiveMeter";
 import Avatar from "../../components/Avatar";
 import TileCard, { TileGrid } from "../../components/TileCard";
 import PageHero from "../../components/PageHero";
+import { IMAGERY } from "../../imagery";
 
 export default function AdminOverview() {
   const [stats, setStats] = useState(null);
@@ -46,14 +47,14 @@ export default function AdminOverview() {
         <div className="kpi"><span>Support desk</span><strong>{stats.openTickets || 0}</strong><small><Link to="/support">Open the queue</Link></small></div>
       </div>
       <TileGrid label="Operations shortcuts">
-        <TileCard to="/admin/users" icon={Users} title="Staff directory" subtitle="Patients and clinicians" />
-        <TileCard to="/admin/hospital" icon={Building2} title="Bed board" subtitle={`${stats.bedsAvailable} beds open`} />
-        <TileCard to="/admin/appointments" icon={CalendarDays} title="Clinic diary" subtitle="Confirm and schedule" />
-        <TileCard to="/admin/reports" icon={ScrollText} title="Reports" subtitle="Revenue and audit" />
-        <TileCard to="/admin/cases" icon={FolderKanban} title="Case workflow" subtitle="Files and encounters" />
-        <TileCard to="/pay" icon={Receipt} title="Receipts" subtitle="Paid patient receipts" />
-        <TileCard to="/billing/tariff" icon={Wallet} title="Tariff" subtitle="Published hospital fees" />
-        <TileCard to="/support" icon={LifeBuoy} title="Support desk" subtitle={`${stats.openTickets || 0} open tickets`} />
+        <TileCard photo={IMAGERY.corridor} to="/admin/users" icon={Users} title="Staff directory" subtitle="Patients and clinicians" />
+        <TileCard photo={IMAGERY.wards} to="/admin/hospital" icon={Building2} title="Bed board" subtitle={`${stats.bedsAvailable} beds open`} />
+        <TileCard photo={IMAGERY.clinic} to="/admin/appointments" icon={CalendarDays} title="Clinic diary" subtitle="Confirm and schedule" />
+        <TileCard photo={IMAGERY.ops} to="/admin/reports" icon={ScrollText} title="Reports" subtitle="Revenue and audit" />
+        <TileCard photo={IMAGERY.records} to="/admin/cases" icon={FolderKanban} title="Case workflow" subtitle="Files and encounters" />
+        <TileCard photo={IMAGERY.corridor} to="/pay" icon={Receipt} title="Receipts" subtitle="Paid patient receipts" />
+        <TileCard photo={IMAGERY.campus} to="/billing/tariff" icon={Wallet} title="Tariff" subtitle="Published hospital fees" />
+        <TileCard photo={IMAGERY.ops} to="/support" icon={LifeBuoy} title="Support desk" subtitle={`${stats.openTickets || 0} open tickets`} />
       </TileGrid>
       <section className="card" style={{ marginBottom: 18 }}>
         <div className="card-head"><div><span className="eyebrow">Live occupancy</span><h3>Beds in use · {occupancy}% campus load</h3></div></div>

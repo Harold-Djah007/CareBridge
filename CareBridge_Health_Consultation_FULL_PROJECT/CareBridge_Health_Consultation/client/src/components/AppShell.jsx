@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   CalendarDays, LayoutDashboard, MessageCircle, BedDouble, Video, LogOut, HeartPulse,
   Bell, Users, Mail, UserRound, Stethoscope, ClipboardList, Building2, Search, Inbox,
-  FolderOpen, ScrollText, Pill, Receipt, ShoppingBag, Settings, LifeBuoy, HelpCircle, PanelTop, ChevronDown, ChevronUp, FolderKanban,
+  FolderOpen, ScrollText, Pill, Receipt, ShoppingBag, Settings, LifeBuoy, FolderKanban,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
@@ -12,7 +12,6 @@ import { HOSPITAL, BUILD } from "../utils";
 import { LiveClock } from "./LiveMeter";
 import PageAtmosphere from "./PageAtmosphere";
 import { sceneFor } from "../imagery";
-import { useTopbar } from "../chrome";
 import Avatar from "./Avatar";
 
 const NAV = {
@@ -181,7 +180,6 @@ export default function AppShell() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [badges, setBadges] = useState({ visits: 0, wards: 0, messages: 0, tickets: 0, queue: 0, notifications: 0 });
-  const [topbarOn, setTopbarOn] = useTopbar();
 
   const groups = NAV[user.role] || NAV.patient;
   const mobileItems = groups.flatMap((g) => g.items).filter((i) => i.primary).slice(0, 5);
@@ -244,16 +242,43 @@ export default function AppShell() {
     );
   };
 
+  const portalLabel = user.role === "patient" ? "Patient portal" : user.role === "doctor" ? "Clinical" : user.role === "nurse" ? "Pharmacy" : "Operations";
+
   return (
-    <div className={`app-layout role-${user.role}`} data-role={user.role}>
-      <aside className={`sidebar sidebar-${user.role}`}>
-        <div className="brand">
-          <div className="brand-mark live"><HeartPulse size={22} /></div>
+    <div className={`app-layout portal-app role-${user.role}`} data-role={user.role}>
+      <header className="portal-mast">
+        <Link to={user.role === "admin" ? "/admin" : "/home"} className="brand portal-brand">
+          <div className="brand-mark live"><HeartPulse size={20} /></div>
           <div>
             <b>{HOSPITAL.short}</b>
-            <span>{user.role === "patient" ? "Patient portal" : user.role === "doctor" ? "Clinical" : user.role === "nurse" ? "Pharmacy" : "Operations"}</span>
+            <span>{portalLabel}</span>
           </div>
+        </Link>
+        <p className="portal-meta">{topMeta}<em>{HOSPITAL.phone}</em></p>
+        <form className="top-search portal-search" onSubmit={onSearch}>
+          <Search size={16} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} />
+        </form>
+        <div className="portal-tools">
+          <LiveClock />
+          <button className="icon-btn bell-btn" type="button" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications" aria-label={unread ? `${unread} unread notices` : "Notifications"}>
+            <Bell size={18} />
+            {unread > 0 && <em className="bell-count">{unread > 99 ? "99+" : unread}</em>}
+          </button>
+          <button type="button" className="portal-user" onClick={() => navigate("/settings")}>
+            <Avatar person={user} className="small" />
+            <span>
+              <b>{user.name.split(" ").slice(-1)[0]}</b>
+              <small>{user.role === "patient" ? `MRN ${user.mrn || "—"}` : user.employeeId || user.specialty || portalLabel}</small>
+            </span>
+          </button>
+          <button className="icon-btn" title="Sign out" type="button" onClick={() => { logout(); navigate("/login"); }}><LogOut size={18} /></button>
         </div>
+      </header>
+      <nav className="portal-pills" aria-label="Primary destinations">
+        {mobileItems.map(renderLink)}
+      </nav>
+      <aside className={`sidebar sidebar-${user.role}`}>
         <div className="sidebar-campus">
           <strong>{HOSPITAL.campus}</strong>
           <span>{HOSPITAL.city} · {BUILD}</span>
@@ -267,93 +292,23 @@ export default function AppShell() {
           ))}
         </NavRail>
         <div className="mobile-nav">{mobileItems.map(renderLink)}</div>
-        <div className="sidebar-user">
-          <button type="button" className="avatar-btn" title="Settings" onClick={() => navigate("/settings")}><Avatar person={user} /></button>
-          <div className="sidebar-user-text">
-            <strong>{user.name}</strong>
-            <span>{user.role === "patient" ? `MRN ${user.mrn || "—"}` : user.employeeId || user.specialty || user.department}</span>
-          </div>
-          <button className="icon-btn" title="Sign out" onClick={() => { logout(); navigate("/login"); }}><LogOut size={18} /></button>
-        </div>
       </aside>
-      <main className={`main ${topbarOn ? "has-topbar" : "topbar-hidden"}`}>
-        <div className="app-util" aria-label="Hospital switchboard">
-          <span>{HOSPITAL.campus}, {HOSPITAL.city}</span>
-          <span>Switchboard {HOSPITAL.phone}</span>
-          <span>Emergency {HOSPITAL.emergency}</span>
-        </div>
-        {!topbarOn && (
-          <div className="chrome-strip">
-            <button type="button" className="toolbar-toggle" onClick={() => setTopbarOn(true)}>
-              <PanelTop size={16} />
-              <span>Show toolbar</span>
-              <ChevronDown size={14} />
-            </button>
-            <LiveClock />
-            <button className="icon-btn bell-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications" aria-label={unread ? `${unread} unread notices` : "Notifications"}>
-              <Bell size={18} />
-              {unread > 0 && <em className="bell-count">{unread > 99 ? "99+" : unread}</em>}
-            </button>
-            <button type="button" className="avatar-btn" title="Settings" onClick={() => navigate("/settings")}><Avatar person={user} className="small" /></button>
-          </div>
-        )}
-        {topbarOn && (
-          <header className="topbar">
-            <div className="topbar-copy">
-              <span className="eyebrow">{topMeta}</span>
-              <small className="muted">{user.role === "doctor" ? `On duty · ${user.shift || "Day clinic"}` : user.role === "nurse" ? `Dispensary · ${user.shift || "Day"}` : user.role === "patient" ? `File ${user.mrn || ""}` : user.employeeId}</small>
-            </div>
-            <nav className="topbar-nav" aria-label="Hospital shortcuts">
-              <Link className="topbar-link" to={user.role === "admin" ? "/admin" : "/home"}>Home</Link>
-              {user.role === "patient" && <Link className="topbar-link" to="/pay">Shop & pay</Link>}
-              {user.role === "admin" && <Link className="topbar-link" to="/pay">Receipts</Link>}
-              {user.role === "nurse" && <Link className="topbar-link" to="/pharmacy-stock">Stock</Link>}
-              <Link className="topbar-link" to="/support"><LifeBuoy size={15} /> Support</Link>
-              <Link className="topbar-link" to="/settings"><Settings size={15} /> Settings</Link>
-              <Link className="topbar-link" to="/guide"><HelpCircle size={15} /> Guide</Link>
-            </nav>
-            <form className="top-search" onSubmit={onSearch}>
-              <Search size={16} />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} />
-            </form>
-            <div className="topbar-actions">
-              <LiveClock />
-              <button className="icon-btn bell-btn" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications" aria-label={unread ? `${unread} unread notices` : "Notifications"}>
-                <Bell size={19} />
-                {unread > 0 && <em className="bell-count">{unread > 99 ? "99+" : unread}</em>}
-              </button>
-              <button type="button" className="avatar-btn" title="Settings" onClick={() => navigate("/settings")}><Avatar person={user} className="small" /></button>
-              <button type="button" className="ghost-btn toolbar-hide" onClick={() => setTopbarOn(false)}>
-                Hide <ChevronUp size={14} />
-              </button>
-            </div>
-            {open && (
-              <div className="notice">
-                <div className="card-head"><b>Notifications</b><button className="ghost-btn" onClick={markRead}>Mark read</button></div>
-                {notes.length === 0 && <p className="muted">No new hospital notices.</p>}
-                {notes.slice(0, 8).map((n) => (
-                  <div key={n.id} className={`notice-item ${n.read ? "" : "unread"}`}><b>{n.title}</b><span>{n.body}</span></div>
-                ))}
-                <div className="notice-actions">
-                  {(user.role === "patient" || user.role === "admin") && (
-                    <button className="secondary-btn" onClick={() => { setOpen(false); navigate("/alerts"); }}>
-                      {user.role === "admin" ? "Notice log" : "Notifications"}
-                    </button>
-                  )}
-                  <button className="secondary-btn" onClick={() => { setOpen(false); navigate("/support"); }}>Support desk</button>
-                  <button className="ghost-btn" onClick={() => { setOpen(false); navigate("/settings"); }}>Settings</button>
-                </div>
-              </div>
-            )}
-          </header>
-        )}
-        {open && !topbarOn && (
+      <main className="main portal-main">
+        {open && (
           <div className="notice notice-float">
-            <div className="card-head"><b>Notifications</b><button className="ghost-btn" onClick={markRead}>Mark read</button></div>
+            <div className="card-head"><b>Notifications</b><button className="ghost-btn" type="button" onClick={markRead}>Mark read</button></div>
             {notes.length === 0 && <p className="muted">No new hospital notices.</p>}
             {notes.slice(0, 8).map((n) => (
               <div key={n.id} className={`notice-item ${n.read ? "" : "unread"}`}><b>{n.title}</b><span>{n.body}</span></div>
             ))}
+            <div className="notice-actions">
+              {(user.role === "patient" || user.role === "admin") && (
+                <button className="secondary-btn" type="button" onClick={() => { setOpen(false); navigate("/alerts"); }}>
+                  {user.role === "admin" ? "Notice log" : "Notifications"}
+                </button>
+              )}
+              <button className="secondary-btn" type="button" onClick={() => { setOpen(false); navigate("/support"); }}>Support</button>
+            </div>
           </div>
         )}
         <div className={`page-stage scene-${scene}`}>

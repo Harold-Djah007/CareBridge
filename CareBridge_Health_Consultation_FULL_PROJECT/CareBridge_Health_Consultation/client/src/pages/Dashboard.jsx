@@ -9,8 +9,9 @@ import { EcgRibbon, Heartbeat } from "../components/LiveMeter";
 import Avatar from "../components/Avatar";
 import Presence from "../components/Presence";
 import DutyToggle from "../components/DutyToggle";
-import TileCard, { TileGrid } from "../components/TileCard";
+import TileCard, { TileGrid, StatStrip } from "../components/TileCard";
 import PageHero, { EmptyPlate } from "../components/PageHero";
+import { IMAGERY } from "../imagery";
 
 function PatientHome({ user, appointments, wards, emails, due, doctors }) {
   const next = appointments.find(isUpcoming);
@@ -41,13 +42,20 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
         </div>
       </PageHero>
 
+      <StatStrip items={[
+        { label: "Next visit", value: next ? formatTime(next.time) : "None", hint: next ? formatDate(next.date) : "Book from Visits" },
+        { label: "Outstanding", value: due.length ? ghs(dueTotal) : "Cleared", hint: due.length ? `${due.length} open bill${due.length === 1 ? "" : "s"}` : "Shop & pay is ready" },
+        { label: "Admission", value: admission ? admission.ward : "None", hint: admission ? admission.status : "No bed reserved" },
+        { label: "Consultant", value: chosen ? chosen.name.replace("Dr. ", "") : "Choose", hint: chosen ? chosen.specialty : "Find a doctor" },
+      ]} />
+
       <TileGrid label="Patient shortcuts">
-        <TileCard to="/pay" icon={ShoppingBag} title="Shop & pay" subtitle={due.length ? `${ghs(dueTotal)} outstanding` : "Bills, medicines, labs"} />
-        <TileCard to="/prescriptions" icon={ClipboardList} title="Prescriptions" subtitle="Print, buy, or collect at Ridge" />
-        <TileCard to="/care" icon={Stethoscope} title="Doctors" subtitle={chosen ? chosen.name : "Find a consultant"} />
-        <TileCard to="/appointments" icon={CalendarDays} title="Visits" subtitle={next ? `${formatDate(next.date)} · ${formatTime(next.time)}` : "Book a visit"} />
-        <TileCard to="/records" icon={FolderOpen} title="Clinical file" subtitle="Notes, labs, and medicines" />
-        <TileCard to="/support" icon={LifeBuoy} title="Support" subtitle={emails.length ? `${emails.length} notices on file` : "Help desk"} />
+        <TileCard photo={IMAGERY.pharmacy} to="/pay" icon={ShoppingBag} title="Shop & pay" subtitle={due.length ? `${ghs(dueTotal)} outstanding` : "Bills, medicines, labs"} />
+        <TileCard photo={IMAGERY.records} to="/prescriptions" icon={ClipboardList} title="Prescriptions" subtitle="Print, buy, or collect at Ridge" />
+        <TileCard photo={IMAGERY.clinic} to="/care" icon={Stethoscope} title="Doctors" subtitle={chosen ? chosen.name : "Find a consultant"} />
+        <TileCard photo={IMAGERY.consult} to="/appointments" icon={CalendarDays} title="Visits" subtitle={next ? `${formatDate(next.date)} · ${formatTime(next.time)}` : "Book a visit"} />
+        <TileCard photo={IMAGERY.records} to="/records" icon={FolderOpen} title="Clinical file" subtitle="Notes, labs, and medicines" />
+        <TileCard photo={IMAGERY.ops} to="/support" icon={LifeBuoy} title="Support" subtitle={emails.length ? `${emails.length} notices on file` : "Help desk"} />
       </TileGrid>
 
       <div className="dashboard-grid">
@@ -143,15 +151,21 @@ function DoctorBoard({ user, appointments, wards }) {
         actions={<DutyToggle available={available} disabled={busy} onChange={(on) => toggleAvail(on)} />}
       />
 
+      <StatStrip items={[
+        { label: "Remaining today", value: remaining, hint: available ? "On duty" : "Marked busy" },
+        { label: "On the board", value: today.length, hint: "Confirmed and pending" },
+        { label: "Admissions", value: pending, hint: pending ? "Waiting on a bed" : "No pending requests" },
+      ]} />
+
       <TileGrid label="Clinic shortcuts">
-        <TileCard to="/care" icon={Users} title="Patients" subtitle="Caseload directory" />
-        <TileCard to="/records" icon={FolderOpen} title="Open chart" subtitle="Notes and letters" />
-        <TileCard to="/prescriptions" icon={Pill} title="Prescriptions" subtitle="Issued letters" />
-        <TileCard to="/wards" icon={BedDouble} title="Admissions" subtitle={pending ? `${pending} waiting` : "Ward requests"} />
-        <TileCard to="/messages" icon={MessageCircle} title="Inbox" subtitle="Clinical messages" />
+        <TileCard photo={IMAGERY.clinic} to="/care" icon={Users} title="Patients" subtitle="Caseload directory" />
+        <TileCard photo={IMAGERY.records} to="/records" icon={FolderOpen} title="Open chart" subtitle="Notes and letters" />
+        <TileCard photo={IMAGERY.pharmacy} to="/prescriptions" icon={Pill} title="Prescriptions" subtitle="Issued letters" />
+        <TileCard photo={IMAGERY.wards} to="/wards" icon={BedDouble} title="Admissions" subtitle={pending ? `${pending} waiting` : "Ward requests"} />
+        <TileCard photo={IMAGERY.consult} to="/messages" icon={MessageCircle} title="Inbox" subtitle="Clinical messages" />
       </TileGrid>
 
-      <div className="clinic-board">
+      <div className="clinic-board work-deck">
         {today.length === 0 && <EmptyPlate scene="clinic" title="No patients on your list" hint="Confirmed visits appear here as a clinic board." />}
         {today.map((a) => (
           <div className={`clinic-row ${a.id === nextId ? "next" : ""}`} key={a.id}>
@@ -221,9 +235,14 @@ function NurseBoard({ user }) {
         title={greeting(firstName(user.name.replace("Nurse ", "")))}
         lead={`${longDate()} · ${queued} waiting for prep · ${ready} ready for collection`}
       />
+      <StatStrip items={[
+        { label: "Queued", value: queued, hint: "Waiting for prep" },
+        { label: "Ready", value: ready, hint: "Awaiting collection" },
+        { label: "Hospital packs", value: hospital.length, hint: "Collect at Ridge" },
+      ]} />
       <TileGrid label="Dispensary shortcuts">
-        <TileCard to="/pharmacy-stock" icon={Pill} title="Stock" subtitle="Cupboard, prices, and restock" />
-        <TileCard to="/messages" icon={MessageCircle} title="Messages" subtitle="Doctors and operations" />
+        <TileCard photo={IMAGERY.pharmacy} to="/pharmacy-stock" icon={Pill} title="Stock" subtitle="Cupboard, prices, and restock" />
+        <TileCard photo={IMAGERY.consult} to="/messages" icon={MessageCircle} title="Messages" subtitle="Doctors and operations" />
       </TileGrid>
       <div className="filters">
         <button className={filter === "queued" ? "active" : ""} onClick={() => setFilter("queued")}>Queued ({queued})</button>
@@ -231,10 +250,10 @@ function NurseBoard({ user }) {
         <button className={filter === "collected" ? "active" : ""} onClick={() => setFilter("collected")}>Collected</button>
         <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>All</button>
       </div>
-      <div className="clinic-board">
+      <div className="clinic-board work-deck">
         {visible.length === 0 && <EmptyPlate scene="pharmacy" title="No hospital pickups in this list" hint="Patients who choose “collect at hospital” appear here." />}
         {visible.map((order) => (
-          <div className="clinic-row" key={order.id}>
+          <div className="work-row" key={order.id}>
             <Avatar person={order.patient} />
             <div className="grow">
               <strong>{order.patient?.name || "Patient"}</strong>

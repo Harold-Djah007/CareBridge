@@ -148,7 +148,7 @@ export default function Messages() {
         lead={copy.blurb}
         actions={user.role === "patient" ? <Link className="primary-btn" to="/care?from=messages"><UserPlus size={16} /> Add a doctor</Link> : null}
       />
-      <div className="chat-layout">
+      <div className="chat-layout workspace-chat">
         <aside className="contact-panel">
           <div className="search-box"><Search size={17} /><input placeholder="Search chats" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
           {user.role === "patient" && (

@@ -84,7 +84,7 @@ export default function Appointments() {
         ))}
       </div>
       {user.role === "doctor" ? (
-        <div className="clinic-board">
+        <div className="clinic-board work-deck">
           {rows.length === 0 ? (
             <EmptyPlate scene="schedule" title="No encounters in this view" />
           ) : rows.map((a) => (
@@ -105,7 +105,7 @@ export default function Appointments() {
           ))}
         </div>
       ) : (
-        <div className="list-card">
+        <div className="list-card work-deck">
           {rows.length === 0 ? (
             <EmptyPlate scene="schedule" icon={CalendarDays} title="No appointments in this view" hint="Book a visit and it will appear here." />
           ) : rows.map((a) => (
