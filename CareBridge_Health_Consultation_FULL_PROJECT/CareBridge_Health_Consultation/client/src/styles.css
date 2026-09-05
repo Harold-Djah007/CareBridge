@@ -1714,7 +1714,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .sidebar .brand b { color: #fff; }
 .sidebar .brand span { color: #9db4c8; }
 .sidebar-campus strong { color: #fff; }
-.welcome h1, .doctor-welcome h1, .ops-hero h1 { color: #fff; }
+.welcome h1, .doctor-welcome h1 { color: #fff; }
+.ops-hero h1 { color: var(--navy); }
 
 @media (max-width: 1100px) {
   .icon-service-grid, .photo-service-grid, .news-grid, .why-grid, .contact-facts-grid { grid-template-columns: 1fr 1fr; }
