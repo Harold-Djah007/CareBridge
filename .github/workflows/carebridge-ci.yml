@@ -42,83 +42,9 @@ jobs:
       - name: Build web client
         run: npm run build --prefix client
 
-      - name: Runtime smoke test patient APIs
+      - name: Runtime regression across all authenticated roles
         shell: bash
         run: |
           set -euo pipefail
           cp server/data/db.json /tmp/carebridge-ci-db.json
-          export DATA_FILE=/tmp/carebridge-ci-db.json
-          export PORT=5055
-          node server/index.js >/tmp/carebridge-server.log 2>&1 &
-          SERVER_PID=$!
-          cleanup() {
-            kill "$SERVER_PID" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-
-          for attempt in {1..30}; do
-            if curl -fsS http://127.0.0.1:5055/api/health >/dev/null; then
-              break
-            fi
-            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-              cat /tmp/carebridge-server.log
-              exit 1
-            fi
-            sleep 1
-          done
-
-          LOGIN_JSON=$(curl -fsS \
-            -H 'Content-Type: application/json' \
-            -d '{"email":"patient@carebridge.test","password":"patient123","expectedRole":"patient"}' \
-            http://127.0.0.1:5055/api/login)
-          TOKEN=$(node -e 'const v=JSON.parse(process.argv[1]); if(!v.token) process.exit(2); process.stdout.write(v.token)' "$LOGIN_JSON")
-          AUTH="Authorization: Bearer $TOKEN"
-
-          check_json() {
-            local path="$1"
-            echo "Checking $path"
-            curl -fsS -H "$AUTH" "http://127.0.0.1:5055$path" | node -e '
-              let data="";
-              process.stdin.on("data", c => data += c);
-              process.stdin.on("end", () => {
-                try { JSON.parse(data); }
-                catch (e) { console.error(data); process.exit(1); }
-              });
-            '
-          }
-
-          check_json '/api/appointments?userId=p1&role=patient'
-          check_json '/api/ward-bookings?userId=p1&role=patient'
-          check_json '/api/emails/p1'
-          check_json '/api/billing?userId=p1&role=patient'
-          check_json '/api/doctors'
-          check_json '/api/notifications/p1'
-          check_json '/api/badges?userId=p1&role=patient'
-
-          cd client
-          TOKEN="$TOKEN" node --input-type=module -e '
-            import { io } from "socket.io-client";
-            const token = process.env.TOKEN;
-            const socket = io("http://127.0.0.1:5055", {
-              auth: { token },
-              transports: ["websocket"],
-              timeout: 5000,
-              reconnection: false,
-            });
-            const timer = setTimeout(() => {
-              console.error("Socket.IO smoke test timed out");
-              socket.close();
-              process.exit(1);
-            }, 7000);
-            socket.on("connect", () => {
-              clearTimeout(timer);
-              socket.close();
-              process.exit(0);
-            });
-            socket.on("connect_error", (err) => {
-              clearTimeout(timer);
-              console.error(err.message);
-              socket.close();
-              process.exit(1);
-            });
-          '
+          DATA_FILE=/tmp/carebridge-ci-db.json PORT=5055 node server/ci-role-regression.mjs
