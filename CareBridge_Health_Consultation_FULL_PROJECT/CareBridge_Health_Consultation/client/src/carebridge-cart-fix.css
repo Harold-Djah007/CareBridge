@@ -1,0 +1,25 @@
+/* Cart drawer state fix
+   Keep the live entrance motion, but never let the animation override the closed transform. */
+
+.cart-scrim {
+  animation: none !important;
+}
+
+.cart-scrim.on {
+  animation: cb-fade-in .2s ease both !important;
+}
+
+.cart-drawer {
+  animation: none !important;
+}
+
+.cart-drawer.open {
+  animation: cb-drawer-in .38s var(--cb-ease) both !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-scrim.on,
+  .cart-drawer.open {
+    animation: none !important;
+  }
+}
