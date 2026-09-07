@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, FolderKanban } from "lucide-react";
+import { FolderKanban, Layers3, Search, Workflow, CheckCircle2, Clock3 } from "lucide-react";
 import { api } from "../../api";
 import { prettyDate } from "../../utils";
 import PageHero from "../../components/PageHero";
@@ -25,76 +25,46 @@ export default function AdminCases() {
   useEffect(() => { api("/cases/meta").then(setMeta); }, []);
   useEffect(() => { load(); }, [type, status]);
 
-  const setFilter = (key, value) => {
-    const next = new URLSearchParams(params);
-    next.set(key, value);
-    setParams(next, { replace: true });
-  };
+  const setFilter = (key, value) => { const next = new URLSearchParams(params); next.set(key, value); setParams(next, { replace: true }); };
+  const stats = useMemo(() => ({
+    shown: rows.length,
+    open: rows.filter((r) => r.status === "open").length,
+    closed: rows.filter((r) => r.status === "closed").length,
+    stages: new Set(rows.map((r) => r.stage)).size,
+  }), [rows]);
 
   return (
-    <div>
-      <PageHero
-        scene="cases"
-        eyebrow="Cases"
-        title="Workflow"
-        lead="CommCare-style case list. Each patient file, encounter, admission, bill, and support ticket is a case with properties, a stage, and a form history. Open a row for the case detail."
-      />
+    <div className="case-ops-os">
+      <PageHero scene="cases" eyebrow="Case operations" title="Workflow registry" lead="Track patient files, encounters, admissions, bills and support work as operational cases with stage, ownership and form history." />
 
-      <div className="filters">
-        <button className={type === "all" ? "active" : ""} onClick={() => setFilter("type", "all")}>All types</button>
-        {(meta.types || []).map((t) => (
-          <button key={t.id} className={type === t.id ? "active" : ""} onClick={() => setFilter("type", t.id)}>{t.label}</button>
-        ))}
-      </div>
-      <div className="filters">
-        <button className={status === "open" ? "active" : ""} onClick={() => setFilter("status", "open")}>Open</button>
-        <button className={status === "closed" ? "active" : ""} onClick={() => setFilter("status", "closed")}>Closed</button>
-        <button className={status === "all" ? "active" : ""} onClick={() => setFilter("status", "all")}>All statuses</button>
-        <form className="search-box" style={{ marginLeft: "auto", maxWidth: 280 }} onSubmit={(e) => { e.preventDefault(); load(); }}>
-          <Search size={16} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, MRN, property" />
-        </form>
-      </div>
+      <section className="ops-metric-grid">
+        <article className="ops-metric"><span className="ops-metric-icon"><FolderKanban size={17} /></span><div><small>Cases in view</small><strong>{stats.shown}</strong><em>Current filters</em></div></article>
+        <article className="ops-metric"><span className="ops-metric-icon amber"><Clock3 size={17} /></span><div><small>Open</small><strong>{stats.open}</strong><em>Needs workflow activity</em></div></article>
+        <article className="ops-metric"><span className="ops-metric-icon green"><CheckCircle2 size={17} /></span><div><small>Closed</small><strong>{stats.closed}</strong><em>Completed in view</em></div></article>
+        <article className="ops-metric"><span className="ops-metric-icon blue"><Layers3 size={17} /></span><div><small>Active stages</small><strong>{stats.stages}</strong><em>Workflow positions</em></div></article>
+      </section>
 
-      <section className="card" style={{ overflow: "auto" }}>
-        <div className="card-head">
-          <div>
-            <span className="eyebrow">Case list</span>
-            <h3><FolderKanban size={16} /> {rows.length} cases{status !== "all" ? ` · ${status}` : ""}</h3>
+      <section className="product-section case-registry-panel">
+        <div className="case-registry-toolbar">
+          <div className="case-filter-stack">
+            <div className="directory-role-tabs compact-tabs"><button className={type === "all" ? "active" : ""} onClick={() => setFilter("type", "all")}>All types</button>{(meta.types || []).map((t) => <button key={t.id} className={type === t.id ? "active" : ""} onClick={() => setFilter("type", t.id)}>{t.label}</button>)}</div>
+            <div className="directory-role-tabs compact-tabs">{[["open","Open"],["closed","Closed"],["all","All statuses"]].map(([id,label]) => <button key={id} className={status === id ? "active" : ""} onClick={() => setFilter("status", id)}>{label}</button>)}</div>
           </div>
+          <form className="directory-search case-search" onSubmit={(e) => { e.preventDefault(); load(); }}><Search size={15} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, MRN, case ID or property" /></form>
         </div>
-        <table className="table case-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Case ID</th>
-              <th>Stage</th>
-              <th>Owner</th>
-              <th>Last modified</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr><td colSpan={7} className="muted">No cases in this filter. Register a patient, book a visit, or open a bill to create one.</td></tr>
-            )}
-            {rows.map((c) => (
-              <tr key={c.id} className="case-row" onClick={() => navigate(`/admin/cases/${c.id}`)}>
-                <td>
-                  <b>{c.caseName}</b>
-                  {c.parent && <small className="muted" style={{ display: "block" }}>Child of {c.parent.caseName}</small>}
-                </td>
-                <td>{c.typeLabel}</td>
-                <td><code>{c.externalId}</code></td>
-                <td><span className="stage-pill">{c.stage.replace("_", " ")}</span></td>
-                <td>{c.ownerName || "—"}</td>
-                <td>{prettyDate(c.lastModified)}</td>
-                <td><span className={`status ${c.status === "open" ? "pending" : "completed"}`}>{c.status}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+        <div className="case-registry-head"><span>Case</span><span>Type</span><span>Workflow stage</span><span>Owner</span><span>Last activity</span><span>Status</span></div>
+        <div className="case-registry-list">
+          {rows.map((c) => <button type="button" className="case-registry-row" key={c.id} onClick={() => navigate(`/admin/cases/${c.id}`)}>
+            <span className="case-identity"><i><FolderKanban size={15} /></i><span><b>{c.caseName}</b><small>{c.externalId}{c.parent ? ` · child of ${c.parent.caseName}` : ""}</small></span></span>
+            <span><b>{c.typeLabel}</b><small>{c.caseType || "Operational case"}</small></span>
+            <span className="case-stage"><Workflow size={14} /><b>{String(c.stage || "—").replaceAll("_", " ")}</b></span>
+            <span>{c.ownerName || "Unassigned"}</span>
+            <span>{prettyDate(c.lastModified)}</span>
+            <span><em className={`status ${c.status === "open" ? "pending" : "completed"}`}>{c.status}</em></span>
+          </button>)}
+          {rows.length === 0 && <div className="product-empty-inline"><FolderKanban size={18} /><span>No cases match this operational view.</span></div>}
+        </div>
       </section>
     </div>
   );
