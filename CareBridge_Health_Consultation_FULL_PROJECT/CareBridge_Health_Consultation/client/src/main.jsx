@@ -10,6 +10,7 @@ import "./carebridge-product.css";
 import "./carebridge-workflows.css";
 import "./carebridge-modules.css";
 import "./carebridge-v6.css";
+import "./carebridge-premium-pages.css";
 import { homeFor } from "./utils";
 import { AuthProvider, ToastProvider, useAuth } from "./state";
 import { CartProvider } from "./ShopCart";
