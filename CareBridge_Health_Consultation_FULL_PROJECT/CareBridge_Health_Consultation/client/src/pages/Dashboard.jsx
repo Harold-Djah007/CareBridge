@@ -4,7 +4,7 @@ import {
   FileHeart, FolderOpen, HeartPulse, LifeBuoy, MessageCircle, PackageCheck, Pill,
   ShieldCheck, ShoppingBag, Sparkles, Stethoscope, Users, Video,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
 import { api, socketOptions, socketUrl } from "../api";
@@ -20,7 +20,7 @@ function ActionTile({ to, icon: Icon, title, text, badge, tone = "default" }) {
     <Link className={`cbv6-action-tile tone-${tone}`} to={to}>
       <span><Icon size={20} /></span>
       <div><strong>{title}</strong><small>{text}</small></div>
-      {badge ? <em>{badge}</em> : <ArrowRight size={16} />}
+      {Number(badge || 0) > 0 ? <em>{Number(badge) > 99 ? "99+" : badge}</em> : <ArrowRight size={16} />}
     </Link>
   );
 }
@@ -29,9 +29,9 @@ function Signal({ label, value, detail, tone = "default" }) {
   return <div className={`cbv6-signal tone-${tone}`}><small>{label}</small><strong>{value}</strong><span>{detail}</span></div>;
 }
 
-function PatientHome({ user, appointments, wards, emails, due, doctors }) {
+function PatientHome({ user, appointments, wards, due, doctors, badges }) {
   const next = appointments.filter(isUpcoming).sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))[0];
-  const admission = wards.find((w) => w.status !== "declined");
+  const admission = wards.find((w) => !["declined", "cancelled", "discharged", "completed"].includes(w.status));
   const dueTotal = due.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const chosen = doctors.find((doctor) => doctor.id === user.preferredDoctorId);
   const nextAction = due.length ? { title: "Review your hospital balance", copy: `${ghs(dueTotal)} is outstanding across ${due.length} item${due.length === 1 ? "" : "s"}.`, to: "/pay", cta: "Review & pay", icon: CreditCard } : next ? { title: "Your next consultation is ready", copy: `${formatDate(next.date)} at ${formatTime(next.time)} with ${next.doctor?.name || "your clinician"}.`, to: next.mode === "video" ? `/video?with=${next.doctorId}` : "/appointments", cta: next.mode === "video" ? "Open consultation" : "View appointment", icon: CalendarDays } : { title: "Your care plan is open", copy: "Book a clinician when you need care. Your record and care team stay connected.", to: "/appointments", cta: "Book care", icon: Stethoscope };
@@ -98,7 +98,7 @@ function PatientHome({ user, appointments, wards, emails, due, doctors }) {
       <section className="cbv6-patient-actions">
         <ActionTile to="/appointments" icon={CalendarDays} title="Book care" text="In-person or video consultation" tone="blue" />
         <ActionTile to="/records" icon={FolderOpen} title="Health record" text="Your complete clinical timeline" tone="teal" />
-        <ActionTile to="/messages" icon={MessageCircle} title="Messages" text="Secure care-team communication" badge={emails.length || undefined} tone="violet" />
+        <ActionTile to="/messages" icon={MessageCircle} title="Messages" text="Secure care-team communication" badge={badges?.messages} tone="violet" />
         <ActionTile to="/pay" icon={ShoppingBag} title="Shop & pay" text="Bills, medicines and services" badge={due.length || undefined} tone="amber" />
         <ActionTile to="/support" icon={LifeBuoy} title="Hospital support" text="Get help from operations" tone="green" />
       </section>
@@ -242,9 +242,10 @@ function NurseBoard({ user }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const shell = useOutletContext() || {};
+  const badges = shell.badges || {};
   const [appointments, setAppointments] = useState([]);
   const [wards, setWards] = useState([]);
-  const [emails, setEmails] = useState([]);
   const [due, setDue] = useState([]);
   const [doctors, setDoctors] = useState([]);
 
@@ -253,7 +254,6 @@ export default function Dashboard() {
     api(`/appointments?userId=${user.id}&role=${user.role}`).then(setAppointments).catch(() => {});
     api(`/ward-bookings?userId=${user.id}&role=${user.role}`).then(setWards).catch(() => {});
     if (user.role === "patient") {
-      api(`/emails/${user.id}`).then(setEmails).catch(() => {});
       api(`/billing?userId=${user.id}&role=${user.role}`).then((rows) => setDue(rows.filter((row) => row.status === "due"))).catch(() => {});
       api("/doctors").then(setDoctors).catch(() => {});
     }
@@ -261,5 +261,5 @@ export default function Dashboard() {
 
   if (user.role === "doctor") return <DoctorBoard user={user} appointments={appointments} wards={wards} />;
   if (user.role === "nurse") return <NurseBoard user={user} />;
-  return <PatientHome user={user} appointments={appointments} wards={wards} emails={emails} due={due} doctors={doctors} />;
+  return <PatientHome user={user} appointments={appointments} wards={wards} due={due} doctors={doctors} badges={badges} />;
 }
