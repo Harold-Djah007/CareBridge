@@ -4,7 +4,7 @@ import {
   Sparkles, Stethoscope, UserPlus, Video,
 } from "lucide-react";
 import { io } from "socket.io-client";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useOutletContext, useSearchParams } from "react-router-dom";
 import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { roomIdFor } from "../utils";
@@ -23,6 +23,8 @@ const prettyTime = (iso) => {
 export default function Messages() {
   const { user } = useAuth();
   const { push } = useToast();
+  const shell = useOutletContext() || {};
+  const refreshBadges = shell.refreshBadges || (() => Promise.resolve());
   const [params] = useSearchParams();
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -33,15 +35,15 @@ export default function Messages() {
   const endRef = useRef();
   const fileRef = useRef();
   const socketRef = useRef();
+  const seenRef = useRef(new Set());
 
-  const loadContacts = (keepId) => {
-    api(`/contacts?userId=${user.id}&role=${user.role}`).then((list) => {
-      const rows = user.role === "nurse" ? (list || []).filter((contact) => ["doctor", "admin"].includes(contact.role)) : (list || []);
-      setContacts(rows);
-      const wanted = keepId || params.get("with");
-      setSelected((current) => rows.find((contact) => contact.id === (wanted || current?.id)) || rows[0] || null);
-    });
-  };
+  const loadContacts = (keepId) => api(`/contacts?userId=${user.id}&role=${user.role}`).then((list) => {
+    const rows = user.role === "nurse" ? (list || []).filter((contact) => ["doctor", "admin"].includes(contact.role)) : (list || []);
+    setContacts(rows);
+    const wanted = keepId || params.get("with");
+    setSelected((current) => rows.find((contact) => contact.id === (wanted || current?.id)) || rows[0] || null);
+    return rows;
+  });
 
   useEffect(() => {
     loadContacts();
@@ -66,17 +68,45 @@ export default function Messages() {
   useEffect(() => {
     if (!roomId || !socketRef.current) return undefined;
     socketRef.current.emit("join-room", roomId);
-    api(`/messages/${roomId}?userId=${user.id}`).then(setMessages);
+    api(`/messages/${roomId}?userId=${user.id}`).then((rows) => {
+      setMessages(rows);
+      rows.forEach((message) => seenRef.current.add(message.id));
+      setContacts((list) => list.map((contact) => contact.id === selected?.id ? { ...contact, unread: 0 } : contact));
+      refreshBadges();
+    });
+
     const handler = (message) => {
-      if (message.roomId === roomId) setMessages((previous) => previous.some((row) => row.id === message.id) ? previous : [...previous, message]);
-      setContacts((list) => list.map((contact) => {
-        const other = message.roomId?.split("-").find((id) => id !== user.id);
-        return contact.id === other ? { ...contact, lastMessage: { text: message.text, timestamp: message.timestamp, senderId: message.senderId } } : contact;
-      }));
+      if (!message?.id || seenRef.current.has(message.id)) return;
+      seenRef.current.add(message.id);
+      const other = message.roomId?.split("-").find((id) => id !== user.id);
+      const isCurrentRoom = message.roomId === roomId;
+      const isIncoming = message.senderId !== user.id;
+
+      if (isCurrentRoom) {
+        setMessages((previous) => [...previous, message]);
+        setContacts((list) => list.map((contact) => contact.id === other ? {
+          ...contact,
+          unread: 0,
+          lastMessage: { text: message.text, timestamp: message.timestamp, senderId: message.senderId },
+        } : contact));
+        if (isIncoming) {
+          api(`/messages/${roomId}/read`, { method: "PATCH" }).then(refreshBadges).catch(() => refreshBadges());
+        } else {
+          refreshBadges();
+        }
+      } else {
+        setContacts((list) => list.map((contact) => contact.id === other ? {
+          ...contact,
+          unread: Number(contact.unread || 0) + (isIncoming ? 1 : 0),
+          lastMessage: { text: message.text, timestamp: message.timestamp, senderId: message.senderId },
+        } : contact));
+        refreshBadges();
+      }
     };
+
     socketRef.current.on("chat-message", handler);
     return () => socketRef.current?.off("chat-message", handler);
-  }, [roomId]);
+  }, [roomId, selected?.id]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
