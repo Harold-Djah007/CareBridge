@@ -10,6 +10,8 @@ import "./carebridge-product.css";
 import "./carebridge-workflows.css";
 import "./carebridge-modules.css";
 import "./carebridge-v5.css";
+import "./carebridge-v5-dashboard.css";
+import "./carebridge-v5-admin.css";
 import { homeFor } from "./utils";
 import { AuthProvider, ToastProvider, useAuth } from "./state";
 import { CartProvider } from "./ShopCart";
