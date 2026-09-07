@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { CheckCircle2, Download, ShieldCheck, Sparkles } from "lucide-react";
 import { api } from "../api";
 import { HOSPITAL, prettyDate } from "../utils";
 import { useAuth } from "../state";
-import PageHero from "../components/PageHero";
 
-const ghs = (n) => `GHS ${Number(n || 0).toLocaleString()}`;
+const ghs = (value) => `GHS ${Number(value || 0).toLocaleString()}`;
 
 export default function Receipt() {
   const { id } = useParams();
@@ -15,56 +15,25 @@ export default function Receipt() {
 
   useEffect(() => {
     setError("");
-    api(`/receipts/${id}`).then(setData).catch((e) => { setData(null); setError(e.message); });
+    api(`/receipts/${id}`).then(setData).catch((err) => { setData(null); setError(err.message); });
   }, [id]);
 
-  if (error) return <p className="error-box">{error}</p>;
-  if (!data) return <p className="muted">Loading receipt…</p>;
+  if (error) return <div className="px-empty"><ShieldCheck size={28} /><h3>{error}</h3></div>;
+  if (!data) return <div className="px-empty"><ShieldCheck size={28} /><h3>Loading receipt…</h3></div>;
 
   const { payment, invoice, patient, hospital, lines } = data;
+  const receiptLines = lines || invoice?.lines || [{ name: invoice?.item, lineTotal: payment.amount }];
+
   return (
-    <div>
-      <PageHero
-        className="no-print"
-        scene="billing"
-        eyebrow="Official receipt"
-        title={payment.receiptNo}
-        lead={`${HOSPITAL.name} · ${HOSPITAL.campus}, ${HOSPITAL.city}`}
-        actions={(
-          <div className="row-actions">
-            <Link className="ghost-btn" to="/pay">{user?.role === "admin" ? "Back to receipts" : "Back to shop"}</Link>
-            <button className="secondary-btn" type="button" onClick={() => window.print()}>Print / save PDF</button>
-          </div>
-        )}
-      />
-      <section className="card receipt-sheet">
-        <div className="receipt-head">
-          <div>
-            <b>{HOSPITAL.name}</b>
-            <p>{HOSPITAL.campus}, {HOSPITAL.city}<br />Tel {HOSPITAL.phone}<br />TIN / accounts: CareBridge Medical Centre Ltd</p>
-          </div>
-          <div>
-            <span className="eyebrow">Receipt</span>
-            <strong>{payment.receiptNo}</strong>
-            <p className="muted">Ref {payment.reference}</p>
-          </div>
-        </div>
-        <hr />
-        <p>Received from <b>{patient.name}</b><br />MRN {patient.mrn || "—"} · {patient.email}<br />{patient.phone || ""}</p>
-        <table className="table">
-          <thead><tr><th>Description</th><th>Amount</th></tr></thead>
-          <tbody>
-            {(lines || invoice?.lines || [{ name: invoice?.item, lineTotal: payment.amount }]).map((line, i) => (
-              <tr key={i}><td>{line.name}{line.qty ? ` × ${line.qty}` : ""}</td><td>{ghs(line.lineTotal || payment.amount)}</td></tr>
-            ))}
-            <tr><td><b>Total paid</b></td><td><b>{ghs(payment.amount)}</b></td></tr>
-          </tbody>
-        </table>
-        <p>Method: {invoice?.method || payment.method}<br />Posted: {prettyDate(payment.confirmedAt || payment.createdAt)}</p>
-        {hospital?.bank && (
-          <p className="muted">Settled to {hospital.bank.bank} {hospital.bank.accountNumber} or hospital MoMo merchant {hospital.momo?.merchantId}.</p>
-        )}
-        <p className="muted">Keep this receipt for NHIS, employer, and insurance claims. It is the official record of payment on the patient file.</p>
+    <div className="px-page px-receipt-page">
+      <section className="px-receipt-actions no-print"><div><span className="px-kicker"><Sparkles size={14} /> Official payment record</span><h1>{payment.receiptNo}</h1><p>Verified settlement on the CareBridge patient account.</p></div><div><Link className="px-secondary" to="/pay">{user?.role === "admin" ? "Back to finance" : "Back to Shop & Pay"}</Link><button className="px-primary" type="button" onClick={() => window.print()}><Download size={16} /> Print / save PDF</button></div></section>
+
+      <section className="px-receipt-document">
+        <header><div className="px-receipt-brand"><span><ShieldCheck size={21} /></span><div><strong>{HOSPITAL.name}</strong><small>{HOSPITAL.campus}, {HOSPITAL.city}</small></div></div><div className="px-receipt-number"><span>Official receipt</span><strong>{payment.receiptNo}</strong><small>Reference {payment.reference}</small></div></header>
+        <div className="px-receipt-verified"><CheckCircle2 size={19} /><div><strong>Payment verified</strong><span>{prettyDate(payment.confirmedAt || payment.createdAt)}</span></div></div>
+        <div className="px-receipt-party"><div><span>Received from</span><strong>{patient.name}</strong><small>MRN {patient.mrn || "—"} · {patient.email}</small><small>{patient.phone || ""}</small></div><div><span>Payment method</span><strong>{invoice?.method || payment.method}</strong><small>{hospital?.bank ? `${hospital.bank.bank} / hospital settlement` : "CareBridge verified settlement"}</small></div></div>
+        <div className="px-receipt-lines"><div className="px-receipt-line-head"><span>Description</span><span>Amount</span></div>{receiptLines.map((line, index) => <div className="px-receipt-line" key={index}><span>{line.name}{line.qty ? ` × ${line.qty}` : ""}</span><strong>{ghs(line.lineTotal || payment.amount)}</strong></div>)}<div className="px-receipt-total"><span>Total paid</span><strong>{ghs(payment.amount)}</strong></div></div>
+        <footer><div><strong>{HOSPITAL.campus}</strong><span>Tel {HOSPITAL.phone}</span><span>CareBridge Medical Centre Ltd</span></div><div><ShieldCheck size={16} /><span>Keep this document for NHIS, employer and insurance claims. It is the official payment record on the patient file.</span></div></footer>
       </section>
     </div>
   );
