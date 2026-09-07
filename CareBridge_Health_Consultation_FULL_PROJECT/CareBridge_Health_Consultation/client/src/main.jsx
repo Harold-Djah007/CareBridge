@@ -8,6 +8,7 @@ import "./carebridge-live.css";
 import "./carebridge-cart-fix.css";
 import "./carebridge-product.css";
 import "./carebridge-workflows.css";
+import "./carebridge-modules.css";
 import { homeFor } from "./utils";
 import { AuthProvider, ToastProvider, useAuth } from "./state";
 import { CartProvider } from "./ShopCart";
