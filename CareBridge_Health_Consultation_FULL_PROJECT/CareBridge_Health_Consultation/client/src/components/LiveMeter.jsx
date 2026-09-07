@@ -1,16 +1,28 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Video, BedDouble, Home } from "lucide-react";
 
 const ECG = "M0 36 L18 36 L26 36 L32 12 L38 60 L46 36 L58 36 L66 36 L72 22 L78 36 L96 36 L104 36 L110 14 L116 58 L124 36 L160 36 L168 36 L174 20 L180 36 L220 36 L228 36 L234 12 L240 60 L248 36 L280 36";
 
+function usePageVisible() {
+  const [visible, setVisible] = useState(() => typeof document === "undefined" || document.visibilityState !== "hidden");
+  useEffect(() => {
+    const onChange = () => setVisible(document.visibilityState !== "hidden");
+    document.addEventListener("visibilitychange", onChange);
+    return () => document.removeEventListener("visibilitychange", onChange);
+  }, []);
+  return visible;
+}
+
 export function LiveClock({ className = "" }) {
   const [now, setNow] = useState(() => new Date());
+  const visible = usePageVisible();
   useEffect(() => {
+    if (!visible) return undefined;
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [visible]);
   return (
-    <time className={`live-clock ${className}`} dateTime={now.toISOString()}>
+    <time className={`live-clock ${className}`} dateTime={now.toISOString()} title={now.toLocaleDateString()}>
       {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
     </time>
   );
@@ -29,18 +41,28 @@ export function EcgRibbon() {
 
 export function Heartbeat({ bpm = 72 }) {
   const [beat, setBeat] = useState(bpm);
+  const visible = usePageVisible();
+
   useEffect(() => {
+    if (!visible) return undefined;
     const id = setInterval(() => {
-      setBeat((n) => Math.max(62, Math.min(88, n + (Math.random() > 0.5 ? 1 : -1))));
-    }, 1100);
+      setBeat((n) => {
+        const drift = Math.random() > 0.56 ? 1 : Math.random() < 0.18 ? -1 : 0;
+        const centerPull = n > bpm + 5 ? -1 : n < bpm - 5 ? 1 : 0;
+        return Math.max(58, Math.min(96, n + drift + centerPull));
+      });
+    }, 2100);
     return () => clearInterval(id);
-  }, []);
+  }, [bpm, visible]);
+
+  const beatPeriod = useMemo(() => `${Math.max(.55, Math.min(1.1, 60 / Math.max(1, beat))).toFixed(3)}s`, [beat]);
 
   return (
-    <div className="vital-card vital-doctor">
+    <div className="vital-card vital-doctor" style={{ "--beat-period": beatPeriod }}>
       <div className="vital-head">
         <span className="live-dot" />
         <span>Live · Monitor</span>
+        <span className="vital-signal" aria-hidden="true"><i /><i /><i /><i /></span>
       </div>
       <div className="vital-body">
         <div className="heart-wrap" aria-hidden="true">
@@ -49,7 +71,7 @@ export function Heartbeat({ bpm = 72 }) {
             <path d="M12 21s-6.7-4.4-9.3-8.1C.4 9.8 1.6 5.8 5.2 4.7c2-.6 3.9.3 4.8 1.8 1-1.5 2.8-2.4 4.8-1.8 3.6 1.1 4.8 5.1 2.5 8.2C18.7 16.6 12 21 12 21z" />
           </svg>
         </div>
-        <div className="vital-readout">
+        <div className="vital-readout" aria-label={`Live demonstration heart rate ${beat} beats per minute`}>
           <strong>{beat}</strong>
           <small>BPM</small>
         </div>
@@ -73,16 +95,18 @@ const CARE_STEPS = [
 
 export function CarePath({ caption = "From home to the ward" }) {
   const [step, setStep] = useState(0);
+  const visible = usePageVisible();
   useEffect(() => {
-    const id = setInterval(() => setStep((s) => (s + 1) % CARE_STEPS.length), 1600);
+    if (!visible) return undefined;
+    const id = setInterval(() => setStep((s) => (s + 1) % CARE_STEPS.length), 1700);
     return () => clearInterval(id);
-  }, []);
+  }, [visible]);
 
   return (
     <div className="care-path-card">
       <div className="vital-head">
         <span className="care-dot" />
-        <span>With you</span>
+        <span>Care journey · live</span>
       </div>
       <div className="care-path" aria-hidden="true">
         <span className="care-halo" />
@@ -103,10 +127,12 @@ export function CarePath({ caption = "From home to the ward" }) {
 
 export function OpsRadar({ occupancy = 0, pending = 0, beds = 0 }) {
   const [tick, setTick] = useState(0);
+  const visible = usePageVisible();
   useEffect(() => {
+    if (!visible) return undefined;
     const id = setInterval(() => setTick((n) => n + 1), 2200);
     return () => clearInterval(id);
-  }, []);
+  }, [visible]);
   const blips = [
     { label: "Clinic", top: "22%", left: "62%" },
     { label: "Wards", top: "58%", left: "28%" },
@@ -118,7 +144,8 @@ export function OpsRadar({ occupancy = 0, pending = 0, beds = 0 }) {
     <div className="ops-radar-card">
       <div className="vital-head">
         <span className="radar-dot" />
-        <span>Campus scan</span>
+        <span>Campus scan · live</span>
+        <span className="vital-signal" aria-hidden="true"><i /><i /><i /><i /></span>
       </div>
       <div className="radar-disc" aria-hidden="true">
         <span className="radar-ring" />
