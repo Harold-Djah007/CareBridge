@@ -78,7 +78,7 @@ function AppRoutes() {
         <Route path="/register" element={user ? <Navigate to={homeFor(user)} /> : <Register />} />
         <Route path="/help" element={user ? <Navigate to="/guide" replace /> : <Help />} />
         <Route path="/privacy" element={<Privacy />} />
-        <Route path="/tariff" element={user ? <Navigate to="/billing/tariff" replace />} />
+        <Route path="/tariff" element={user ? <Navigate to="/billing/tariff" replace /> : <Tariff />} />
         <Route element={user ? <AppShell /> : <Navigate to="/login" />}>
           <Route path="/home" element={<RoleRoute roles={["patient", "doctor", "nurse"]}><Dashboard /></RoleRoute>} />
           <Route path="/care" element={<RoleRoute roles={["patient", "doctor"]}><CareTeam /></RoleRoute>} />
