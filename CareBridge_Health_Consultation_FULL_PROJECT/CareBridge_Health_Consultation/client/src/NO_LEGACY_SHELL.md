@@ -1,0 +1,1 @@
+The authenticated AppShell must remain independent from the former portal layout classes. Do not reintroduce app-layout, portal-app, portal-main, legacy sidebar/main/page-wrap hooks into AppShell.jsx.
