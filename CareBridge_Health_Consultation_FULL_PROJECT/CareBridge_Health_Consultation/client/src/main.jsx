@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import "./styles.css";
 import "./carebridge-refresh.css";
 import "./carebridge-field.css";
@@ -21,6 +21,7 @@ import "./carebridge-premium-ehr.css";
 import "./carebridge-premium-final.css";
 import "./carebridge-premium-readable.css";
 import "./carebridge-premium-contrast.css";
+import "./carebridge-premium-repair.css";
 import { homeFor } from "./utils";
 import { AuthProvider, ToastProvider, useAuth } from "./state";
 import { CartProvider } from "./ShopCart";
@@ -64,6 +65,14 @@ import PaymentStatus from "./pages/PaymentStatus";
 import AppShell from "./components/AppShell";
 import ErrorBoundary from "./ErrorBoundary";
 
+function RouteReset() {
+  const location = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location.pathname]);
+  return null;
+}
+
 function RoleRoute({ roles, children }) {
   const { user } = useAuth();
   if (!roles.includes(user.role)) return <Navigate to={homeFor(user)} replace />;
@@ -74,6 +83,7 @@ function AppRoutes() {
   const { user } = useAuth();
   return (
     <BrowserRouter>
+      <RouteReset />
       <CartProvider>
       <Routes>
         <Route path="/" element={user ? <Navigate to={homeFor(user)} /> : <Landing />} />
