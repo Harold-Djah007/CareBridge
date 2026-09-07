@@ -1,49 +1,43 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  Activity, BedDouble, Bell, Building2, CalendarDays, ChevronLeft, ClipboardList,
-  FolderKanban, FolderOpen, HeartPulse, Inbox, LayoutDashboard, LifeBuoy, LogOut,
-  Mail, Menu, MessageCircle, Pill, Receipt, Search, ScrollText, ShieldCheck,
-  ShoppingBag, Stethoscope, UserRound, Users, Video, Wifi,
+  Activity, BedDouble, Bell, Building2, CalendarDays, ClipboardList, FolderKanban,
+  FolderOpen, HeartPulse, Inbox, LayoutDashboard, LifeBuoy, LogOut, Mail,
+  MessageCircle, Pill, Receipt, Search, ScrollText, ShieldCheck, ShoppingBag,
+  Stethoscope, UserRound, Users, Video, Wifi,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { CartMastButton, useCart } from "../ShopCart";
 import { useAuth, useToast } from "../state";
 import { api, socketOptions, socketUrl } from "../api";
-import { BUILD, HOSPITAL } from "../utils";
+import { HOSPITAL } from "../utils";
 import { LiveClock } from "./LiveMeter";
-import PageAtmosphere from "./PageAtmosphere";
-import { sceneFor } from "../imagery";
 import Avatar from "./Avatar";
+import { photoFor, sceneFor } from "../imagery";
 
 const NAV = {
   patient: [
-    { group: "Care", items: [
-      { to: "/home", icon: LayoutDashboard, label: "Care overview", end: true, primary: true },
-      { to: "/appointments", icon: CalendarDays, label: "Appointments", primary: true },
-      { to: "/messages", icon: MessageCircle, label: "Messages", badge: "messages", primary: true },
-      { to: "/wards", icon: BedDouble, label: "Admissions", badge: "wards" },
-      { to: "/records", icon: FolderOpen, label: "Clinical record", primary: true },
-      { to: "/prescriptions", icon: ClipboardList, label: "Prescriptions" },
-    ]},
-    { group: "Services", items: [
-      { to: "/pay", icon: ShoppingBag, label: "Shop & pay", primary: true },
-      { to: "/care", icon: Stethoscope, label: "Care team" },
-      { to: "/alerts", icon: Inbox, label: "Notifications" },
-    ]},
-    { group: "Account", items: [
-      { to: "/support", icon: LifeBuoy, label: "Support", badge: "tickets" },
-      { to: "/settings", icon: UserRound, label: "Profile & settings" },
-    ]},
+    { to: "/home", icon: LayoutDashboard, label: "Home", end: true, primary: true },
+    { to: "/appointments", icon: CalendarDays, label: "Appointments", primary: true },
+    { to: "/messages", icon: MessageCircle, label: "Messages", badge: "messages", primary: true },
+    { to: "/records", icon: FolderOpen, label: "Health record", primary: true },
+    { to: "/prescriptions", icon: ClipboardList, label: "Prescriptions" },
+    { to: "/wards", icon: BedDouble, label: "Admissions", badge: "wards" },
+    { to: "/pay", icon: ShoppingBag, label: "Shop & pay", primary: true },
+    { to: "/care", icon: Stethoscope, label: "Care team" },
+    { to: "/alerts", icon: Inbox, label: "Notifications" },
+    { to: "/support", icon: LifeBuoy, label: "Support", badge: "tickets" },
   ],
   doctor: [
-    { group: "Clinical workspace", items: [
-      { to: "/home", icon: Activity, label: "Clinical cockpit", end: true, primary: true },
+    { group: "Today", items: [
+      { to: "/home", icon: Activity, label: "Clinical home", end: true, primary: true },
       { to: "/appointments", icon: CalendarDays, label: "Schedule", badge: "visits", primary: true },
+      { to: "/messages", icon: MessageCircle, label: "Inbox", badge: "messages", primary: true },
+      { to: "/video", icon: Video, label: "Teleconsult" },
+    ]},
+    { group: "Clinical", items: [
       { to: "/care", icon: Users, label: "Caseload", primary: true },
       { to: "/records", icon: FolderOpen, label: "Patient charts", primary: true },
-      { to: "/messages", icon: MessageCircle, label: "Clinical inbox", badge: "messages", primary: true },
-      { to: "/video", icon: Video, label: "Teleconsult" },
       { to: "/prescriptions", icon: Pill, label: "Prescriptions" },
       { to: "/wards", icon: BedDouble, label: "Admissions", badge: "wards" },
     ]},
@@ -55,8 +49,8 @@ const NAV = {
   ],
   nurse: [
     { group: "Dispensary", items: [
-      { to: "/home", icon: ClipboardList, label: "Dispensary board", end: true, badge: "queue", primary: true },
-      { to: "/pharmacy-stock", icon: Pill, label: "Stock control", primary: true },
+      { to: "/home", icon: ClipboardList, label: "Dispensing board", end: true, badge: "queue", primary: true },
+      { to: "/pharmacy-stock", icon: Pill, label: "Inventory", primary: true },
       { to: "/messages", icon: MessageCircle, label: "Clinical messages", badge: "messages", primary: true },
     ]},
     { group: "Account", items: [
@@ -65,11 +59,13 @@ const NAV = {
     ]},
   ],
   admin: [
-    { group: "Hospital command", items: [
-      { to: "/admin", icon: LayoutDashboard, label: "Command centre", end: true, primary: true },
+    { group: "Operations", items: [
+      { to: "/admin", icon: LayoutDashboard, label: "Operations home", end: true, primary: true },
       { to: "/admin/hospital", icon: Building2, label: "Capacity & beds", badge: "wards", primary: true },
       { to: "/admin/appointments", icon: CalendarDays, label: "Clinic operations", primary: true },
-      { to: "/admin/users", icon: Users, label: "People directory", primary: true },
+      { to: "/admin/users", icon: Users, label: "People", primary: true },
+    ]},
+    { group: "Control", items: [
       { to: "/admin/cases", icon: FolderKanban, label: "Case workflow" },
       { to: "/admin/reports", icon: ScrollText, label: "Analytics & audit", primary: true },
       { to: "/pay", icon: Receipt, label: "Finance & receipts" },
@@ -85,59 +81,40 @@ const NAV = {
 };
 
 const PAGE_META = [
-  ["/admin/reports", "Analytics & audit", "Financial, operational and audit intelligence"],
-  ["/admin/appointments", "Clinic operations", "Manage the hospital diary and encounter flow"],
-  ["/admin/hospital", "Capacity & beds", "Live occupancy, admission decisions and bed allocation"],
-  ["/admin/users", "People directory", "Patients, clinicians, access and hospital identities"],
-  ["/admin/cases", "Case workflow", "Operational files, cases and follow-up state"],
-  ["/admin", "Hospital command centre", "Live operational picture across Ridge Campus"],
-  ["/appointments", "Appointments", "Schedule, prepare for and manage encounters"],
-  ["/messages", "Messages", "Secure care-team communication"],
-  ["/video", "Teleconsultation", "Private real-time consultation workspace"],
-  ["/wards", "Admissions", "Bed availability, requests and admission status"],
-  ["/records", "Clinical record", "Longitudinal patient information and clinical actions"],
-  ["/prescriptions", "Prescriptions", "Medication orders, dispensing and patient access"],
-  ["/pharmacy-stock", "Stock control", "Dispensary inventory and availability"],
-  ["/pharmacy", "Pharmacy", "Medicines and fulfilment"],
-  ["/pay", "Shop & pay", "Bills, services, medicines and verified payments"],
-  ["/care", "Care team", "People and relationships around care"],
-  ["/support", "Support", "Operational and patient support"],
-  ["/settings", "Profile & settings", "Identity, preferences and account controls"],
-  ["/alerts", "Notifications", "Hospital notices and patient communications"],
+  ["/admin/reports", "Analytics & audit", "Operational intelligence and governance"],
+  ["/admin/appointments", "Clinic operations", "Hospital diary and encounter flow"],
+  ["/admin/hospital", "Capacity & beds", "Occupancy, admissions and bed allocation"],
+  ["/admin/users", "People", "Patients, clinicians and access"],
+  ["/admin/cases", "Case workflow", "Operational cases and follow-up"],
+  ["/admin", "Operations home", "Live hospital overview"],
+  ["/appointments", "Appointments", "Schedule and manage care"],
+  ["/messages", "Messages", "Secure care communication"],
+  ["/video", "Teleconsultation", "Private video consultation"],
+  ["/wards", "Admissions", "Bed requests and admission status"],
+  ["/records", "Health record", "Longitudinal clinical information"],
+  ["/prescriptions", "Prescriptions", "Medication orders and fulfilment"],
+  ["/pharmacy-stock", "Inventory", "Dispensary stock and availability"],
+  ["/pay", "Shop & pay", "Bills, medicines and services"],
+  ["/care", "Care team", "People involved in care"],
+  ["/support", "Support", "Hospital support and assistance"],
+  ["/settings", "Account", "Identity, preferences and security"],
+  ["/alerts", "Notifications", "Hospital notices and communications"],
   ["/billing/tariff", "Hospital tariff", "Published prices and service charges"],
-  ["/home", "Overview", "Your live CareBridge workspace"],
+  ["/home", "Home", "Your CareBridge workspace"],
 ];
 
-function contextFor(pathname, role) {
-  const found = PAGE_META.find(([path]) => pathname === path || pathname.startsWith(`${path}/`));
-  if (found) return { title: found[1], description: found[2] };
-  const fallback = role === "admin" ? "Hospital workspace" : role === "doctor" ? "Clinical workspace" : role === "nurse" ? "Dispensary workspace" : "Care workspace";
-  return { title: fallback, description: "CareBridge connected care" };
+function pageMeta(pathname, role) {
+  const hit = PAGE_META.find(([path]) => pathname === path || pathname.startsWith(`${path}/`));
+  if (hit) return { title: hit[1], description: hit[2] };
+  return {
+    title: role === "admin" ? "Operations" : role === "doctor" ? "Clinical workspace" : role === "nurse" ? "Dispensary" : "CareBridge",
+    description: "Connected hospital care",
+  };
 }
 
-function NavRail({ children }) {
-  const railRef = useRef(null);
-  const [glow, setGlow] = useState({ y: 0, h: 44, visible: false });
-  const [spot, setSpot] = useState({ y: 40, visible: false });
-
-  const onMove = (event) => {
-    const nav = railRef.current;
-    if (!nav) return;
-    const nr = nav.getBoundingClientRect();
-    setSpot({ y: event.clientY - nr.top + nav.scrollTop, visible: true });
-    const item = event.target.closest(".nav-item");
-    if (!item || !nav.contains(item)) return;
-    const ir = item.getBoundingClientRect();
-    setGlow({ y: ir.top - nr.top + nav.scrollTop, h: ir.height, visible: true });
-  };
-
-  return (
-    <nav ref={railRef} className="nav-rail product-nav-rail" onMouseMove={onMove} onMouseLeave={() => { setGlow((g) => ({ ...g, visible: false })); setSpot((s) => ({ ...s, visible: false })); }}>
-      <span className={`nav-follow ${glow.visible ? "on" : ""}`} style={{ transform: `translate3d(0, ${glow.y}px, 0)`, height: glow.h }} />
-      <span className={`nav-spot ${spot.visible ? "on" : ""}`} style={{ transform: `translate3d(0, ${spot.y - 48}px, 0)` }} />
-      {children}
-    </nav>
-  );
+function flatNav(role) {
+  const rows = NAV[role] || NAV.patient;
+  return rows.flatMap((row) => row.items || [row]);
 }
 
 export default function AppShell() {
@@ -146,17 +123,18 @@ export default function AppShell() {
   const cart = useCart();
   const navigate = useNavigate();
   const location = useLocation();
+  const [query, setQuery] = useState("");
   const [notes, setNotes] = useState([]);
   const [noticeOpen, setNoticeOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("carebridge-nav-collapsed") === "1");
   const [connected, setConnected] = useState(false);
   const [badges, setBadges] = useState({ visits: 0, wards: 0, messages: 0, tickets: 0, queue: 0, notifications: 0 });
 
-  const groups = NAV[user.role] || NAV.patient;
-  const mobileItems = groups.flatMap((g) => g.items).filter((i) => i.primary).slice(0, 5);
+  const isPatient = user.role === "patient";
+  const meta = pageMeta(location.pathname, user.role);
   const scene = sceneFor(location.pathname, user.role);
-  const context = contextFor(location.pathname, user.role);
+  const scenePhoto = photoFor(scene);
+  const allNav = flatNav(user.role);
+  const mobileNav = allNav.filter((item) => item.primary).slice(0, 5);
 
   const loadNotes = () => api(`/notifications/${user.id}`).then(setNotes).catch(() => {});
   const loadBadges = () => api(`/badges?userId=${user.id}&role=${user.role}`).then(setBadges).catch(() => {});
@@ -170,32 +148,26 @@ export default function AppShell() {
     socket.on("disconnect", () => setConnected(false));
     const refresh = () => { loadNotes(); loadBadges(); };
     socket.on("notification", (n) => { push(n.title); refresh(); });
-    socket.on("email-alert", (n) => { push(`Notice sent: ${n.subject}`); refresh(); });
+    socket.on("email-alert", refresh);
     socket.on("chat-message", refresh);
     socket.on("pharmacy-order", refresh);
     socket.on("pharmacy-stock", refresh);
     return () => socket.disconnect();
   }, [user.id, user.role]);
 
-  useEffect(() => { setNoticeOpen(false); loadBadges(); }, [location.pathname]);
-  useEffect(() => { localStorage.setItem("carebridge-nav-collapsed", collapsed ? "1" : "0"); }, [collapsed]);
+  useEffect(() => {
+    setNoticeOpen(false);
+    loadBadges();
+  }, [location.pathname]);
 
   const unread = Number(badges.notifications || notes.filter((n) => !n.read).length);
-  const markRead = async () => {
-    await api(`/notifications/${user.id}/read`, { method: "PATCH" });
-    loadNotes();
-    loadBadges();
-  };
-
-  const topMeta = useMemo(() => {
-    if (user.role === "doctor") return `${user.department || "Outpatient"} · ${user.clinic || HOSPITAL.campus}`;
-    if (user.role === "admin") return `${HOSPITAL.campus} operations`;
-    if (user.role === "nurse") return `Dispensary · ${HOSPITAL.campus}`;
-    return `MRN ${user.mrn || "Pending"} · ${HOSPITAL.campus}`;
+  const roleName = user.role === "doctor" ? "Clinician" : user.role === "nurse" ? "Pharmacy" : user.role === "admin" ? "Operations" : "Patient";
+  const userMeta = useMemo(() => {
+    if (user.role === "patient") return `MRN ${user.mrn || "Pending"}`;
+    if (user.role === "doctor") return user.specialty || user.department || "Clinical staff";
+    if (user.role === "nurse") return user.department || "Dispensary";
+    return HOSPITAL.campus;
   }, [user]);
-
-  const roleLabel = user.role === "patient" ? "Patient" : user.role === "doctor" ? "Clinician" : user.role === "nurse" ? "Pharmacy" : "Operations";
-  const searchPlaceholder = user.role === "admin" ? "Search people or operations" : user.role === "doctor" ? "Search patients" : user.role === "nurse" ? "Search dispensing queue" : "Find a doctor or service";
 
   const onSearch = (event) => {
     event.preventDefault();
@@ -205,123 +177,140 @@ export default function AppShell() {
     else navigate(q ? `/care?q=${encodeURIComponent(q)}` : "/care");
   };
 
-  const badgeFor = (key) => Number(badges[key] || 0);
-  const renderLink = (item, mobile = false) => {
+  const markAllRead = async () => {
+    try {
+      await api(`/notifications/${user.id}/read`, { method: "PATCH" });
+      await Promise.all([loadNotes(), loadBadges()]);
+    } catch {}
+  };
+
+  const badgeCount = (key) => Number(badges[key] || 0);
+  const navLink = (item, compact = false) => {
     const Icon = item.icon;
-    const count = item.badge ? badgeFor(item.badge) : 0;
-    const cartItems = user.role === "patient" && item.to === "/pay" ? Number(cart?.count || 0) : 0;
-    const shown = count || cartItems;
+    const badge = item.badge ? badgeCount(item.badge) : 0;
+    const cartCount = user.role === "patient" && item.to === "/pay" ? Number(cart?.count || 0) : 0;
+    const shown = badge || cartCount;
     return (
-      <NavLink key={`${mobile ? "m-" : ""}${item.to}`} to={item.to} end={item.end} title={collapsed && !mobile ? item.label : undefined} className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-        <span className="nav-icon"><Icon size={18} /></span>
-        <span className="nav-text">{item.label}</span>
-        {shown > 0 && <em className="nav-badge">{shown > 99 ? "99+" : shown}</em>}
+      <NavLink
+        key={`${compact ? "compact-" : ""}${item.to}`}
+        to={item.to}
+        end={item.end}
+        className={({ isActive }) => `cbx-nav-link ${isActive ? "is-active" : ""}`}
+      >
+        <Icon size={compact ? 19 : 17} />
+        <span>{item.label}</span>
+        {shown > 0 && <b>{shown > 99 ? "99+" : shown}</b>}
       </NavLink>
     );
   };
 
   return (
-    <div className={`app-layout portal-app carebridge-shell role-${user.role} ${collapsed ? "nav-collapsed" : ""}`} data-role={user.role}>
-      <a className="skip-link" href="#main-content">Skip to main content</a>
+    <div className={`cbx-app cbx-role-${user.role}`}>
+      <a className="skip-link" href="#cbx-main">Skip to main content</a>
 
-      <aside className={`sidebar product-sidebar sidebar-${user.role}`}>
-        <div className="product-sidebar-head">
-          <Link to={user.role === "admin" ? "/admin" : "/home"} className="product-brand" aria-label="CareBridge home">
-            <span className="product-brand-mark"><HeartPulse size={20} /></span>
-            <span className="product-brand-copy"><b>{HOSPITAL.short}</b><small>Health OS</small></span>
-          </Link>
-          <button className="product-collapse" type="button" onClick={() => setCollapsed((v) => !v)} aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}>
-            {collapsed ? <Menu size={17} /> : <ChevronLeft size={17} />}
+      <header className="cbx-topbar">
+        <Link className="cbx-brand" to={user.role === "admin" ? "/admin" : "/home"}>
+          <span className="cbx-brand-mark"><HeartPulse size={21} /></span>
+          <span className="cbx-brand-copy"><strong>CareBridge</strong><small>{isPatient ? "My health" : "Hospital workspace"}</small></span>
+        </Link>
+
+        <div className="cbx-top-title">
+          <small>{roleName}</small>
+          <strong>{meta.title}</strong>
+        </div>
+
+        <form className="cbx-search" onSubmit={onSearch}>
+          <Search size={16} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={user.role === "admin" ? "Search people" : user.role === "doctor" ? "Search patients" : user.role === "nurse" ? "Search dispensing" : "Find a doctor or service"}
+            aria-label="Search CareBridge"
+          />
+        </form>
+
+        <div className="cbx-top-actions">
+          <span className={`cbx-live ${connected ? "is-live" : ""}`} title={connected ? "Live services connected" : "Reconnecting"}>
+            <Wifi size={14} /><span>{connected ? "Live" : "Connecting"}</span>
+          </span>
+          <LiveClock />
+          {isPatient && <CartMastButton />}
+          <button className="cbx-icon-btn" type="button" onClick={() => { setNoticeOpen((v) => !v); if (!noticeOpen && unread) markAllRead(); }} aria-label="Notifications">
+            <Bell size={18} />
+            {unread > 0 && <em>{unread > 99 ? "99+" : unread}</em>}
           </button>
-        </div>
-
-        <div className="product-campus-card">
-          <span className="product-live-dot" />
-          <div><strong>{HOSPITAL.campus}</strong><small>{HOSPITAL.city} · {BUILD}</small></div>
-        </div>
-
-        <NavRail>
-          {groups.map((group) => (
-            <div className="nav-group" key={group.group}>
-              <p className="nav-label">{group.group}</p>
-              {group.items.map((item) => renderLink(item))}
-            </div>
-          ))}
-        </NavRail>
-
-        <div className="product-sidebar-foot">
-          <button type="button" className="product-user-card" onClick={() => navigate("/settings")}>
+          <button className="cbx-profile" type="button" onClick={() => navigate("/settings")}>
             <Avatar person={user} className="small" />
-            <span><b>{user.name}</b><small>{user.role === "patient" ? `MRN ${user.mrn || "—"}` : user.employeeId || user.specialty || roleLabel}</small></span>
+            <span><strong>{user.name}</strong><small>{userMeta}</small></span>
           </button>
-          <button className="icon-btn product-logout" title="Sign out" aria-label="Sign out" type="button" onClick={() => { logout(); navigate("/login"); }}><LogOut size={18} /></button>
         </div>
-      </aside>
+      </header>
 
-      <section className="product-workspace">
-        <header className="product-topbar">
-          <div className="product-page-context">
-            <span className="product-context-kicker">{roleLabel} workspace</span>
-            <strong>{context.title}</strong>
+      {isPatient && (
+        <nav className="cbx-patient-nav" aria-label="Patient navigation">
+          <div>{allNav.map((item) => navLink(item))}</div>
+        </nav>
+      )}
+
+      <div className={`cbx-layout ${isPatient ? "cbx-layout-patient" : "cbx-layout-staff"}`}>
+        {!isPatient && (
+          <aside className="cbx-side">
+            <div className="cbx-side-campus">
+              <span className="cbx-campus-photo" style={{ backgroundImage: `url(${scenePhoto})` }} />
+              <div><strong>{HOSPITAL.campus}</strong><small>{HOSPITAL.city}</small></div>
+              <span className={`cbx-status-dot ${connected ? "on" : ""}`} />
+            </div>
+
+            <nav className="cbx-side-nav" aria-label={`${roleName} navigation`}>
+              {(NAV[user.role] || []).map((group) => (
+                <section key={group.group}>
+                  <p>{group.group}</p>
+                  {group.items.map((item) => navLink(item))}
+                </section>
+              ))}
+            </nav>
+
+            <div className="cbx-side-foot">
+              <button type="button" onClick={() => navigate("/settings")}>
+                <Avatar person={user} className="small" />
+                <span><strong>{user.name}</strong><small>{userMeta}</small></span>
+              </button>
+              <button className="cbx-side-logout" type="button" title="Sign out" onClick={() => { logout(); navigate("/login"); }}><LogOut size={17} /></button>
+            </div>
+          </aside>
+        )}
+
+        <main className="cbx-main" id="cbx-main" tabIndex="-1">
+          <div className="cbx-contextbar">
+            <div>
+              <ShieldCheck size={15} />
+              <span>{meta.description}</span>
+            </div>
+            <span className="cbx-context-photo" style={{ backgroundImage: `url(${scenePhoto})` }} aria-hidden="true" />
           </div>
 
-          <form className="top-search product-search" onSubmit={onSearch}>
-            <Search size={16} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} aria-label={searchPlaceholder} />
-            <kbd>⌘ K</kbd>
-          </form>
-
-          <div className="product-top-actions">
-            <span className={`product-connection ${connected ? "connected" : "offline"}`} title={connected ? "Live services connected" : "Reconnecting live services"}>
-              <Wifi size={14} /><span>{connected ? "Live" : "Connecting"}</span>
-            </span>
-            <LiveClock />
-            {user.role === "patient" && <CartMastButton />}
-            <button className="icon-btn bell-btn" type="button" onClick={() => { setNoticeOpen((v) => !v); if (!noticeOpen && unread) markRead(); }} title="Notifications" aria-label={unread ? `${unread} unread notices` : "Notifications"} aria-expanded={noticeOpen}>
-              <Bell size={18} />
-              {unread > 0 && <em className="bell-count">{unread > 99 ? "99+" : unread}</em>}
-            </button>
-            <button type="button" className="product-top-user" onClick={() => navigate("/settings")} aria-label="Open account settings">
-              <Avatar person={user} className="small" />
-              <span><b>{user.name.split(" ").slice(-1)[0]}</b><small>{roleLabel}</small></span>
-            </button>
-          </div>
-        </header>
-
-        <div className="product-context-strip">
-          <div><ShieldCheck size={15} /><span>{context.description}</span></div>
-          <div className="product-context-right"><Activity size={14} /><span>{topMeta}</span></div>
-        </div>
-
-        <main className="main portal-main product-main" id="main-content" tabIndex="-1">
           {noticeOpen && (
-            <aside className="product-notification-drawer" role="dialog" aria-label="Notifications">
-              <div className="product-notification-head">
-                <div><span className="eyebrow">Live feed</span><h3>Notifications</h3></div>
-                <button className="ghost-btn" type="button" onClick={markRead}>Mark all read</button>
-              </div>
-              <div className="product-notification-list">
-                {notes.length === 0 && <p className="muted">No new hospital notices.</p>}
-                {notes.slice(0, 10).map((n) => (
-                  <div key={n.id} className={`notice-item ${n.read ? "" : "unread"}`}><i /><span><b>{n.title}</b><small>{n.body}</small></span></div>
+            <aside className="cbx-notice-popover" role="dialog" aria-label="Notifications">
+              <header><div><small>Live feed</small><strong>Notifications</strong></div><button type="button" onClick={markAllRead}>Mark read</button></header>
+              <div className="cbx-notice-list">
+                {notes.length === 0 && <p>No new hospital notices.</p>}
+                {notes.slice(0, 8).map((note) => (
+                  <article key={note.id} className={note.read ? "" : "unread"}>
+                    <i />
+                    <div><strong>{note.title}</strong><p>{note.body}</p></div>
+                  </article>
                 ))}
               </div>
-              <div className="notice-actions">
-                {(user.role === "patient" || user.role === "admin") && <button className="secondary-btn" type="button" onClick={() => { setNoticeOpen(false); navigate("/alerts"); }}>Open notification centre</button>}
-                <button className="secondary-btn" type="button" onClick={() => { setNoticeOpen(false); navigate("/support"); }}>Support</button>
-              </div>
+              <footer><button type="button" onClick={() => { setNoticeOpen(false); navigate("/alerts"); }}>Open notification centre</button></footer>
             </aside>
           )}
 
-          <div className={`page-stage scene-${scene}`}>
-            <PageAtmosphere scene={scene} />
-            <div className="page-wrap product-page"><Outlet /></div>
-          </div>
+          <div className="cbx-content"><Outlet /></div>
         </main>
-      </section>
+      </div>
 
-      <nav className="product-mobile-nav" aria-label="Primary navigation">
-        {mobileItems.map((item) => renderLink(item, true))}
+      <nav className="cbx-mobile-nav" aria-label="Primary navigation">
+        {mobileNav.map((item) => navLink(item, true))}
       </nav>
     </div>
   );
