@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Clock, XCircle, Plus, Stethoscope, Video, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { io } from "socket.io-client";
-import { api, socketUrl } from "../api";
+import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { formatDate, formatTime, isUpcoming, todayISO, ghs, consultQuote } from "../utils";
 import Avatar from "../components/Avatar";
@@ -25,7 +25,7 @@ export default function Appointments() {
     api("/doctors").then(setDoctors);
     if (user.role !== "patient") api("/patients").then(setPatients);
     api("/finance/rates").then(setRates);
-    const socket = io(socketUrl, { autoConnect: true });
+    const socket = io(socketUrl, socketOptions());
     socket.on("doctor-status", (p) => {
       setDoctors((list) => list.map((d) => (d.id === p.id ? { ...d, available: p.available, photo: p.photo || d.photo } : d)));
     });

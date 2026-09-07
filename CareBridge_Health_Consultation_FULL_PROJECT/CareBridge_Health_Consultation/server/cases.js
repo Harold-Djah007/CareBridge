@@ -243,11 +243,19 @@ function enrich(db, row) {
 }
 
 export function mountCases(app, { readDb, writeDb, safeUser }) {
-  app.get("/api/cases/meta", (_, res) => {
+  const operationsOnly = (req, res) => {
+    if (req.authUser?.role === "admin") return false;
+    res.status(403).json({ message: "Case operations are available to hospital administrators." });
+    return true;
+  };
+
+  app.get("/api/cases/meta", (req, res) => {
+    if (operationsOnly(req, res)) return;
     res.json({ types: TYPES, workflows: WORKFLOWS });
   });
 
   app.get("/api/cases", (req, res) => {
+    if (operationsOnly(req, res)) return;
     const db = readDb();
     const added = syncCases(db);
     if (added) writeDb(db);
@@ -265,6 +273,7 @@ export function mountCases(app, { readDb, writeDb, safeUser }) {
   });
 
   app.get("/api/cases/:id", (req, res) => {
+    if (operationsOnly(req, res)) return;
     const db = readDb();
     syncCases(db);
     const row = (db.cases || []).find((c) => c.id === req.params.id);
@@ -273,6 +282,7 @@ export function mountCases(app, { readDb, writeDb, safeUser }) {
   });
 
   app.post("/api/cases/:id/forms", (req, res) => {
+    if (operationsOnly(req, res)) return;
     const db = readDb();
     const row = (db.cases || []).find((c) => c.id === req.params.id);
     if (!row) return res.status(404).json({ message: "Case not found" });
@@ -308,6 +318,7 @@ export function mountCases(app, { readDb, writeDb, safeUser }) {
   });
 
   app.patch("/api/cases/:id", (req, res) => {
+    if (operationsOnly(req, res)) return;
     const db = readDb();
     const row = (db.cases || []).find((c) => c.id === req.params.id);
     if (!row) return res.status(404).json({ message: "Case not found" });

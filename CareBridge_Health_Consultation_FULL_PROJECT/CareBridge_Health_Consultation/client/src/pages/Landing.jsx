@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Phone } from "lucide-react";
+import { ArrowRight, Phone, ShieldCheck, Smartphone, ReceiptText } from "lucide-react";
 import { HOSPITAL } from "../utils";
 import { HERO_SLIDES, QUICK_ACTIONS, SERVICES, NEWS } from "../publicContent";
 import { EcgRibbon } from "../components/LiveMeter";
@@ -24,6 +24,11 @@ export default function Landing() {
             <div className="hero-actions">
               <Link className="primary-btn cta-pulse" to="/book">Book Appointment <ArrowRight size={18} /></Link>
               <Link className="secondary-btn" to="/doctors">Find a doctor</Link>
+            </div>
+            <div className="hero-trustline" aria-label="CareBridge service benefits">
+              <span><ShieldCheck size={16} /> Secure patient portal</span>
+              <span><Smartphone size={16} /> Ghana MoMo checkout</span>
+              <span><ReceiptText size={16} /> Verified receipts</span>
             </div>
             <p className="muted hero-phone"><Phone size={16} /> Switchboard {HOSPITAL.phone} · Emergency {HOSPITAL.emergency}</p>
           </div>

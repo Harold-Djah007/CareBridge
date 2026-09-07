@@ -3,7 +3,7 @@ import { CalendarDays, BedDouble, Video, FolderOpen, Pill, Stethoscope, Check, P
 import { Link } from "react-router-dom";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
-import { api, socketUrl } from "../api";
+import { api, socketOptions, socketUrl } from "../api";
 import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate, prettyDate, ghs } from "../utils";
 import { Heartbeat } from "../components/LiveMeter";
 import Avatar from "../components/Avatar";
@@ -206,7 +206,7 @@ function NurseBoard({ user }) {
 
   useEffect(() => {
     load();
-    const socket = io(socketUrl, { autoConnect: true });
+    const socket = io(socketUrl, socketOptions());
     socket.emit("join-user", user.id);
     socket.on("pharmacy-order", (order) => {
       setOrders((rows) => {

@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import { api } from "../../api";
 import { ghs, prettyDate } from "../../utils";
 import PageHero from "../../components/PageHero";
+import { useAuth, useToast } from "../../state";
 
 function receiptKey(row) {
   return row.paymentId || row.receiptNo || row.id;
@@ -17,14 +18,37 @@ function haystack(row) {
 }
 
 export default function AdminReceipts() {
+  const { user } = useAuth();
+  const { push } = useToast();
   const [invoices, setInvoices] = useState([]);
   const [payments, setPayments] = useState([]);
   const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState("");
 
-  useEffect(() => {
+  const reload = () => {
     api("/billing?role=admin").then(setInvoices).catch(() => {});
     api("/finance/payments").then(setPayments).catch(() => {});
+  };
+
+  useEffect(() => {
+    reload();
   }, []);
+
+  const confirmManual = async (payment) => {
+    setBusyId(payment.id);
+    try {
+      await api("/finance/confirm", {
+        method: "POST",
+        body: JSON.stringify({ paymentId: payment.id, actorId: user.id }),
+      });
+      push("Offline payment posted and receipt issued.");
+      reload();
+    } catch (error) {
+      push(error.message, "error");
+    } finally {
+      setBusyId("");
+    }
+  };
 
   const paid = useMemo(() => {
     const fromPayments = (payments || [])
@@ -60,6 +84,7 @@ export default function AdminReceipts() {
     return [...fromPayments, ...fromInvoices].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
   }, [invoices, payments]);
 
+  const pendingManual = payments.filter((p) => p.status === "pending" && ["cash", "nhis"].includes(p.method));
   const due = invoices.filter((i) => i.status === "due");
   const q = query.trim().toLowerCase();
   const visible = q ? paid.filter((row) => haystack(row).includes(q)) : paid;
@@ -126,6 +151,33 @@ export default function AdminReceipts() {
           </tbody>
         </table>
       </section>
+
+      {pendingManual.length > 0 && (
+        <section className="card receipt-ledger manual-review-ledger">
+          <div className="card-head">
+            <div>
+              <span className="eyebrow">Verification queue</span>
+              <h3>Cash &amp; NHIS awaiting review</h3>
+            </div>
+            <small className="muted">Only post after you verify the cashier/NHIS record</small>
+          </div>
+          <table className="table">
+            <thead><tr><th>Patient</th><th>Reference</th><th>Method</th><th>Amount</th><th>Created</th><th /></tr></thead>
+            <tbody>
+              {pendingManual.map((payment) => (
+                <tr key={payment.id}>
+                  <td><b>{payment.patient?.name || "Patient"}</b><small className="muted" style={{ display: "block" }}>{payment.patient?.mrn || "—"}</small></td>
+                  <td>{payment.reference}</td>
+                  <td>{payment.method === "nhis" ? `NHIS · ${payment.nhisNumber || "policy"}` : "Cash"}</td>
+                  <td>{ghs(payment.amount)}</td>
+                  <td>{prettyDate(payment.createdAt)}</td>
+                  <td><button className="primary-btn" type="button" disabled={busyId === payment.id} onClick={() => confirmManual(payment)}>{busyId === payment.id ? "Posting…" : "Verify & post"}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       <section className="card due-readonly">
         <div className="card-head">

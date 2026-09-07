@@ -1,0 +1,226 @@
+/* CareBridge 2026 UI/UX refresh */
+:root {
+  --navy: #0b2f4f;
+  --navy-deep: #071f35;
+  --ink: #172432;
+  --muted: #657585;
+  --line: #dbe5ec;
+  --paper: #f4f8fb;
+  --card: #ffffff;
+  --teal: #087f73;
+  --teal-dark: #05675e;
+  --teal-soft: #e8f6f3;
+  --danger: #b42318;
+  --ok: #157347;
+  --shadow: 0 10px 30px rgba(11, 47, 79, 0.07);
+}
+
+html { scroll-behavior: smooth; }
+body { background: var(--paper); color: var(--ink); }
+::selection { background: #c8efe9; color: #082f49; }
+
+.skip-link {
+  position: fixed; left: 16px; top: 12px; z-index: 9999;
+  transform: translateY(-180%); padding: 10px 14px; border-radius: 10px;
+  background: #fff; color: var(--navy); border: 2px solid var(--teal);
+  font-weight: 800; box-shadow: 0 12px 30px rgba(0,0,0,.16);
+}
+.skip-link:focus { transform: translateY(0); }
+
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+[tabindex]:focus-visible { outline: 3px solid rgba(8, 127, 115, .28); outline-offset: 2px; }
+
+.primary-btn, .secondary-btn, .ghost-btn { min-height: 42px; border-radius: 12px; }
+.primary-btn { background: linear-gradient(135deg, #087f73, #05675e); box-shadow: 0 8px 18px rgba(8, 127, 115, .18); }
+.primary-btn:hover { background: linear-gradient(135deg, #05675e, #04554e); }
+.secondary-btn { background: #eef4f7; color: #17324a; border: 1px solid #d8e4eb; }
+.secondary-btn:hover { background: #e5eff4; border-color: #c8d9e4; transform: translateY(-1px); }
+.ghost-btn:hover { background: var(--teal-soft); }
+
+input, select, textarea { min-height: 44px; background: #fff; border-color: #ccd9e2; }
+input::placeholder, textarea::placeholder { color: #8b9aa8; }
+input:focus, select:focus, textarea:focus { border-color: #0b9587; box-shadow: 0 0 0 4px rgba(8, 127, 115, .1); }
+
+.card, .list-card, .stat-card, .ward-card, .person-card, .feature-card, .step {
+  background: #fff; border-color: #dce6ed; box-shadow: 0 8px 24px rgba(11, 47, 79, .05);
+}
+
+/* Public hospital experience */
+.util-bar { position: relative; z-index: 40; }
+.hospital-nav {
+  position: sticky; top: 0; z-index: 35;
+  background: rgba(255,255,255,.94); border-bottom: 1px solid rgba(219,229,236,.9);
+  backdrop-filter: blur(16px); box-shadow: 0 5px 18px rgba(11,47,79,.04);
+}
+.hospital-nav .brand-mark { box-shadow: 0 0 0 5px rgba(8,127,115,.08); }
+.public-links > a:not(.primary-btn) { position: relative; }
+.public-links > a:not(.primary-btn)::after {
+  content: ""; position: absolute; left: 10px; right: 10px; bottom: 3px; height: 2px;
+  background: var(--teal); border-radius: 99px; transform: scaleX(0); transition: transform .18s ease;
+}
+.public-links > a:hover::after, .public-links > a.on::after { transform: scaleX(1); }
+
+.hero-home { min-height: 620px; }
+.hero-card {
+  border: 1px solid rgba(255,255,255,.24); border-radius: 22px;
+  box-shadow: 0 24px 60px rgba(3,28,50,.18); backdrop-filter: blur(12px);
+}
+.hero-card h1 { line-height: 1.04; letter-spacing: -.035em; }
+.hero-trustline {
+  display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 4px 0 16px;
+  color: #dff7f3; font-size: 12px; font-weight: 700;
+}
+.hero-trustline span { display: inline-flex; align-items: center; gap: 6px; }
+.quick-card, .icon-service, .news-card { border-radius: 18px; }
+.quick-card:hover, .icon-service:hover, .news-card:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(11,47,79,.10); }
+
+/* Sign-in */
+.login-page { background: #f3f8fb; }
+.login-panel { background: radial-gradient(circle at 12% 0%, rgba(8,127,115,.08), transparent 38%), #f8fbfd; }
+.login-card { background: #fff; border: 1px solid #dce6ed; border-radius: 24px; padding: 28px; box-shadow: 0 24px 54px rgba(11,47,79,.1); }
+.portal-chooser { gap: 6px; padding: 5px; background: #eef4f7; border-radius: 14px; }
+.portal-chooser button { border-radius: 10px; }
+
+/* Signed-in portal */
+.app-layout.portal-app {
+  --mast-h: 72px; --pills-h: 54px;
+  grid-template-columns: 236px minmax(0, 1fr);
+  background: radial-gradient(900px 420px at 84% -14%, rgba(8,127,115,.08), transparent 60%), #f4f8fb;
+}
+.role-patient, .role-doctor, .role-admin, .role-nurse {
+  --paper: #f4f8fb; --card: #fff; --line: #dce6ed;
+  --teal: #087f73; --teal-dark: #05675e; --teal-soft: #e8f6f3;
+  --ink: #172432; --sidebar-bg: #0b2f4f; --sidebar-ink: #f5fbff; --nav-muted: #b7cad8;
+}
+.role-nurse { --sidebar-bg: #0b3b35; }
+.role-admin { --sidebar-bg: #142b43; }
+.role-doctor { --sidebar-bg: #11314b; }
+
+.portal-mast {
+  padding: 10px 22px; background: linear-gradient(105deg, var(--sidebar-bg), #0b3957);
+  box-shadow: 0 6px 20px rgba(6,32,53,.12);
+}
+.role-nurse .portal-mast { background: linear-gradient(105deg, #0b3b35, #0c4b43); }
+.role-admin .portal-mast { background: linear-gradient(105deg, #142b43, #173956); }
+.portal-brand .brand-mark { width: 42px; height: 42px; background: #fff; color: var(--teal); box-shadow: 0 0 0 5px rgba(255,255,255,.08); }
+.portal-brand span { color: #9ee3d9; }
+.portal-meta { color: #c6d6e2; }
+.portal-meta em { color: #9ee3d9; }
+.portal-search { max-width: 280px; flex-basis: 280px; border-radius: 12px; padding: 8px 12px; background: rgba(255,255,255,.10); }
+.portal-role-chip {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 10px;
+  border: 1px solid rgba(255,255,255,.18); border-radius: 999px; background: rgba(255,255,255,.08);
+  color: #dff7f3; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+}
+.portal-user { border-radius: 12px; padding-right: 10px; }
+.portal-pills { padding: 8px 22px; background: rgba(255,255,255,.96); box-shadow: 0 5px 16px rgba(11,47,79,.035); }
+.portal-pills .nav-item { border-radius: 10px; background: #f0f5f8; color: #27445c; }
+.portal-pills .nav-item.active, .portal-pills .nav-item.active:hover { background: #0c8175; box-shadow: 0 6px 14px rgba(8,127,115,.18); }
+
+.portal-app > .sidebar { padding-top: 16px; box-shadow: inset -1px 0 rgba(255,255,255,.04); }
+.portal-app .nav-item { min-height: 42px; border-radius: 10px; }
+.portal-app .nav-item.active { background: rgba(255,255,255,.10); color: #9ff0e4; box-shadow: inset 3px 0 #6de1d1; }
+.portal-app .nav-item:hover { background: rgba(255,255,255,.07); }
+.portal-app .page-wrap { max-width: 1320px; padding: 24px 30px 54px; }
+.portal-app .page-hero {
+  border-radius: 18px; overflow: hidden; box-shadow: 0 12px 30px rgba(11,47,79,.12);
+  border: 1px solid rgba(255,255,255,.55);
+}
+.portal-app .page-title { border-radius: 18px; box-shadow: 0 8px 22px rgba(11,47,79,.04); }
+.portal-app .card, .portal-app .list-card, .portal-app .stat-card, .portal-app .person-card,
+.portal-app .ward-card, .portal-app .kpi, .portal-app .clinic-board, .portal-app .work-deck {
+  border-radius: 18px; box-shadow: 0 8px 24px rgba(11,47,79,.055); border-color: #dce6ed;
+}
+.portal-app .card:hover { border-color: #cfdfe8; }
+.stat-chip { border-radius: 16px; box-shadow: 0 8px 24px rgba(11,47,79,.045); }
+.stat-chip strong { color: #102f48; }
+.tile-card { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.portal-app .tile-card { border-radius: 18px; }
+.portal-app .tile-card:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(11,47,79,.10); border-color: #c8dce5; }
+
+/* Commerce */
+.commerce-trustbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 0 0 14px;
+  padding: 10px 14px; border: 1px solid #cfe5df; border-radius: 14px; background: #f1faf8;
+  color: #285d58; font-size: 12px; font-weight: 750;
+}
+.commerce-trustbar span { display: inline-flex; align-items: center; gap: 6px; }
+.shop-toolbar { position: sticky; top: 8px; z-index: 8; padding: 10px; border: 1px solid #dce6ed; border-radius: 16px; background: rgba(255,255,255,.94); backdrop-filter: blur(12px); box-shadow: 0 8px 24px rgba(11,47,79,.06); }
+.shop-toolbar .filters { flex: 1 1 auto; border: 0; padding: 0; background: transparent; }
+.shop-toolbar .filters button { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; border-radius: 10px; color: #496072; }
+.shop-toolbar .filters button.active { color: #fff; background: #0c8175; box-shadow: 0 6px 14px rgba(8,127,115,.18); }
+.tab-count { min-width: 22px; height: 22px; padding: 0 6px; display: inline-grid; place-items: center; border-radius: 999px; background: rgba(11,47,79,.08); color: inherit; font-size: 10px; font-style: normal; }
+.shop-toolbar .filters button.active .tab-count { background: rgba(255,255,255,.18); }
+.shop-toolbar .shop-search { flex-basis: 300px; border-left-width: 1px; border-radius: 11px; }
+.pharm-cat, .shop-layout > div > .card { border-radius: 18px; }
+.pharm-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.pharm-card { border-radius: 16px; padding: 16px; border: 1px solid #dce6ed; background: #fff; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.pharm-card:hover { transform: translateY(-2px); border-color: #c8dce5; box-shadow: 0 12px 28px rgba(11,47,79,.08); }
+.pharm-card.in-cart { border-color: #6bc5b8; background: #f5fbfa; box-shadow: 0 0 0 3px #e8f6f3; }
+.add-cart-btn { border-radius: 11px; min-height: 40px; background: #0b2f4f; }
+.add-cart-btn:hover { background: #08253e; }
+.shop-spend-bar { border-radius: 14px; box-shadow: 0 10px 28px rgba(11,47,79,.09); }
+.pending-payments-strip { border-left: 4px solid #d59b2e; }
+
+.cart-scrim { background: rgba(4,23,38,.56); backdrop-filter: blur(2px); }
+.cart-drawer { width: min(460px, 100vw); background: #fff; border-left-color: #d7e3ea; box-shadow: -24px 0 58px rgba(4,23,38,.18); }
+.cart-drawer-head { background: linear-gradient(180deg, #f8fbfd, #f2f7fa); padding: 20px; }
+.cart-drawer-body { background: #fbfdfe; padding: 14px 20px 30px; }
+.cart-drawer > .running-total { background: #eaf8f5; color: #103c39; padding: 12px 20px; }
+.basket-group { background: #fff; border: 1px solid #dce6ed; border-radius: 14px; padding: 12px; margin-bottom: 12px; }
+.basket-row { padding: 10px 0; }
+.basket-totals { background: #fff; border: 1px solid #dce6ed; border-radius: 14px; padding: 12px 14px; }
+.pay-form { margin-top: 14px; padding: 16px; background: #fff; border: 1px solid #dce6ed; border-radius: 16px; }
+.checkout-title { display: flex; align-items: center; gap: 7px; margin: 0 0 10px; color: #075e55; font-weight: 850; font-size: 13px; letter-spacing: .02em; }
+.payment-method-card { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 10px; padding: 12px; margin-bottom: 8px; border: 1px solid #dce6ed; border-radius: 12px; background: #fff; cursor: pointer; }
+.payment-method-card:has(input:checked) { border-color: #64bdb1; background: #f0faf8; box-shadow: 0 0 0 3px rgba(8,127,115,.08); }
+.payment-method-card input { min-height: 0; margin-top: 3px; accent-color: #087f73; }
+.payment-method-card small { line-height: 1.35; }
+.bank-box { border-radius: 12px; background: #f5f9fb; border-color: #d9e5ec; }
+
+/* Tables and dense operational surfaces */
+.table-wrap { border: 1px solid #dce6ed; border-radius: 16px; overflow: auto; background: #fff; }
+.table th { background: #f4f8fa; color: #567083; position: sticky; top: 0; z-index: 1; }
+.table td { border-color: #e7eef3; }
+.table tbody tr:hover { background: #f5fafb; }
+
+/* Mobile ergonomics */
+@media (max-width: 1180px) {
+  .app-layout.portal-app { grid-template-columns: 78px minmax(0, 1fr); }
+  .portal-role-chip { display: none; }
+}
+@media (max-width: 720px) {
+  .app-layout.portal-app { --pills-h: 50px; }
+  .portal-brand { min-width: 0; }
+  .portal-brand b { font-size: 14px; }
+  .portal-tools { gap: 4px; }
+  .portal-user { padding: 4px; border-radius: 999px; }
+  .portal-pills { padding: 7px 10px; }
+  .portal-pills .nav-item { padding: 8px 11px; }
+  .portal-app > .sidebar { height: 76px; background: rgba(9,45,72,.97); backdrop-filter: blur(14px); }
+  .portal-app .mobile-nav { height: 100%; gap: 2px; }
+  .portal-app .mobile-nav .nav-item { flex-direction: column; gap: 3px; padding: 7px 3px; font-size: 10px; }
+  .portal-app .mobile-nav .nav-item span { display: block; max-width: 62px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .portal-app .mobile-nav .nav-item.active { background: rgba(255,255,255,.11); color: #9ff0e4; }
+  .portal-main { padding-bottom: 84px; }
+  .portal-app .page-wrap { padding: 14px 12px 30px; }
+  .shop-toolbar { top: 4px; padding: 8px; }
+  .shop-toolbar .shop-search { flex: 1 1 100%; }
+  .shop-toolbar .filters { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .shop-toolbar .filters button { justify-content: space-between; }
+  .shop-toolbar .shop-cart-chip { width: 100%; margin-left: 0; justify-content: center; }
+  .commerce-trustbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pharm-grid { grid-template-columns: 1fr; }
+  .cart-drawer { width: 100vw; }
+}
+@media (max-width: 420px) {
+  .portal-mast .live-clock { display: none; }
+  .portal-pills .nav-item span { display: none; }
+  .commerce-trustbar { grid-template-columns: 1fr; }
+  .stat-strip { grid-template-columns: 1fr 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}

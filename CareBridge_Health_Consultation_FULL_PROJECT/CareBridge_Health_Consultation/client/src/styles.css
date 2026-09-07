@@ -2512,3 +2512,24 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
   .jump-menu { width: 100%; }
   .jump-menu select { flex: 1; min-width: 0; }
 }
+
+/* Secure ecommerce checkout */
+.check-row.disabled { opacity: 0.52; cursor: not-allowed; }
+.check-row.disabled input { cursor: not-allowed; }
+.pending-payments-strip { margin: 0 0 16px; }
+.pending-payment-list { display: grid; gap: 8px; }
+.pending-payment-list .pay-pick { text-decoration: none; }
+.payment-callback-card,
+.payment-status-card { max-width: 780px; display: grid; gap: 18px; }
+.payment-callback-card { grid-template-columns: auto minmax(0, 1fr); align-items: flex-start; }
+.payment-status-title { display: flex; align-items: center; gap: 12px; color: var(--navy); }
+.payment-status-title h3 { margin: 2px 0 0; }
+.manual-review-ledger { margin-bottom: 16px; }
+.spin { animation: carebridge-spin 0.9s linear infinite; }
+@keyframes carebridge-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 720px) {
+  .payment-callback-card { grid-template-columns: 1fr; }
+  .pending-payment-list .pay-pick { grid-template-columns: minmax(0, 1fr) auto; }
+  .pending-payment-list .status { grid-column: 1 / -1; justify-self: start; }
+}

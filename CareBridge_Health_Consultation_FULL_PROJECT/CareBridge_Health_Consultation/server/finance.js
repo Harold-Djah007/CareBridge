@@ -1,5 +1,6 @@
 import { audit } from "./clinical.js";
 import { markPharmacyPaid, catalogStock, isSellable } from "./pharmacy.js";
+import { flutterwaveStatus, paymentMatchesVerification, startFlutterwavePayment, validFlutterwaveWebhook, verifyFlutterwaveTransaction } from "./flutterwave.js";
 
 export const ACCOUNTS = {
   bank: {
@@ -211,7 +212,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
 
   app.patch("/api/finance/rates", (req, res) => {
     const db = readDb();
-    const actor = db.users.find((u) => u.id === req.body.actorId);
+    const actor = req.authUser;
     if (!actor || !["doctor", "admin"].includes(actor.role)) {
       return res.status(403).json({ message: "Only consultants and operations can change the hospital tariff." });
     }
@@ -267,19 +268,23 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
   });
 
   app.get("/api/finance/payments", (req, res) => {
+    if (!req.authUser) return res.status(401).json({ message: "Sign in to view payments." });
     const db = readDb();
-    const { userId, role } = req.query;
     let rows = db.payments || [];
-    if (role === "patient") rows = rows.filter((p) => p.patientId === userId);
+    if (req.authUser.role !== "admin") rows = rows.filter((p) => p.patientId === req.authUser.id);
     res.json(rows.slice().reverse().map((p) => ({
-      ...p,
+      ...publicPayment(p),
       patient: safeUser(db.users.find((u) => u.id === p.patientId) || {}),
     })));
   });
 
   const placeOrder = (kind) => async (req, res) => {
-    const { patientId, items = [], actorId } = req.body;
+    if (!req.authUser) return res.status(401).json({ message: "Sign in to place an order." });
+    const { items = [] } = req.body;
+    const patientId = req.authUser.role === "patient" ? req.authUser.id : req.body.patientId;
+    const actorId = req.authUser.id;
     const db = readDb();
+    if (!patientId || !(db.users || []).some((u) => u.id === patientId && u.role === "patient")) return res.status(400).json({ message: "Choose a valid patient." });
     const t = tariffOf(db);
     const catalog = kind === "lab" ? t.labs : (db.pharmacyStock || PHARMACY);
     if (kind === "pharmacy") {
@@ -322,7 +327,10 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
   app.post("/api/finance/labs/order", placeOrder("lab"));
 
   app.post("/api/finance/services/order", async (req, res) => {
-    const { patientId, serviceId, actorId } = req.body;
+    if (!req.authUser) return res.status(401).json({ message: "Sign in to order a hospital service." });
+    const patientId = req.authUser.role === "patient" ? req.authUser.id : req.body.patientId;
+    const serviceId = req.body.serviceId;
+    const actorId = req.authUser.id;
     const db = readDb();
     const service = tariffOf(db).services.find((s) => s.id === serviceId);
     if (!service) return res.status(404).json({ message: "Service not on the tariff." });
@@ -339,29 +347,146 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     res.status(201).json(invoice);
   });
 
-  const rejectAdminPay = (req, res, db) => {
-    const actor = db.users.find((u) => u.id === req.body.actorId);
-    if (actor?.role === "admin") {
-      res.status(403).json({ message: "Administrators review receipts only. Patients complete payment in Shop & pay." });
+  const gatewayMethods = new Set(["card", "momo", "bank"]);
+  const manualMethods = new Set(["cash", "nhis"]);
+
+  const publicPayment = (payment = {}) => {
+    const { providerPayload, providerErrorPayload, ...safe } = payment;
+    return safe;
+  };
+
+  const invoicesForPayment = (db, payment) => {
+    const ids = payment?.invoiceIds?.length ? payment.invoiceIds : [payment?.invoiceId];
+    return ids.map((id) => (db.invoices || []).find((row) => row.id === id)).filter(Boolean);
+  };
+
+  const methodLabel = (payment) => {
+    if (payment.method === "card") return "Flutterwave card";
+    if (payment.method === "momo") return `Flutterwave ${(payment.network || "MoMo").toUpperCase()}`;
+    if (payment.method === "bank") return "Flutterwave bank transfer";
+    if (payment.method === "nhis") return `NHIS ${payment.nhisNumber || "claim"}`;
+    return "Cash at Ridge cashier";
+  };
+
+  const completePayment = async (db, payment, verification = null, actorId = "flutterwave") => {
+    if (!payment) throw Object.assign(new Error("Payment not found."), { status: 404 });
+    if (payment.status === "paid") return { payment, invoices: invoicesForPayment(db, payment) };
+    if (gatewayMethods.has(payment.method) && !paymentMatchesVerification(payment, verification)) {
+      throw Object.assign(new Error("Flutterwave verification does not match this CareBridge payment."), { status: 400 });
+    }
+
+    const invoices = invoicesForPayment(db, payment);
+    if (!invoices.length) throw Object.assign(new Error("The invoices for this payment could not be found."), { status: 404 });
+    const stamp = new Date().toISOString();
+    payment.status = "paid";
+    payment.confirmedAt = stamp;
+    payment.verifiedAt = stamp;
+    payment.requiresManualReview = false;
+    payment.providerStatus = verification?.status || payment.providerStatus || "manual";
+    if (verification?.id) payment.gatewayTransactionId = String(verification.id);
+    if (verification?.flw_ref) payment.flwRef = verification.flw_ref;
+
+    const label = methodLabel(payment);
+    invoices.forEach((row) => {
+      row.status = "paid";
+      row.paidAt = stamp;
+      row.receiptNo = payment.receiptNo;
+      row.paymentId = payment.id;
+      row.method = label;
+    });
+    markPharmacyPaid(db, invoices);
+    clearUserCart?.(db, payment.patientId);
+    audit(db, {
+      actorId,
+      action: gatewayMethods.has(payment.method) ? "payment.verify" : "payment.manual-confirm",
+      entity: "payment",
+      entityId: payment.id,
+      detail: `${payment.receiptNo} · ${payment.currency} ${payment.amount}`,
+    });
+    notify(db, payment.patientId, "Payment received", `Receipt ${payment.receiptNo} · GHS ${payment.amount}`);
+    await emailPatient(db, payment.patientId, {
+      type: "account",
+      subject: `Receipt ${payment.receiptNo} from CareBridge`,
+      heading: "Payment received",
+      intro: "Your payment has been verified and posted to the hospital accounts.",
+      details: [
+        ["Receipt", payment.receiptNo],
+        ["Reference", payment.reference],
+        ["Amount", `GHS ${payment.amount}`],
+        ["Method", label],
+        ["Item", invoices.map((i) => i.item).join("; ") || "Hospital services"],
+      ],
+    });
+    writeDb(db);
+    io?.to(payment.patientId).emit("payment-updated", publicPayment(payment));
+    return { payment, invoices };
+  };
+
+  const refreshGatewayPayment = async (db, payment, transactionId = null) => {
+    if (!payment || !gatewayMethods.has(payment.method) || payment.status === "paid") return { payment, invoices: invoicesForPayment(db, payment) };
+    const id = transactionId || payment.gatewayTransactionId;
+    if (!id) return { payment, invoices: invoicesForPayment(db, payment) };
+    const verification = await verifyFlutterwaveTransaction(id);
+    payment.lastVerifiedAt = new Date().toISOString();
+    payment.providerStatus = verification?.status || payment.providerStatus || "pending";
+    if (verification?.id) payment.gatewayTransactionId = String(verification.id);
+    if (verification?.flw_ref) payment.flwRef = verification.flw_ref;
+    if (paymentMatchesVerification(payment, verification)) {
+      return completePayment(db, payment, verification);
+    }
+    if (["failed", "cancelled"].includes(String(verification?.status || "").toLowerCase())) {
+      payment.status = "failed";
+      payment.failedAt = new Date().toISOString();
+    }
+    writeDb(db);
+    return { payment, invoices: invoicesForPayment(db, payment), verification };
+  };
+
+  const rejectAdminPay = (req, res) => {
+    const actor = req.authUser;
+    if (!actor) {
+      res.status(401).json({ message: "Sign in before starting checkout." });
+      return true;
+    }
+    if (actor.role !== "patient") {
+      res.status(403).json({ message: "Checkout is available from a patient account; staff review and fulfil orders." });
       return true;
     }
     return false;
   };
 
+  app.get("/api/finance/payment-config", (_, res) => {
+    const fw = flutterwaveStatus();
+    res.json({
+      currency: "GHS",
+      flutterwave: fw,
+      methods: [
+        { id: "card", online: true, enabled: fw.configured },
+        { id: "momo", online: true, enabled: fw.configured },
+        { id: "bank", online: true, enabled: fw.configured },
+        { id: "nhis", online: false, enabled: true },
+        { id: "cash", online: false, enabled: true },
+      ],
+    });
+  });
+
   app.post("/api/finance/checkout", async (req, res) => {
     const db = readDb();
-    if (rejectAdminPay(req, res, db)) return;
+    if (rejectAdminPay(req, res)) return;
     const inv = (db.invoices || []).find((i) => i.id === req.body.invoiceId);
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
     if (inv.status === "paid") return res.status(400).json({ message: "This invoice is already paid." });
+    if (inv.patientId !== req.authUser.id) return res.status(403).json({ message: "That bill is not on your patient file." });
     return startPayment(req, res, db, [inv]);
   });
 
   app.post("/api/finance/checkout-cart", async (req, res) => {
     const db = readDb();
-    if (rejectAdminPay(req, res, db)) return;
-    const pid = req.body.patientId;
-    if (!pid) return res.status(400).json({ message: "Patient is required." });
+    if (rejectAdminPay(req, res)) return;
+    const pid = req.authUser.id;
+    const patient = (db.users || []).find((u) => u.id === pid && u.role === "patient");
+    if (!patient) return res.status(404).json({ message: "Patient not found." });
+    const checkoutKey = String(req.body.checkoutKey || "").trim().slice(0, 120);
     const invoices = [];
     for (const id of req.body.invoiceIds || []) {
       const inv = (db.invoices || []).find((i) => i.id === id && i.patientId === pid && i.status === "due");
@@ -370,31 +495,57 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     for (const svc of req.body.services || []) {
       const service = tariffOf(db).services.find((s) => s.id === svc.id || s.id === svc.productId);
       if (!service) return res.status(400).json({ message: "That hospital service is not on the tariff." });
-      const qty = Math.max(1, Number(svc.qty || 1));
+      const qty = Math.max(1, Math.min(50, Number(svc.qty || 1) || 1));
       const price = Number(service.price || 0);
-      invoices.push(addInvoice(db, {
-        patientId: pid,
-        item: qty > 1 ? `${service.name} ×${qty}` : service.name,
-        amount: price * qty,
-        category: "service",
-        nhis: service.nhis,
-        lines: [{ ...service, price, qty, lineTotal: price * qty }],
-      }));
+      let invoice = checkoutKey && (db.invoices || []).find((row) => (
+        row.patientId === pid
+        && row.status === "due"
+        && row.checkoutKey === checkoutKey
+        && row.sourceProductId === service.id
+        && Number(row.sourceQty || 1) === qty
+      ));
+      if (!invoice) {
+        invoice = addInvoice(db, {
+          patientId: pid,
+          item: qty > 1 ? `${service.name} ×${qty}` : service.name,
+          amount: price * qty,
+          category: "service",
+          nhis: service.nhis,
+          checkoutKey: checkoutKey || undefined,
+          sourceProductId: service.id,
+          sourceQty: qty,
+          lines: [{ ...service, price, qty, lineTotal: price * qty }],
+        });
+      }
+      if (!invoices.some((row) => row.id === invoice.id)) invoices.push(invoice);
     }
     if (!invoices.length) return res.status(400).json({ message: "Your cart is empty. Add a bill or a hospital service first." });
-    clearUserCart?.(db, pid);
     return startPayment(req, res, db, invoices);
   });
 
-  function startPayment(req, res, db, invoices) {
+  async function startPayment(req, res, db, invoices) {
     const method = req.body.method;
-    if (!["momo", "bank", "nhis", "cash"].includes(method)) {
-      return res.status(400).json({ message: "Choose MoMo, bank transfer, NHIS, or cash." });
+    if (!["card", "momo", "bank", "nhis", "cash"].includes(method)) {
+      return res.status(400).json({ message: "Choose card, Mobile Money, bank transfer, NHIS, or cash." });
     }
+    if (gatewayMethods.has(method) && !flutterwaveStatus().configured) {
+      return res.status(503).json({
+        message: "Online checkout is ready but Flutterwave is not configured. Add FLW_SECRET_KEY and FLW_SECRET_HASH to server/.env, then restart CareBridge.",
+      });
+    }
+    if (!invoices.length || invoices.some((i) => i.status !== "due")) {
+      return res.status(400).json({ message: "Only unpaid invoices can be checked out." });
+    }
+    if (new Set(invoices.map((i) => i.patientId)).size !== 1) {
+      return res.status(400).json({ message: "A checkout can only contain bills for one patient." });
+    }
+    const patient = (db.users || []).find((u) => u.id === invoices[0].patientId);
+    if (!patient) return res.status(404).json({ message: "Patient not found." });
     const network = req.body.network || "mtn";
-    const amount = invoices.reduce((s, i) => s + Number(i.amount || 0), 0);
+    const amount = Number(invoices.reduce((s, i) => s + Number(i.amount || 0), 0).toFixed(2));
+    if (!(amount > 0)) return res.status(400).json({ message: "The checkout total must be greater than zero." });
     const payment = {
-      id: `pay${Date.now()}`,
+      id: `pay${Date.now()}${Math.floor(Math.random() * 900)}`,
       invoiceId: invoices[0].id,
       invoiceIds: invoices.map((i) => i.id),
       patientId: invoices[0].patientId,
@@ -402,95 +553,143 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
       currency: "GHS",
       method,
       network,
-      phone: req.body.phone || "",
-      payerName: req.body.payerName || "",
-      nhisNumber: req.body.nhisNumber || "",
+      phone: String(req.body.phone || patient.phone || "").trim(),
+      payerName: String(req.body.payerName || patient.name || "").trim(),
+      nhisNumber: String(req.body.nhisNumber || "").trim(),
       reference: payRef(),
       receiptNo: receiptNo(),
-      status: method === "cash" ? "paid" : "pending",
-      destination: method === "momo"
-        ? { type: "momo", network, merchant: ACCOUNTS.momo.name, merchantId: ACCOUNTS.momo.merchantId, number: ACCOUNTS.momo[network] || ACCOUNTS.momo.mtn }
-        : method === "bank"
-          ? ACCOUNTS.bank
-          : method === "nhis"
-            ? { type: "nhis", scheme: "National Health Insurance Scheme" }
-            : ACCOUNTS.cashier,
+      status: "pending",
+      requiresManualReview: manualMethods.has(method),
+      checkoutKey: String(req.body.checkoutKey || "").trim().slice(0, 120) || undefined,
       createdAt: new Date().toISOString(),
     };
     db.payments = db.payments || [];
     db.payments.push(payment);
-    if (payment.status === "paid") {
-      invoices.forEach((inv) => {
-        inv.status = "paid";
-        inv.method = "Cash at Ridge cashier";
-        inv.paidAt = payment.createdAt;
-        inv.receiptNo = payment.receiptNo;
-        inv.paymentId = payment.id;
-      });
-      markPharmacyPaid(db, invoices);
-      clearUserCart?.(db, invoices[0].patientId);
-    }
-    audit(db, { actorId: req.body.actorId, action: "payment.start", entity: "payment", entityId: payment.id, detail: `${method} GHS ${amount}` });
+    audit(db, { actorId: req.authUser?.id || payment.patientId, action: "payment.start", entity: "payment", entityId: payment.id, detail: `${method} GHS ${amount}` });
     writeDb(db);
-    res.status(201).json({ payment, invoices, invoice: invoices[0], accounts: ACCOUNTS });
+
+    if (manualMethods.has(method)) {
+      payment.destination = method === "nhis"
+        ? { type: "nhis", scheme: "National Health Insurance Scheme" }
+        : ACCOUNTS.cashier;
+      writeDb(db);
+      return res.status(201).json({ payment: publicPayment(payment), invoices, invoice: invoices[0], mode: "manual_review" });
+    }
+
+    try {
+      const result = await startFlutterwavePayment({ req, payment, user: patient });
+      payment.provider = "flutterwave";
+      payment.providerMode = result.mode;
+      payment.gatewayTransactionId = result.gatewayTransactionId || payment.gatewayTransactionId || null;
+      payment.flwRef = result.flwRef || payment.flwRef || null;
+      payment.bankTransfer = result.bankTransfer || null;
+      payment.providerInitiatedAt = new Date().toISOString();
+      writeDb(db);
+      return res.status(201).json({
+        payment: publicPayment(payment),
+        invoices,
+        invoice: invoices[0],
+        mode: result.mode,
+        checkoutUrl: result.checkoutUrl || null,
+        bankTransfer: result.bankTransfer || null,
+      });
+    } catch (error) {
+      payment.status = "failed";
+      payment.failedAt = new Date().toISOString();
+      payment.providerError = error.message;
+      writeDb(db);
+      return res.status(error.status || 502).json({
+        message: error.message || "Flutterwave checkout could not be started.",
+        payment: publicPayment(payment),
+      });
+    }
   }
+
+  app.post("/api/finance/verify", async (req, res) => {
+    if (!req.authUser) return res.status(401).json({ message: "Sign in to verify this payment." });
+    const db = readDb();
+    const payment = (db.payments || []).find((p) => p.id === req.body.paymentId || p.reference === req.body.txRef);
+    if (!payment) return res.status(404).json({ message: "Payment not found." });
+    if (req.authUser.role !== "admin" && payment.patientId !== req.authUser.id) return res.status(403).json({ message: "That payment is not on your patient file." });
+    if (!gatewayMethods.has(payment.method)) return res.status(400).json({ message: "That payment is reviewed by hospital accounts, not Flutterwave." });
+    try {
+      const result = await refreshGatewayPayment(db, payment, req.body.transactionId);
+      return res.json({ payment: publicPayment(result.payment), invoices: result.invoices, invoice: result.invoices?.[0] || null });
+    } catch (error) {
+      return res.status(error.status || 502).json({ message: error.message || "Payment verification failed." });
+    }
+  });
+
+  app.get("/api/finance/payments/:id/status", async (req, res) => {
+    if (!req.authUser) return res.status(401).json({ message: "Sign in to view this payment." });
+    const db = readDb();
+    const payment = (db.payments || []).find((p) => p.id === req.params.id);
+    if (!payment) return res.status(404).json({ message: "Payment not found." });
+    if (req.authUser.role !== "admin" && payment.patientId !== req.authUser.id) return res.status(403).json({ message: "That payment is not on your patient file." });
+    try {
+      const last = payment.lastVerifiedAt ? new Date(payment.lastVerifiedAt).getTime() : 0;
+      const dueForRefresh = String(req.query.refresh) === "1" && Date.now() - last > 8000;
+      const result = dueForRefresh ? await refreshGatewayPayment(db, payment) : { payment, invoices: invoicesForPayment(db, payment) };
+      return res.json({ payment: publicPayment(result.payment), invoices: result.invoices, invoice: result.invoices?.[0] || null });
+    } catch (error) {
+      return res.status(error.status || 502).json({ message: error.message || "Could not refresh payment status.", payment: publicPayment(payment) });
+    }
+  });
 
   app.post("/api/finance/confirm", async (req, res) => {
     const db = readDb();
-    if (rejectAdminPay(req, res, db)) return;
+    const actor = req.authUser;
+    if (!actor || actor.role !== "admin") return res.status(403).json({ message: "Only hospital operations can manually confirm offline payments." });
     const payment = (db.payments || []).find((p) => p.id === req.body.paymentId);
-    if (!payment) return res.status(404).json({ message: "Payment not found" });
-    const ids = payment.invoiceIds?.length ? payment.invoiceIds : [payment.invoiceId];
-    const invoices = ids.map((id) => (db.invoices || []).find((i) => i.id === id)).filter(Boolean);
-    const inv = invoices[0];
-    payment.status = "paid";
-    payment.confirmedAt = new Date().toISOString();
-    const methodLabel = payment.method === "momo"
-      ? `${(payment.network || "MoMo").toUpperCase()} ${payment.phone}`
-      : payment.method === "bank"
-        ? `GCB transfer ${payment.reference}`
-        : payment.method === "nhis"
-          ? `NHIS ${payment.nhisNumber}`
-          : "Cash";
-    invoices.forEach((row) => {
-      row.status = "paid";
-      row.paidAt = payment.confirmedAt;
-      row.receiptNo = payment.receiptNo;
-      row.paymentId = payment.id;
-      row.method = methodLabel;
-    });
-    markPharmacyPaid(db, invoices);
-    clearUserCart?.(db, payment.patientId);
-    audit(db, { actorId: req.body.actorId, action: "payment.confirm", entity: "payment", entityId: payment.id, detail: payment.receiptNo });
-    notify(db, payment.patientId, "Payment received", `Receipt ${payment.receiptNo} · GHS ${payment.amount}`);
-    await emailPatient(db, payment.patientId, {
-      type: "account",
-      subject: `Receipt ${payment.receiptNo} from CareBridge`,
-      heading: "Payment received",
-      intro: "Your payment has been posted to the hospital accounts. Keep this receipt for NHIS or employer claims.",
-      details: [
-        ["Receipt", payment.receiptNo],
-        ["Reference", payment.reference],
-        ["Amount", `GHS ${payment.amount}`],
-        ["Method", inv?.method || payment.method],
-        ["Item", invoices.map((i) => i.item).join("; ") || "Hospital services"],
-        ["Settled to", payment.method === "momo" ? `MoMo ${payment.destination?.number}` : payment.method === "bank" ? `GCB ${ACCOUNTS.bank.accountNumber}` : "Ridge cashier / NHIS"],
-      ],
-    });
-    writeDb(db);
-    res.json({ payment, invoice: inv, invoices });
+    if (!payment) return res.status(404).json({ message: "Payment not found." });
+    if (!manualMethods.has(payment.method)) return res.status(400).json({ message: "Card, Mobile Money, and bank payments must be verified by Flutterwave." });
+    if (payment.status === "paid") return res.json({ payment: publicPayment(payment), invoices: invoicesForPayment(db, payment) });
+    try {
+      const result = await completePayment(db, payment, null, actor.id);
+      return res.json({ payment: publicPayment(result.payment), invoices: result.invoices, invoice: result.invoices[0] || null });
+    } catch (error) {
+      return res.status(error.status || 500).json({ message: error.message || "Could not confirm the payment." });
+    }
+  });
+
+  app.post(["/api/payments/webhook", "/api/finance/webhook"], async (req, res) => {
+    if (!validFlutterwaveWebhook(req)) return res.status(401).send("Invalid signature");
+    const eventName = req.body?.event || req.body?.type;
+    const data = req.body?.data || {};
+    if (eventName && eventName !== "charge.completed") return res.sendStatus(200);
+    if (!data.id) return res.sendStatus(200);
+    try {
+      const verification = await verifyFlutterwaveTransaction(data.id);
+      const db = readDb();
+      const payment = (db.payments || []).find((p) => p.reference === verification?.tx_ref);
+      if (!payment) return res.sendStatus(200);
+      if (!paymentMatchesVerification(payment, verification)) {
+        payment.providerStatus = verification?.status || "mismatch";
+        payment.lastVerifiedAt = new Date().toISOString();
+        writeDb(db);
+        return res.sendStatus(200);
+      }
+      await completePayment(db, payment, verification);
+      return res.sendStatus(200);
+    } catch (error) {
+      console.error("Flutterwave webhook verification failed:", error.message);
+      return res.sendStatus(500);
+    }
   });
 
   app.get("/api/receipts/:id", (req, res) => {
+    if (!req.authUser) return res.status(401).json({ message: "Sign in to view a receipt." });
     const db = readDb();
     const key = decodeURIComponent(req.params.id);
     const payment = (db.payments || []).find((p) => p.id === key || p.receiptNo === key);
     if (payment) {
+      if (req.authUser.role !== "admin" && payment.patientId !== req.authUser.id) return res.status(403).json({ message: "That receipt is not on your patient file." });
       const invoice = (db.invoices || []).find((i) => i.id === payment.invoiceId);
-      return res.json(receiptPayload(db, payment, invoice));
+      return res.json(receiptPayload(db, publicPayment(payment), invoice));
     }
     const invoice = (db.invoices || []).find((i) => i.id === key || i.receiptNo === key);
     if (invoice && invoice.status === "paid") {
+      if (req.authUser.role !== "admin" && invoice.patientId !== req.authUser.id) return res.status(403).json({ message: "That receipt is not on your patient file." });
       const linked = (db.payments || []).find((p) => p.invoiceId === invoice.id);
       const synthetic = linked || {
         id: invoice.id,

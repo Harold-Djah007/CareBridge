@@ -12,8 +12,21 @@ export function AuthProvider({ children }) {
   });
   const auth = useMemo(() => ({
     user,
-    login: (u) => { setUser(u); localStorage.setItem("carebridge-user", JSON.stringify(u)); },
-    logout: () => { setUser(null); localStorage.removeItem("carebridge-user"); },
+    login: (u, token) => {
+      setUser(u);
+      localStorage.setItem("carebridge-user", JSON.stringify(u));
+      if (token) localStorage.setItem("carebridge-token", token);
+    },
+    logout: () => {
+      const token = localStorage.getItem("carebridge-token");
+      if (token) {
+        const apiBase = import.meta.env.VITE_API_URL || "/api";
+        fetch(`${apiBase}/logout`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+      }
+      setUser(null);
+      localStorage.removeItem("carebridge-user");
+      localStorage.removeItem("carebridge-token");
+    },
     updateUser: (u) => { setUser(u); localStorage.setItem("carebridge-user", JSON.stringify(u)); },
   }), [user]);
   return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;

@@ -120,6 +120,7 @@ export default function PublicChrome({ variant = "page", children }) {
 
   return (
     <div className={`hospital-site ${home ? "landing landing-home" : "landing hospital-page"}`}>
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <UtilBar tone="navy" />
       <header className={`public-nav hospital-nav ${home ? "nav-home" : "nav-page"} ${open ? "nav-open" : ""}`}>
         <Link to="/" className="brand" onClick={close}>
@@ -140,7 +141,7 @@ export default function PublicChrome({ variant = "page", children }) {
         </button>
         <NavLinks className={open ? "open" : ""} onNavigate={close} />
       </header>
-      <div key={location.pathname} className="hospital-body">{children}</div>
+      <main id="main-content" tabIndex="-1" key={location.pathname} className="hospital-body">{children}</main>
       <HospitalFooter />
     </div>
   );

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Pill, Plus, Trash2 } from "lucide-react";
 import { io } from "socket.io-client";
-import { api, socketUrl } from "../api";
+import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { ghs } from "../utils";
 
@@ -19,7 +19,7 @@ export default function RxPad({ patient, source = "chart", compact = false, onIs
 
   useEffect(() => {
     api("/pharmacy/stock").then(setStock).catch(() => {});
-    const socket = io(socketUrl, { autoConnect: true });
+    const socket = io(socketUrl, socketOptions());
     socket.on("pharmacy-stock", setStock);
     return () => socket.disconnect();
   }, []);

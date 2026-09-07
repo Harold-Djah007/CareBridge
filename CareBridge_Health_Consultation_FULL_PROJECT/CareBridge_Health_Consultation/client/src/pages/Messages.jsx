@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Send, Paperclip, Search, UserPlus, Video, CalendarDays } from "lucide-react";
 import { io } from "socket.io-client";
 import { Link, useSearchParams } from "react-router-dom";
-import { api, socketUrl } from "../api";
+import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { roomIdFor } from "../utils";
 import Avatar from "../components/Avatar";
@@ -45,7 +45,7 @@ export default function Messages() {
 
   useEffect(() => {
     loadContacts();
-    const socket = io(socketUrl, { autoConnect: true });
+    const socket = io(socketUrl, socketOptions());
     socket.emit("join-user", user.id);
     socket.on("doctor-status", (p) => {
       setContacts((list) => list.map((c) => (c.id === p.id ? { ...c, available: p.available, photo: p.photo || c.photo } : c)));

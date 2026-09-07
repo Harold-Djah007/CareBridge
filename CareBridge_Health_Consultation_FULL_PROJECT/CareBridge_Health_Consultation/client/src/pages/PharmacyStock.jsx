@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Plus, Archive, RotateCcw } from "lucide-react";
 import { io } from "socket.io-client";
-import { api, socketUrl } from "../api";
+import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { ghs } from "../utils";
 import PageHero from "../components/PageHero";
@@ -50,7 +50,7 @@ export default function PharmacyStock() {
   useEffect(() => {
     load();
     api("/pharmacy/categories").then(setCategories).catch(() => {});
-    const socket = io(socketUrl, { autoConnect: true });
+    const socket = io(socketUrl, socketOptions());
     socket.on("pharmacy-stock", load);
     return () => socket.disconnect();
   }, []);

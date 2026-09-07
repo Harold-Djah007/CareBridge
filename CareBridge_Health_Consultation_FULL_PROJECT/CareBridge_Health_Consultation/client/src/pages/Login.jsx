@@ -70,7 +70,7 @@ export default function Login() {
     setLoading(true);
     try {
       const r = await api("/login", { method: "POST", body: JSON.stringify({ email, password, expectedRole: portal }) });
-      login(r.user);
+      login(r.user, r.token);
       push(`Signed in to ${HOSPITAL.short}`);
     } catch (err) {
       setError(err.message);

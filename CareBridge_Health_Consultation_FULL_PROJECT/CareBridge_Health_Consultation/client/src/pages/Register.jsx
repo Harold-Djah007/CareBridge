@@ -39,7 +39,7 @@ export default function Register() {
     setLoading(true);
     try {
       const r = await api("/register", { method: "POST", body: JSON.stringify(form) });
-      login(r.user);
+      login(r.user, r.token);
       push("Account created. A welcome email is in your alerts.");
     } catch (err) {
       setError(err.message);

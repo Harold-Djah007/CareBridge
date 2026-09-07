@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Minus, Plus, ShoppingCart, Trash2, X } from "lucide-react";
+import { Minus, Plus, ShoppingCart, Trash2, X, ShieldCheck } from "lucide-react";
 import { api } from "./api";
 import { BILLS_EVENT, cartCount, cartTotal, clampCartToStock, invoiceLine, loadCart, mergeCarts, saveCart, toServerItem } from "./cart";
 import { useAuth, useToast } from "./state";
@@ -9,11 +9,14 @@ import { ghs } from "./utils";
 const CartContext = createContext(null);
 
 const METHODS = [
-  { id: "momo", label: "Mobile money", hint: "MTN, Telecel Cash, or AirtelTigo Money to the hospital merchant wallets" },
-  { id: "bank", label: "GCB bank transfer", hint: "CareBridge Medical Centre Ltd, Ridge branch — use the payment reference as narration" },
-  { id: "nhis", label: "NHIS / insurance", hint: "Claim against the policy number on the patient file" },
-  { id: "cash", label: "Cash at cashier", hint: "Ridge Campus accounts desk, ground floor — receipt issued immediately" },
+  { id: "card", label: "Card", hint: "Visa or Mastercard on Flutterwave secure checkout", online: true },
+  { id: "momo", label: "Mobile Money", hint: "MTN, Telecel Cash, or AirtelTigo Money through Flutterwave", online: true },
+  { id: "bank", label: "Bank transfer", hint: "Flutterwave creates a temporary GHS account for this payment", online: true },
+  { id: "nhis", label: "NHIS / insurance", hint: "Send the claim to hospital accounts for review", online: false },
+  { id: "cash", label: "Cash at cashier", hint: "Pay at Ridge Campus accounts; staff confirm it before a receipt is issued", online: false },
 ];
+const newCheckoutKey = () => (globalThis.crypto?.randomUUID?.() || `cb-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
 
 export function useCart() {
   return useContext(CartContext);
@@ -283,6 +286,7 @@ function CartDrawer() {
   const cart = useCart();
   const prefs = user?.paymentPrefs || {};
   const [accounts, setAccounts] = useState(null);
+  const [paymentConfig, setPaymentConfig] = useState(null);
   const [method, setMethod] = useState(prefs.method || "momo");
   const [form, setForm] = useState({
     network: prefs.momoNetwork || "mtn",
@@ -291,11 +295,13 @@ function CartDrawer() {
     nhisNumber: prefs.nhisNumber || user?.insurance || "",
   });
   const [payment, setPayment] = useState(null);
+  const [checkoutKey, setCheckoutKey] = useState(() => newCheckoutKey());
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!cart?.open) return;
     api("/finance/accounts").then(setAccounts).catch(() => {});
+    api("/finance/payment-config").then(setPaymentConfig).catch(() => {});
   }, [cart?.open]);
 
   useEffect(() => {
@@ -314,9 +320,9 @@ function CartDrawer() {
   const labTotal = labItems.reduce((s, i) => s + i.price * i.qty, 0);
   const svcTotal = svcItems.reduce((s, i) => s + i.price * i.qty, 0);
   const billTotal = billItems.reduce((s, i) => s + Number(i.amount || i.price || 0), 0);
-  const merchant = accounts?.momo?.[form.network] || accounts?.momo?.mtn;
   const pid = user?.id;
   const payable = items.length;
+  const flutterwaveReady = paymentConfig?.flutterwave?.configured !== false;
 
   const startPayment = async (invoiceIds, servicesToBill) => {
     const r = await api("/finance/checkout-cart", {
@@ -327,16 +333,25 @@ function CartDrawer() {
         invoiceIds,
         services: servicesToBill,
         method,
+        checkoutKey,
         ...form,
       }),
     });
-    setPayment(r.payment);
+    const nextPayment = { ...r.payment, bankTransfer: r.bankTransfer || r.payment?.bankTransfer || null };
+    setPayment(nextPayment);
     cart.persist([]);
+    setCheckoutKey(newCheckoutKey());
     window.dispatchEvent(new CustomEvent(BILLS_EVENT));
-    if (r.payment.status === "paid") {
-      push("Cash posted. Receipt issued.");
-      cart.closeDrawer();
-      navigate(`/receipts/${r.payment.id}`);
+    if (r.checkoutUrl) {
+      window.location.assign(r.checkoutUrl);
+      return;
+    }
+    if (r.mode === "manual_review") {
+      push(method === "cash" ? "Cash payment created. Accounts will issue the receipt after the cashier posts it." : "NHIS claim sent for accounts review.");
+    } else if (r.mode === "bank_transfer") {
+      push("Temporary bank-transfer details are ready.");
+    } else {
+      push("Payment started. Complete the authorization to receive your receipt.");
     }
   };
 
@@ -415,20 +430,37 @@ function CartDrawer() {
     }
   };
 
-  const confirm = async () => {
-    setBusy(true);
+  const refreshPayment = async ({ silent = false } = {}) => {
+    if (!payment?.id) return null;
+    if (!silent) setBusy(true);
     try {
-      const r = await api("/finance/confirm", { method: "POST", body: JSON.stringify({ paymentId: payment.id, actorId: user.id }) });
-      push("Accounts posted the payment and emailed the receipt.");
-      setPayment(null);
-      cart.closeDrawer();
-      navigate(`/receipts/${r.payment.id}`);
+      const r = await api(`/finance/payments/${payment.id}/status?refresh=1`);
+      const next = r.payment || payment;
+      setPayment(next);
+      if (next.status === "paid") {
+        if (!silent) push("Payment verified. Your receipt is ready.");
+        cart.closeDrawer();
+        window.dispatchEvent(new CustomEvent(BILLS_EVENT));
+        navigate(`/receipts/${next.id}`);
+      } else if (!silent && next.status === "failed") {
+        push("The payment was not completed. You can return to the cart and try again.", "error");
+      } else if (!silent) {
+        push("Payment is still awaiting confirmation.");
+      }
+      return next;
     } catch (err) {
-      push(err.message, "error");
+      if (!silent) push(err.message, "error");
+      return null;
     } finally {
-      setBusy(false);
+      if (!silent) setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!cart?.open || !payment?.id || payment.status !== "pending" || !["card", "momo", "bank"].includes(payment.method)) return undefined;
+    const timer = window.setInterval(() => refreshPayment({ silent: true }), 7000);
+    return () => window.clearInterval(timer);
+  }, [cart?.open, payment?.id, payment?.status, payment?.method]);
 
   if (!cart || !user) return null;
 
@@ -441,7 +473,7 @@ function CartDrawer() {
         tabIndex={cart.open ? 0 : -1}
         onClick={cart.closeDrawer}
       />
-      <aside className={`cart-drawer ${cart.open ? "open" : ""}`} id="shop-basket" aria-hidden={!cart.open} aria-label="Shopping cart">
+      <aside className={`cart-drawer ${cart.open ? "open" : ""}`} id="shop-basket" aria-hidden={!cart.open} aria-label="Shopping cart" aria-live="polite">
         <div className="cart-drawer-head">
           <div>
             <span className="eyebrow">Shop & pay</span>
@@ -502,13 +534,25 @@ function CartDrawer() {
 
           {items.length > 0 && !payment && (
             <form onSubmit={(e) => checkout("online", e)} className="pay-form">
-              <p className="eyebrow">Checkout</p>
-              {METHODS.map((m) => (
-                <label className="check-row" key={m.id}>
-                  <input type="radio" name="method" checked={method === m.id} onChange={() => setMethod(m.id)} />
-                  <span><b>{m.label}</b><small className="muted"> — {m.hint}</small></span>
-                </label>
-              ))}
+              <p className="checkout-title"><ShieldCheck size={16} /> Secure checkout</p>
+              {paymentConfig?.flutterwave && !paymentConfig.flutterwave.configured && (
+                <div className="error-box">Online card, Mobile Money, and bank transfer are installed but disabled until the server has Flutterwave test keys.</div>
+              )}
+              {METHODS.map((m) => {
+                const disabled = Boolean(m.online && !flutterwaveReady);
+                return (
+                  <label className={`check-row payment-method-card ${disabled ? "disabled" : ""}`} key={m.id}>
+                    <input type="radio" name="method" disabled={disabled} checked={method === m.id} onChange={() => setMethod(m.id)} />
+                    <span><b>{m.label}</b><small className="muted"> — {m.hint}</small></span>
+                  </label>
+                );
+              })}
+              {method === "card" && (
+                <div className="bank-box">
+                  <p><b>Flutterwave hosted checkout</b></p>
+                  <p className="muted">Card details are entered on Flutterwave's secure payment page. CareBridge never receives or stores your card number.</p>
+                </div>
+              )}
               {method === "momo" && (
                 <>
                   <label>Network
@@ -518,29 +562,28 @@ function CartDrawer() {
                       <option value="at">AirtelTigo Money</option>
                     </select>
                   </label>
-                  <label>Payer MoMo number<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required /></label>
+                  <label>Payer MoMo number<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required inputMode="tel" /></label>
                   <div className="bank-box">
-                    <p><b>Send to hospital merchant</b></p>
-                    <p>{accounts?.momo.name}<br />Merchant ID {accounts?.momo.merchantId}<br />{form.network.toUpperCase()} {merchant}</p>
-                    <p className="muted">MTN: *170# → Send Money → Mobile Number → {merchant}.</p>
+                    <p><b>Secure Mobile Money request</b></p>
+                    <p className="muted">Flutterwave will send the authorization request to this phone. CareBridge marks the bill paid only after Flutterwave verifies the transaction.</p>
                   </div>
                 </>
               )}
-              {method === "bank" && accounts && (
+              {method === "bank" && (
                 <div className="bank-box">
-                  <p><b>{accounts.bank.bank}</b></p>
-                  <p>{accounts.bank.accountName}<br />A/C {accounts.bank.accountNumber}<br />{accounts.bank.branch}</p>
-                  <label>Account name used for the transfer<input value={form.payerName} onChange={(e) => setForm({ ...form, payerName: e.target.value })} required /></label>
+                  <p><b>Temporary GHS transfer account</b></p>
+                  <p className="muted">After you continue, Flutterwave creates a one-time bank account and exact transfer reference for this payment.</p>
+                  <label>Payer name<input value={form.payerName} onChange={(e) => setForm({ ...form, payerName: e.target.value })} required /></label>
                 </div>
               )}
               {method === "nhis" && (
                 <label>NHIS / policy number<input value={form.nhisNumber} onChange={(e) => setForm({ ...form, nhisNumber: e.target.value })} required /></label>
               )}
               {method === "cash" && (
-                <p className="muted">{accounts?.cashier.desk}. {accounts?.cashier.hours}.</p>
+                <p className="muted">{accounts?.cashier?.desk}. {accounts?.cashier?.hours}. Your receipt appears only after hospital accounts posts the cash payment.</p>
               )}
-              <button className="primary-btn full" disabled={busy || !payable}>
-                {busy ? "Posting…" : method === "cash" ? `Pay ${ghs(cart.total)} cash` : `Pay ${ghs(cart.total)}`}
+              <button className="primary-btn full" disabled={busy || !payable || (["card", "momo", "bank"].includes(method) && !flutterwaveReady)}>
+                {busy ? "Starting checkout…" : method === "cash" ? `Create cash payment · ${ghs(cart.total)}` : method === "nhis" ? `Submit NHIS claim · ${ghs(cart.total)}` : `Pay securely · ${ghs(cart.total)}`}
               </button>
             </form>
           )}
@@ -554,19 +597,49 @@ function CartDrawer() {
           {payment && payment.status === "pending" && (
             <div className="cart-pending">
               <p className="eyebrow">Reference {payment.reference}</p>
-              <h3>Complete this transfer</h3>
-              {payment.method === "momo" && (
-                <p>Pay <b>{ghs(payment.amount)}</b> from <b>{payment.phone}</b> to merchant <b>{payment.destination?.number}</b>. Use reference {payment.reference}.</p>
+              <h3>{payment.requiresManualReview ? "Awaiting hospital accounts" : "Waiting for verified payment"}</h3>
+              {payment.method === "card" && (
+                <p>If the hosted checkout window was closed, return to your unpaid bills to start a new card attempt. A receipt is created only after Flutterwave confirms success.</p>
               )}
-              {payment.method === "bank" && (
-                <p>Transfer <b>{ghs(payment.amount)}</b> to GCB {accounts?.bank.accountNumber}. Narration must be <b>{payment.reference}</b>.</p>
+              {payment.method === "momo" && (
+                <p>Approve the <b>{ghs(payment.amount)}</b> Mobile Money request on <b>{payment.phone}</b>. This screen checks the server automatically.</p>
+              )}
+              {payment.method === "bank" && payment.bankTransfer && (
+                <div className="bank-box">
+                  <p><b>{payment.bankTransfer.bank}</b></p>
+                  <p>Account <b>{payment.bankTransfer.account}</b><br />Amount <b>GHS {payment.bankTransfer.amount}</b><br />Reference <b>{payment.bankTransfer.transferReference || payment.reference}</b><br />Expires {payment.bankTransfer.expiration || "after the provider window"}</p>
+                </div>
               )}
               {payment.method === "nhis" && (
-                <p>Claim for policy <b>{payment.nhisNumber}</b> is lodged. Confirm when NHIS authorises.</p>
+                <p>Claim for policy <b>{payment.nhisNumber}</b> has been lodged. Hospital accounts must approve it before the invoice is marked paid.</p>
               )}
-              <div className="modal-actions" style={{ marginTop: 16 }}>
-                <button className="primary-btn full" type="button" disabled={busy} onClick={confirm}>Payment sent — issue receipt</button>
-              </div>
+              {payment.method === "cash" && (
+                <p>Pay <b>{ghs(payment.amount)}</b> at {accounts?.cashier?.desk || "the Ridge Campus accounts desk"}. Hospital staff will post the payment and your receipt will then appear.</p>
+              )}
+              {["card", "momo", "bank"].includes(payment.method) && (
+                <div className="modal-actions" style={{ marginTop: 16 }}>
+                  <button className="secondary-btn full" type="button" disabled={busy} onClick={() => refreshPayment()}>
+                    {busy ? "Checking…" : "Check payment status"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {payment && payment.status === "failed" && (
+            <div className="cart-pending">
+              <p className="eyebrow">Reference {payment.reference}</p>
+              <h3>Payment not completed</h3>
+              <p>No receipt was issued and the hospital bills remain unpaid. Return to Shop & pay to try again.</p>
+              <button className="secondary-btn full" type="button" onClick={() => { setPayment(null); cart.closeDrawer(); navigate("/pay?tab=bills"); }}>Return to unpaid bills</button>
+            </div>
+          )}
+
+          {payment && payment.status === "paid" && (
+            <div className="cart-pending">
+              <p className="eyebrow">Verified payment</p>
+              <h3>Receipt ready</h3>
+              <button className="primary-btn full" type="button" onClick={() => { cart.closeDrawer(); navigate(`/receipts/${payment.id}`); }}>Open receipt</button>
             </div>
           )}
         </div>

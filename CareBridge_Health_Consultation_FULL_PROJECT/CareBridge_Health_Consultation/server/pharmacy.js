@@ -209,8 +209,7 @@ export function mountPharmacy(app, ctx) {
 
   const actorOrDeny = (req, res) => {
     const db = readDb();
-    const actorId = req.body?.actorId || req.query.actorId;
-    const actor = db.users.find((u) => u.id === actorId);
+    const actor = req.authUser;
     if (!actor || !["nurse", "admin"].includes(actor.role)) {
       res.status(403).json({ message: "Only pharmacy nurses and operations can manage stock." });
       return { db: null, actor: null };
@@ -223,6 +222,7 @@ export function mountPharmacy(app, ctx) {
   app.get("/api/pharmacy/stock", (req, res) => {
     const db = readDb();
     if (String(req.query.manage) === "1") {
+      if (!req.authUser || !["nurse", "admin"].includes(req.authUser.role)) return res.status(403).json({ message: "Only pharmacy nurses and operations can view stock controls." });
       return res.json((db.pharmacyStock || []).map(publicStock));
     }
     res.json(catalogStock(db));
@@ -230,7 +230,7 @@ export function mountPharmacy(app, ctx) {
 
   app.post("/api/pharmacy/stock", (req, res) => {
     const db = readDb();
-    const actor = db.users.find((u) => u.id === req.body.actorId);
+    const actor = req.authUser;
     if (!actor || !["nurse", "admin"].includes(actor.role)) {
       return res.status(403).json({ message: "Only pharmacy nurses and operations can add stock." });
     }
@@ -259,7 +259,7 @@ export function mountPharmacy(app, ctx) {
 
   app.patch("/api/pharmacy/stock/:id", (req, res) => {
     const db = readDb();
-    const actor = db.users.find((u) => u.id === req.body.actorId);
+    const actor = req.authUser;
     if (!actor || !["nurse", "admin"].includes(actor.role)) {
       return res.status(403).json({ message: "Only pharmacy nurses and operations can update stock." });
     }
@@ -315,9 +315,9 @@ export function mountPharmacy(app, ctx) {
 
   app.get("/api/pharmacy/orders", (req, res) => {
     const db = readDb();
-    const { userId, role } = req.query;
     let rows = db.pharmacyOrders || [];
-    if (role === "patient") rows = rows.filter((o) => o.patientId === userId);
+    if (req.authUser?.role === "patient") rows = rows.filter((o) => o.patientId === req.authUser.id);
+    else if (!["nurse", "admin"].includes(req.authUser?.role)) return res.status(403).json({ message: "Pharmacy orders are available to patients, pharmacy nurses, and operations." });
     res.json(rows.slice().reverse().map((o) => enrichOrder(db, o)));
   });
 
@@ -379,11 +379,13 @@ export function mountPharmacy(app, ctx) {
 
   app.patch("/api/pharmacy/orders/:id", async (req, res) => {
     const db = readDb();
-    const actor = db.users.find((u) => u.id === req.body.actorId);
+    const actor = req.authUser;
     const order = (db.pharmacyOrders || []).find((o) => o.id === req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found." });
     const next = req.body.status;
     if (next === "cancelled" && order.status === "queued") {
+      if (actor?.role === "patient" && order.patientId !== actor.id) return res.status(403).json({ message: "That pharmacy order is not yours." });
+      if (!actor || !["patient", "nurse", "admin"].includes(actor.role)) return res.status(403).json({ message: "You cannot cancel this pharmacy order." });
       restoreStock(db, order.items);
       order.status = "cancelled";
       order.cancelledAt = new Date().toISOString();
@@ -410,7 +412,7 @@ export function mountPharmacy(app, ctx) {
     } else {
       return res.status(400).json({ message: "That status change is not allowed." });
     }
-    audit(db, { actorId: req.body.actorId, action: "pharmacy.update", entity: "order", entityId: order.id, detail: order.status });
+    audit(db, { actorId: actor?.id || "", action: "pharmacy.update", entity: "order", entityId: order.id, detail: order.status });
     writeDb(db);
     broadcastStock(db);
     io.emit("pharmacy-order", enrichOrder(db, order));

@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ShoppingCart, Plus, Minus, Search } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Search, ShieldCheck, Smartphone, CreditCard, Landmark } from "lucide-react";
 import { io } from "socket.io-client";
-import { api, socketUrl } from "../api";
+import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { useCart } from "../ShopCart";
 import { ghs } from "../utils";
@@ -44,6 +44,7 @@ function PatientShop() {
   const [labs, setLabs] = useState([]);
   const [services, setServices] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [query, setQuery] = useState("");
   const appliedRx = useRef("");
   const q = query.trim().toLowerCase();
@@ -70,7 +71,8 @@ function PatientShop() {
       shop?.applyStock?.(rows);
     }));
     api("/finance/labs").then(setLabs);
-    const socket = io(socketUrl, { autoConnect: true });
+    api(`/finance/payments?userId=${user.id}&role=patient`).then(setPayments).catch(() => {});
+    const socket = io(socketUrl, socketOptions());
     socket.on("pharmacy-stock", (rows) => {
       setStock(rows);
       shop?.applyStock?.(rows);
@@ -79,7 +81,10 @@ function PatientShop() {
       if (rates?.labs) setLabs(rates.labs);
       if (rates?.services) setServices(rates.services);
     });
-    const onBills = () => loadBills();
+    const onBills = () => {
+      loadBills();
+      api(`/finance/payments?userId=${user.id}&role=patient`).then(setPayments).catch(() => {});
+    };
     window.addEventListener(BILLS_EVENT, onBills);
     return () => {
       socket.disconnect();
@@ -185,6 +190,7 @@ function PatientShop() {
   const inCart = (kind, id) => cart.find((c) => c.kind === kind && c.id === id);
   const due = invoices.filter((i) => i.status === "due");
   const paid = invoices.filter((i) => i.status === "paid");
+  const pendingPayments = payments.filter((p) => p.status === "pending").slice(0, 5);
   const dueVisible = q ? due.filter((i) => matchesCatalogQuery("invoice", i, q)) : due;
   const visibleLabs = q ? labs.filter((p) => matchesCatalogQuery("lab", p, q)) : labs;
   const visibleServices = q ? services.filter((p) => matchesCatalogQuery("svc", p, q)) : services;
@@ -211,6 +217,13 @@ function PatientShop() {
         )}
       />
 
+      <div className="commerce-trustbar" aria-label="Checkout options">
+        <span><ShieldCheck size={16} /> Server-verified payments</span>
+        <span><Smartphone size={16} /> MTN · Telecel · AT Money</span>
+        <span><CreditCard size={16} /> Visa / Mastercard</span>
+        <span><Landmark size={16} /> GHS bank transfer</span>
+      </div>
+
       <div className="shop-toolbar">
         <label className="shop-search">
           <Search size={15} aria-hidden="true" />
@@ -228,11 +241,14 @@ function PatientShop() {
           )}
         </label>
         <div className="filters">
-          {tabs.map((t) => (
-            <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => setTab(t.id)}>
-              {t.id === "bills" && due.length ? `${t.label} (${due.length})` : t.label}
-            </button>
-          ))}
+          {tabs.map((t) => {
+            const count = t.id === "bills" ? due.length : t.id === "pharmacy" ? stock.filter((p) => p.inStock !== false && Number(p.qty) > 0).length : t.id === "labs" ? labs.length : services.length;
+            return (
+              <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => setTab(t.id)} aria-pressed={tab === t.id}>
+                <span>{t.label}</span><em className="tab-count">{count}</em>
+              </button>
+            );
+          })}
         </div>
         <button
           type="button"
@@ -243,6 +259,24 @@ function PatientShop() {
           {shop?.count ? `View cart · ${shop.count} · ${ghs(shop.total)}` : "View cart"}
         </button>
       </div>
+
+      {pendingPayments.length > 0 && (
+        <section className="card pending-payments-strip">
+          <div className="card-head">
+            <div><span className="eyebrow">In progress</span><h3>Pending payments</h3></div>
+            <small className="muted">Receipts appear after verification</small>
+          </div>
+          <div className="pending-payment-list">
+            {pendingPayments.map((payment) => (
+              <Link className="pay-pick" key={payment.id} to={`/payments/${payment.id}`}>
+                <span><b>{payment.method === "momo" ? "Mobile Money" : payment.method === "bank" ? "Bank transfer" : payment.method === "card" ? "Card" : payment.method?.toUpperCase()}</b><small>{payment.reference}</small></span>
+                <strong>{ghs(payment.amount)}</strong>
+                <span className="status pending">pending</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="pharmacy-layout shop-layout">
         <div>

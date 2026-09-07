@@ -131,6 +131,7 @@ export function mountClinical(app, ctx) {
   const { readDb, writeDb, safeUser, notify, emailPatient } = ctx;
 
   app.get("/api/chart/:patientId", (req, res) => {
+    if (req.authUser?.role === "patient" && req.params.patientId !== req.authUser.id) return res.status(403).json({ message: "You can only open your own clinical file." });
     const db = readDb();
     const chart = chartFor(db, req.params.patientId);
     if (!chart) return res.status(404).json({ message: "No clinical file for that person." });
@@ -203,6 +204,7 @@ export function mountClinical(app, ctx) {
     const db = readDb();
     const rx = (db.prescriptions || []).find((r) => r.id === req.params.id);
     if (!rx) return res.status(404).json({ message: "Prescription not found" });
+    if (req.authUser?.role === "patient" && rx.patientId !== req.authUser.id) return res.status(403).json({ message: "That prescription is not on your patient file." });
     res.json(enrichRx(db, rx));
   });
 
@@ -321,20 +323,8 @@ export function mountClinical(app, ctx) {
     res.json(rows.map((i) => ({ ...i, patient: safeUser(db.users.find((u) => u.id === i.patientId) || {}) })));
   });
 
-  app.patch("/api/billing/:id/pay", (req, res) => {
-    const db = readDb();
-    const actor = db.users.find((u) => u.id === req.body.actorId);
-    if (actor?.role === "admin") {
-      return res.status(403).json({ message: "Administrators review receipts only. Patients complete payment in Shop & pay." });
-    }
-    const inv = db.invoices.find((i) => i.id === req.params.id);
-    if (!inv) return res.status(404).json({ message: "Invoice not found" });
-    inv.status = "paid";
-    inv.method = req.body.method || "Mobile money";
-    inv.paidAt = new Date().toISOString();
-    audit(db, { actorId: req.body.actorId, action: "invoice.pay", entity: "invoice", entityId: inv.id, detail: inv.item });
-    writeDb(db);
-    res.json(inv);
+  app.patch("/api/billing/:id/pay", (_req, res) => {
+    return res.status(410).json({ message: "Direct invoice payment is disabled. Use Shop & pay so online payments are verified before a receipt is issued." });
   });
 
   app.get("/api/admin/audit", (_, res) => {

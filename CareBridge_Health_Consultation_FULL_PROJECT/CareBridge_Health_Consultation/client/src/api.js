@@ -1,8 +1,13 @@
 const API = import.meta.env.VITE_API_URL || "/api";
 
 export async function api(path, options = {}) {
+  const token = localStorage.getItem("carebridge-token");
   const response = await fetch(`${API}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
     ...options,
   });
   const data = await response.json().catch(() => ({}));
@@ -13,3 +18,8 @@ export async function api(path, options = {}) {
 export const socketUrl = import.meta.env.VITE_SOCKET_URL || (
   import.meta.env.DEV ? "http://127.0.0.1:5000" : window.location.origin
 );
+
+export const socketOptions = () => ({
+  autoConnect: true,
+  auth: { token: localStorage.getItem("carebridge-token") || "" },
+});

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Video, MessageCircle, CalendarPlus, Search, UserPlus } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { io } from "socket.io-client";
-import { api, socketUrl } from "../api";
+import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { todayISO, ghs, consultQuote } from "../utils";
 import Avatar from "../components/Avatar";
@@ -27,7 +27,7 @@ export default function CareTeam() {
     if (user.role === "patient") api("/doctors").then(setPeople);
     else api(`/contacts?userId=${user.id}&role=${user.role}`).then((list) => setPeople(list.filter((p) => p.role === "patient")));
     api("/finance/rates").then(setRates);
-    const socket = io(socketUrl, { autoConnect: true });
+    const socket = io(socketUrl, socketOptions());
     socket.on("doctor-status", (p) => {
       setPeople((list) => list.map((d) => (d.id === p.id ? { ...d, available: p.available, photo: p.photo || d.photo } : d)));
     });

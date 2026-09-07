@@ -3,7 +3,7 @@ import { Video, VideoOff, Mic, MicOff, PhoneOff, MonitorUp, ShieldCheck } from "
 import { io } from "socket.io-client";
 import { useSearchParams } from "react-router-dom";
 import { useAuth, useToast } from "../state";
-import { api, socketUrl } from "../api";
+import { api, socketOptions, socketUrl } from "../api";
 import { roomIdFor } from "../utils";
 import Avatar from "../components/Avatar";
 import RxPad from "../components/RxPad";
@@ -58,7 +58,7 @@ export default function VideoConsultation() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
       if (localRef.current) localRef.current.srcObject = stream;
-      const socket = io(socketUrl, { autoConnect: true });
+      const socket = io(socketUrl, socketOptions());
       socketRef.current = socket;
       socket.emit("join-room", roomId);
       let pc = initPeer();

@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./styles.css";
+import "./carebridge-refresh.css";
 import { homeFor } from "./utils";
 import { AuthProvider, ToastProvider, useAuth } from "./state";
 import { CartProvider } from "./ShopCart";
@@ -40,6 +41,8 @@ import Receipt from "./pages/Receipt";
 import Tariff from "./pages/Tariff";
 import Settings from "./pages/Settings";
 import Support from "./pages/Support";
+import PaymentCallback from "./pages/PaymentCallback";
+import PaymentStatus from "./pages/PaymentStatus";
 import AppShell from "./components/AppShell";
 import ErrorBoundary from "./ErrorBoundary";
 
@@ -83,6 +86,8 @@ function AppRoutes() {
           <Route path="/records" element={<RoleRoute roles={["patient", "doctor", "admin"]}><ClinicalRecord /></RoleRoute>} />
           <Route path="/records/:patientId" element={<RoleRoute roles={["doctor", "admin"]}><ClinicalRecord /></RoleRoute>} />
           <Route path="/pay" element={<RoleRoute roles={["patient", "admin"]}><Pay /></RoleRoute>} />
+          <Route path="/payment/callback" element={<RoleRoute roles={["patient"]}><PaymentCallback /></RoleRoute>} />
+          <Route path="/payments/:id" element={<RoleRoute roles={["patient", "admin"]}><PaymentStatus /></RoleRoute>} />
           <Route path="/receipts" element={<RoleRoute roles={["patient", "admin"]}><Navigate to="/pay" replace /></RoleRoute>} />
           <Route path="/admin/billing" element={<RoleRoute roles={["admin"]}><Navigate to="/pay" replace /></RoleRoute>} />
           <Route path="/pharmacy" element={<RoleRoute roles={["patient", "admin"]}><Pharmacy /></RoleRoute>} />

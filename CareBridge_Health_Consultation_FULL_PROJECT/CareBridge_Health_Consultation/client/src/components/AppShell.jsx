@@ -8,7 +8,7 @@ import {
 import { CartMastButton, useCart } from "../ShopCart";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
-import { api, socketUrl } from "../api";
+import { api, socketOptions, socketUrl } from "../api";
 import { HOSPITAL, BUILD } from "../utils";
 import { LiveClock } from "./LiveMeter";
 import PageAtmosphere from "./PageAtmosphere";
@@ -189,7 +189,7 @@ export default function AppShell() {
   useEffect(() => {
     loadNotes();
     loadBadges();
-    const socket = io(socketUrl, { autoConnect: true });
+    const socket = io(socketUrl, socketOptions());
     socket.emit("join-user", user.id);
     const refresh = () => { loadNotes(); loadBadges(); };
     socket.on("notification", (n) => { push(n.title); refresh(); });
@@ -246,6 +246,7 @@ export default function AppShell() {
 
   return (
     <div className={`app-layout portal-app role-${user.role}`} data-role={user.role}>
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <header className="portal-mast">
         <Link to={user.role === "admin" ? "/admin" : "/home"} className="brand portal-brand">
           <div className="brand-mark live"><HeartPulse size={20} /></div>
@@ -260,23 +261,24 @@ export default function AppShell() {
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} />
         </form>
         <div className="portal-tools">
+          <span className={`portal-role-chip role-${user.role}`}>{portalLabel}</span>
           <LiveClock />
           {user.role === "patient" && <CartMastButton />}
           <button className="icon-btn bell-btn" type="button" onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }} title="Notifications" aria-label={unread ? `${unread} unread notices` : "Notifications"}>
             <Bell size={18} />
             {unread > 0 && <em className="bell-count">{unread > 99 ? "99+" : unread}</em>}
           </button>
-          <button type="button" className="portal-user" onClick={() => navigate("/settings")}>
+          <button type="button" className="portal-user" onClick={() => navigate("/settings")} aria-label="Open account settings">
             <Avatar person={user} className="small" />
             <span>
               <b>{user.name.split(" ").slice(-1)[0]}</b>
               <small>{user.role === "patient" ? `MRN ${user.mrn || "—"}` : user.employeeId || user.specialty || portalLabel}</small>
             </span>
           </button>
-          <button className="icon-btn" title="Sign out" type="button" onClick={() => { logout(); navigate("/login"); }}><LogOut size={18} /></button>
+          <button className="icon-btn" title="Sign out" aria-label="Sign out" type="button" onClick={() => { logout(); navigate("/login"); }}><LogOut size={18} /></button>
         </div>
       </header>
-      <nav className="portal-pills" aria-label="Primary destinations">
+      <nav className="portal-pills" aria-label="Portal shortcuts">
         {mobileItems.map(renderLink)}
       </nav>
       <aside className={`sidebar sidebar-${user.role}`}>
@@ -294,7 +296,7 @@ export default function AppShell() {
         </NavRail>
         <div className="mobile-nav">{mobileItems.map(renderLink)}</div>
       </aside>
-      <main className="main portal-main">
+      <main className="main portal-main" id="main-content" tabIndex="-1">
         {open && (
           <div className="notice notice-float">
             <div className="card-head"><b>Notifications</b><button className="ghost-btn" type="button" onClick={markRead}>Mark read</button></div>

@@ -1,3 +1,4 @@
+import "./load-env.js";
 import express from "express";
 import cors from "cors";
 import fs from "fs";
@@ -12,10 +13,11 @@ import { mountSupport } from "./support.js";
 import { mountCases } from "./cases.js";
 import { ensurePharmacy, mountPharmacy } from "./pharmacy.js";
 import { ensureCarts, mountCart, clearUserCart, removeCartKinds } from "./cart.js";
+import { authUserFromRequest, ensurePasswordSecurity, hashPassword, issueSession, passwordMatches, revokeSession } from "./auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DATA_FILE = path.join(__dirname, "data", "db.json");
+const DATA_FILE = process.env.DATA_FILE ? path.resolve(process.env.DATA_FILE) : path.join(__dirname, "data", "db.json");
 
 const readDb = () => {
   const db = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
@@ -25,7 +27,7 @@ const readDb = () => {
   db.tickets = db.tickets || [];
   db.messageReads = db.messageReads || {};
   ensureClinical(db);
-  const dirty = ensurePharmacy(db) | ensureTariff(db) | ensureCarts(db);
+  const dirty = ensurePharmacy(db) | ensureTariff(db) | ensureCarts(db) | ensurePasswordSecurity(db);
   if (dirty) fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
   return db;
 };
@@ -33,12 +35,53 @@ const writeDb = (db) => fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2))
 
 const app = express();
 const server = http.createServer(app);
+const allowedOrigins = String(process.env.CLIENT_URLS || process.env.CLIENT_URL || "")
+  .split(",")
+  .map((value) => value.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+const corsOptions = allowedOrigins.length
+  ? {
+      credentials: true,
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(String(origin).replace(/\/$/, ""))) return callback(null, true);
+        return callback(new Error("Origin is not allowed by CareBridge CORS policy."));
+      },
+    }
+  : { origin: true, credentials: true };
 const io = new Server(server, {
-  cors: { origin: true, methods: ["GET", "POST"] },
+  cors: { ...corsOptions, methods: ["GET", "POST"] },
 });
 
-app.use(cors());
-app.use(express.json({ limit: "1mb" }));
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(self), microphone=(self), geolocation=()");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
+app.use(cors(corsOptions));
+app.use(express.json({
+  limit: "1mb",
+  verify: (req, _res, buffer) => {
+    req.rawBody = buffer.toString("utf8");
+  },
+}));
+
+app.use("/api", (req, _res, next) => {
+  if (!req.headers.authorization) return next();
+  const db = readDb();
+  req.authUser = authUserFromRequest(db, req);
+  return next();
+});
+
+const requireAuth = (...roles) => (req, res, next) => {
+  if (!req.authUser) return res.status(401).json({ message: "Your session has expired. Please sign in again." });
+  if (roles.length && !roles.includes(req.authUser.role)) return res.status(403).json({ message: "You do not have permission to perform this action." });
+  return next();
+};
 
 const applyPhoto = (user, photo) => {
   if (photo === undefined) return null;
@@ -175,7 +218,7 @@ app.post("/api/login", (req, res) => {
   const { email, password } = req.body;
   const db = readDb();
   const user = db.users.find(
-    (u) => u.email.toLowerCase() === String(email).toLowerCase() && u.password === password
+    (u) => u.email.toLowerCase() === String(email).toLowerCase() && passwordMatches(password, u.password)
   );
   if (!user) return res.status(401).json({ message: "Incorrect email or password." });
   if (user.status === "inactive") {
@@ -190,9 +233,17 @@ app.post("/api/login", (req, res) => {
     }[user.role] || "Choose the matching portal.";
     return res.status(403).json({ message: `This account is a ${user.role}. ${hint}` });
   }
+  const session = issueSession(db, user);
   audit(db, { actorId: user.id, action: "login", entity: "user", entityId: user.id, detail: `${user.role} signed in` });
   writeDb(db);
-  res.json({ user: safeUser(user) });
+  res.json({ user: safeUser(user), token: session.token, expiresAt: session.expiresAt });
+});
+
+app.post("/api/logout", requireAuth(), (req, res) => {
+  const db = readDb();
+  revokeSession(db, req);
+  writeDb(db);
+  res.json({ ok: true });
 });
 
 app.post("/api/register", async (req, res) => {
@@ -207,7 +258,7 @@ app.post("/api/register", async (req, res) => {
     role: "patient",
     name: req.body.name.trim(),
     email: req.body.email.trim(),
-    password: req.body.password,
+    password: hashPassword(req.body.password),
     avatar: initials(req.body.name),
     photo: "",
     specialty: "",
@@ -238,22 +289,55 @@ app.post("/api/register", async (req, res) => {
     ],
     closing: "Keep email alerts on so you never miss a scheduled visit or ward update.",
   });
+  const session = issueSession(db, user);
   writeDb(db);
-  res.status(201).json({ user: safeUser(user) });
+  res.status(201).json({ user: safeUser(user), token: session.token, expiresAt: session.expiresAt });
 });
 
-app.patch("/api/users/:id", (req, res) => {
+const isPublicApiRequest = (req) => {
+  const pathname = String(req.originalUrl || "").split("?")[0];
+  return (
+    (req.method === "GET" && pathname === "/api/doctors")
+    || (req.method === "POST" && pathname === "/api/contact")
+    || (req.method === "POST" && pathname === "/api/payments/webhook")
+    || (req.method === "POST" && pathname === "/api/finance/webhook")
+  );
+};
+
+app.use("/api", (req, res, next) => {
+  if (isPublicApiRequest(req)) return next();
+  if (!req.authUser) return res.status(401).json({ message: "Your session has expired. Please sign in again." });
+
+  const claimedActorId = req.body?.actorId || req.body?.userId;
+  if (claimedActorId && req.authUser.role !== "admin" && claimedActorId !== req.authUser.id) {
+    return res.status(403).json({ message: "The requested action does not match your signed-in account." });
+  }
+  const queryUserId = req.query?.userId;
+  if (queryUserId && req.authUser.role !== "admin" && queryUserId !== req.authUser.id) {
+    return res.status(403).json({ message: "You can only request data for your signed-in account." });
+  }
+  if (req.query?.role && req.authUser.role !== "admin" && req.query.role !== req.authUser.role) {
+    return res.status(403).json({ message: "The requested portal role does not match your account." });
+  }
+  if (req.authUser.role === "patient" && req.body?.patientId && req.body.patientId !== req.authUser.id) {
+    return res.status(403).json({ message: "You can only submit actions for your own patient file." });
+  }
+  return next();
+});
+
+app.patch("/api/users/:id", requireAuth(), (req, res) => {
   const db = readDb();
   const user = db.users.find((u) => u.id === req.params.id);
   if (!user) return res.status(404).json({ message: "User not found" });
+  if (req.authUser.id !== user.id && req.authUser.role !== "admin") return res.status(403).json({ message: "You can only update your own profile." });
   if (req.body.password) {
-    if (!req.body.currentPassword || req.body.currentPassword !== user.password) {
+    if (!req.body.currentPassword || !passwordMatches(req.body.currentPassword, user.password)) {
       return res.status(400).json({ message: "Current password is incorrect." });
     }
     if (String(req.body.password).length < 6) {
       return res.status(400).json({ message: "New password must be at least 6 characters." });
     }
-    user.password = req.body.password;
+    user.password = hashPassword(req.body.password);
   }
   if (req.body.email !== undefined) {
     const email = String(req.body.email).trim();
@@ -291,7 +375,7 @@ app.get("/api/doctors", (_, res) => {
   res.json(db.users.filter((u) => u.role === "doctor" && u.status !== "inactive").map(safeUser));
 });
 
-app.get("/api/patients", (_, res) => {
+app.get("/api/patients", requireAuth("doctor", "nurse", "admin"), (_, res) => {
   const db = readDb();
   res.json(db.users.filter((u) => u.role === "patient" && u.status !== "inactive").map(safeUser));
 });
@@ -403,10 +487,14 @@ app.patch("/api/appointments/:id", async (req, res) => {
   const db = readDb();
   const item = db.appointments.find((a) => a.id === req.params.id);
   if (!item) return res.status(404).json({ message: "Appointment not found" });
-  Object.assign(item, req.body);
+  const actor = req.authUser;
+  const mayEdit = actor?.role === "admin" || (actor?.role === "doctor" && item.doctorId === actor.id) || (actor?.role === "patient" && item.patientId === actor.id);
+  if (!mayEdit) return res.status(403).json({ message: "You cannot update this appointment." });
+  const allowed = actor.role === "patient" ? ["status"] : ["status", "date", "time", "reason", "mode"];
+  allowed.forEach((key) => { if (req.body[key] !== undefined) item[key] = req.body[key]; });
   if (req.body.status) {
     notify(db, item.patientId, `Appointment ${req.body.status}`, `Your visit on ${item.date} is now ${req.body.status}.`);
-    if (item.doctorId !== req.body.actorId) {
+    if (item.doctorId !== actor.id) {
       notify(db, item.doctorId, `Appointment ${req.body.status}`, `A visit on ${item.date} is now ${req.body.status}.`);
     }
     const doctor = db.users.find((u) => u.id === item.doctorId) || {};
@@ -433,6 +521,7 @@ app.get("/api/wards", (_, res) => {
 });
 
 app.patch("/api/wards/:id", (req, res) => {
+  if (req.authUser?.role !== "admin") return res.status(403).json({ message: "Only hospital operations can edit wards." });
   const db = readDb();
   const ward = (db.wards || []).find((w) => w.id === req.params.id);
   if (!ward) return res.status(404).json({ message: "Ward not found" });
@@ -495,8 +584,16 @@ app.patch("/api/ward-bookings/:id", async (req, res) => {
   const db = readDb();
   const item = db.wardBookings.find((w) => w.id === req.params.id);
   if (!item) return res.status(404).json({ message: "Ward booking not found" });
+  const actor = req.authUser;
+  if (actor?.role === "patient" && item.patientId !== actor.id) return res.status(403).json({ message: "That ward request is not on your patient file." });
+  if (!actor || !["patient", "doctor", "admin"].includes(actor.role)) return res.status(403).json({ message: "You cannot update this ward request." });
   const prev = item.status;
-  Object.assign(item, req.body);
+  if (actor.role === "patient") {
+    if (req.body.status && req.body.status !== "cancelled") return res.status(403).json({ message: "Patients can only cancel a ward request; hospital staff confirm beds." });
+    if (req.body.status) item.status = req.body.status;
+  } else {
+    ["status", "ward", "roomType", "date", "nights", "notes"].forEach((key) => { if (req.body[key] !== undefined) item[key] = req.body[key]; });
+  }
   if (req.body.status && req.body.status !== prev) {
     const accepted = req.body.status === "confirmed";
     notify(
@@ -548,8 +645,10 @@ app.patch("/api/ward-bookings/:id", async (req, res) => {
 });
 
 app.get("/api/messages/:roomId", (req, res) => {
+  const roomMembers = String(req.params.roomId || "").split("-");
+  if (req.authUser?.role !== "admin" && !roomMembers.includes(req.authUser?.id)) return res.status(403).json({ message: "You cannot open this conversation." });
   const db = readDb();
-  const userId = req.query.userId;
+  const userId = req.authUser.id;
   if (userId && markRoomRead(db, userId, req.params.roomId)) writeDb(db);
   res.json(db.messages.filter((m) => m.roomId === req.params.roomId));
 });
@@ -583,11 +682,13 @@ app.get("/api/badges", (req, res) => {
 });
 
 app.get("/api/notifications/:userId", (req, res) => {
+  if (req.authUser.role !== "admin" && req.params.userId !== req.authUser.id) return res.status(403).json({ message: "You cannot read another account's notifications." });
   const db = readDb();
   res.json(db.notifications.filter((n) => n.userId === req.params.userId).reverse());
 });
 
 app.patch("/api/notifications/:userId/read", (req, res) => {
+  if (req.authUser.role !== "admin" && req.params.userId !== req.authUser.id) return res.status(403).json({ message: "You cannot update another account's notifications." });
   const db = readDb();
   db.notifications.forEach((n) => {
     if (n.userId === req.params.userId) n.read = true;
@@ -597,6 +698,7 @@ app.patch("/api/notifications/:userId/read", (req, res) => {
 });
 
 app.get("/api/emails/:userId", (req, res) => {
+  if (req.authUser.role !== "admin" && req.params.userId !== req.authUser.id) return res.status(403).json({ message: "You cannot read another account's email log." });
   const db = readDb();
   const rows = (db.emails || []).filter((e) => e.userId === req.params.userId).reverse();
   res.json(rows);
@@ -630,6 +732,8 @@ app.post("/api/emails/test", async (req, res) => {
   writeDb(db);
   res.status(201).json(record);
 });
+
+app.use("/api/admin", requireAuth("admin"));
 
 app.get("/api/admin/overview", (_, res) => {
   const db = readDb();
@@ -700,7 +804,7 @@ app.post("/api/admin/users", (req, res) => {
     role,
     name: req.body.name.trim(),
     email: req.body.email.trim(),
-    password: req.body.password,
+    password: hashPassword(req.body.password),
     avatar: initials(req.body.name),
     photo: "",
     specialty: req.body.specialty || (role === "admin" ? "Hospital Administration" : ""),
@@ -725,9 +829,13 @@ app.patch("/api/admin/users/:id", (req, res) => {
   const db = readDb();
   const user = db.users.find((u) => u.id === req.params.id);
   if (!user) return res.status(404).json({ message: "User not found" });
-  ["name", "email", "phone", "city", "about", "specialty", "role", "status", "available", "years", "password"].forEach((key) => {
+  ["name", "email", "phone", "city", "about", "specialty", "role", "status", "available", "years"].forEach((key) => {
     if (req.body[key] !== undefined && req.body[key] !== "") user[key] = req.body[key];
   });
+  if (req.body.password) {
+    if (String(req.body.password).length < 6) return res.status(400).json({ message: "Password must be at least 6 characters." });
+    user.password = hashPassword(req.body.password);
+  }
   const photoErr = applyPhoto(user, req.body.photo);
   if (photoErr) return res.status(400).json({ message: photoErr });
   if (req.body.name) user.avatar = initials(req.body.name);
@@ -735,16 +843,30 @@ app.patch("/api/admin/users/:id", (req, res) => {
   res.json(safeUser(user));
 });
 
-io.on("connection", (socket) => {
-  socket.on("join-user", (userId) => socket.join(userId));
-  socket.on("join-room", (roomId) => socket.join(roomId));
+io.use((socket, next) => {
+  const token = String(socket.handshake.auth?.token || "");
+  const db = readDb();
+  const user = authUserFromRequest(db, { headers: { authorization: token ? `Bearer ${token}` : "" } });
+  if (!user) return next(new Error("Unauthorized socket connection"));
+  socket.data.user = user;
+  return next();
+});
 
-  socket.on("chat-message", async (message) => {
+io.on("connection", (socket) => {
+  const signedInUser = socket.data.user;
+  const roomAllowed = (roomId) => String(roomId || "").split("-").includes(signedInUser.id);
+  socket.on("join-user", (userId) => { if (userId === signedInUser.id) socket.join(userId); });
+  socket.on("join-room", (roomId) => { if (roomAllowed(roomId)) socket.join(roomId); });
+
+  socket.on("chat-message", async (incoming) => {
+    const roomId = String(incoming?.roomId || "");
+    if (!roomAllowed(roomId)) return;
+    const message = { ...incoming, roomId, senderId: signedInUser.id };
     const db = readDb();
-    const sender = db.users.find((u) => u.id === message.senderId);
-    const recipientId = String(message.roomId)
+    const sender = db.users.find((u) => u.id === signedInUser.id);
+    const recipientId = roomId
       .split("-")
-      .find((id) => id !== message.senderId);
+      .find((id) => id !== signedInUser.id);
     const recipient = db.users.find((u) => u.id === recipientId);
     const nursePatient = (sender?.role === "nurse" && recipient?.role === "patient")
       || (sender?.role === "patient" && recipient?.role === "nurse");
@@ -772,9 +894,9 @@ io.on("connection", (socket) => {
     if (message.senderId) io.to(message.senderId).emit("chat-message", record);
   });
 
-  socket.on("webrtc-offer", ({ roomId, offer }) => socket.to(roomId).emit("webrtc-offer", { offer }));
-  socket.on("webrtc-answer", ({ roomId, answer }) => socket.to(roomId).emit("webrtc-answer", { answer }));
-  socket.on("webrtc-ice", ({ roomId, candidate }) => socket.to(roomId).emit("webrtc-ice", { candidate }));
+  socket.on("webrtc-offer", ({ roomId, offer }) => { if (roomAllowed(roomId)) socket.to(roomId).emit("webrtc-offer", { offer }); });
+  socket.on("webrtc-answer", ({ roomId, answer }) => { if (roomAllowed(roomId)) socket.to(roomId).emit("webrtc-answer", { answer }); });
+  socket.on("webrtc-ice", ({ roomId, candidate }) => { if (roomAllowed(roomId)) socket.to(roomId).emit("webrtc-ice", { candidate }); });
 });
 
 const dist = path.join(__dirname, "..", "client", "dist");

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { io } from "socket.io-client";
-import { api, socketUrl } from "../api";
+import { api, socketOptions, socketUrl } from "../api";
 import { HOSPITAL, ghs, prettyDate } from "../utils";
 import { useAuth, useToast } from "../state";
 import PublicChrome from "../components/PublicChrome";
@@ -83,7 +83,7 @@ export default function Tariff() {
 
   useEffect(() => {
     api("/finance/rates").then((r) => { setRates(r); setDraft(r); });
-    const socket = io(socketUrl, { autoConnect: true });
+    const socket = io(socketUrl, socketOptions());
     socket.on("tariff-updated", (payload) => {
       setRates(payload);
       if (!canEdit) setDraft(payload);
