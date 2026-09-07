@@ -1,0 +1,124 @@
+/* CareBridge Product OS — role module design layer */
+
+/* ---------- Care team / caseload ---------- */
+.care-team-toolbar { min-height: 52px; padding: 6px; display: grid; grid-template-columns: minmax(220px,1fr) auto; gap: 8px; align-items: center; border: 1px solid #dbe5ea; border-radius: 11px; background: #fff; box-shadow: 0 3px 12px rgba(6,30,49,.035); }
+.care-team-search { min-height: 38px; padding: 0 9px; display: flex; align-items: center; gap: 7px; border: 1px solid #dce6eb; border-radius: 9px; background: #f7fafb; color: #7c8e99; }
+.care-team-search input { min-height: 30px; flex: 1; padding: 0; border: 0; background: transparent; box-shadow: none; font-size: 9px; }
+.care-team-search input:focus { box-shadow: none; }
+.care-team-status-filter { margin: 0 !important; }
+.care-specialty-chips { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 2px 0 4px; }
+.care-specialty-chips button { min-height: 30px; padding: 0 10px; border: 1px solid #dbe5ea; border-radius: 999px; color: #607786; background: #fff; font-size: 8px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.care-specialty-chips button.active { color: #0d776c; background: #eaf7f3; border-color: #cfe7e0; }
+.care-directory-section { padding: 16px !important; }
+.care-person-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(290px,1fr)); gap: 11px; }
+.care-person-card { min-height: 218px; padding: 13px; display: flex; flex-direction: column; border: 1px solid #dbe5ea; border-radius: 12px; background: linear-gradient(180deg,#fff,#fbfdfe); box-shadow: 0 3px 12px rgba(6,30,49,.035); transition: transform .22s cubic-bezier(.22,1,.36,1), box-shadow .22s ease, border-color .2s ease; position: relative; overflow: hidden; }
+.care-person-card::after { content: ""; position: absolute; inset: auto -50px -60px auto; width: 160px; height: 160px; border-radius: 50%; background: radial-gradient(circle, rgba(19,139,123,.07), transparent 70%); pointer-events: none; }
+.care-person-card:hover { transform: translateY(-3px); border-color: #bfd5de; box-shadow: 0 13px 32px rgba(6,30,49,.085); }
+.care-person-card.chosen { border-color: #bfe3da; box-shadow: inset 0 3px #1b9b89, 0 5px 18px rgba(6,30,49,.05); }
+.care-person-card.busy { background: linear-gradient(180deg,#fff,#fcfaf7); }
+.care-person-top { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 10px; align-items: center; }
+.care-person-top h3 { margin: 0; font-size: 13px; }
+.care-person-top p { margin: 3px 0 5px; color: #768a96; font-size: 8px; }
+.team-badge { min-height: 24px; padding: 0 7px; display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; color: #0e786c; background: #e8f7f3; border: 1px solid #cfe8e1; font-size: 7px; font-weight: 850; white-space: nowrap; }
+.care-person-about { min-height: 56px; margin: 12px 0 10px; padding: 9px; color: #667c8a; background: #f6f9fa; border: 1px solid #e5ecef; border-radius: 9px; font-size: 9px; line-height: 1.45; }
+.care-person-actions { margin-top: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.care-person-actions .primary-btn,
+.care-person-actions .secondary-btn { min-height: 35px; padding: 0 10px; font-size: 8px; }
+.care-person-actions > * { flex: 1; }
+
+/* ---------- Prescriptions ---------- */
+.prescription-list-section { padding: 16px !important; }
+.prescription-product-list { display: grid; gap: 10px; }
+.prescription-product-card { overflow: hidden; border: 1px solid #dbe5ea; border-radius: 12px; background: #fff; box-shadow: 0 4px 14px rgba(6,30,49,.04); }
+.prescription-product-card.active { box-shadow: inset 3px 0 #6d5cb4, 0 4px 14px rgba(6,30,49,.04); }
+.prescription-card-head { padding: 12px 13px 10px; display: grid; grid-template-columns: 38px minmax(0,1fr) auto; gap: 10px; align-items: center; background: linear-gradient(180deg,#fff,#fbfdfe); border-bottom: 1px solid #e6edf0; }
+.prescription-card-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; color: #6558aa; background: #f0eefb; }
+.prescription-card-head h3 { margin: 3px 0 4px; font-size: 14px; }
+.prescription-person { display: flex; align-items: center; gap: 6px; color: #70848f; font-size: 8px; }
+.prescription-lines { padding: 10px 13px; display: grid; gap: 6px; }
+.prescription-lines > div { min-height: 43px; padding: 7px 9px; display: flex; align-items: center; justify-content: space-between; gap: 9px; border: 1px solid #e3eaee; border-radius: 9px; background: #fbfdfe; }
+.prescription-lines span { min-width: 0; display: flex; flex-direction: column; }
+.prescription-lines b { font-size: 9px; }
+.prescription-lines small { margin-top: 2px; color: #7c8e98; font-size: 7px; }
+.prescription-lines strong { min-width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: #564b95; background: #f0eefb; font-size: 9px; }
+.prescription-note { margin: 0 13px 10px; padding: 8px; display: flex; align-items: flex-start; gap: 7px; border-radius: 8px; color: #687d8a; background: #f5f8fa; font-size: 8px; line-height: 1.4; }
+.prescription-card-foot { min-height: 54px; padding: 9px 13px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid #e6edf0; background: #fbfdfe; }
+.prescription-source { display: inline-flex; align-items: center; gap: 5px; color: #7c8d97; font-size: 8px; }
+.prescription-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.prescription-actions .primary-btn,
+.prescription-actions .secondary-btn,
+.prescription-actions .ghost-btn { min-height: 34px; padding: 0 9px; font-size: 8px; }
+
+/* ---------- Pharmacy stock ---------- */
+.stock-toolbar { min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.stock-toolbar .filters { margin: 0 !important; }
+.stock-table-section { padding: 0 !important; overflow: hidden; }
+.stock-table-section .product-section-head { padding: 15px 16px 9px; margin: 0; }
+.ops-footer-assurance.compact { min-height: 32px; padding: 0 9px; border: 0; background: #f1f8f5; }
+.stock-table-wrap { overflow-x: auto; border-top: 1px solid #e2eaee; }
+.product-stock-table { min-width: 1050px; border: 0 !important; border-radius: 0 !important; }
+.product-stock-table thead th { position: sticky; top: 0; z-index: 1; }
+.product-stock-table td { vertical-align: middle; }
+.product-stock-table input,
+.product-stock-table select { min-height: 34px; padding: 6px 8px; font-size: 8px; }
+.stock-product-cell { min-width: 180px; display: grid; gap: 4px; }
+.stock-product-cell small { color: #7f919c; font-size: 7px; }
+.product-stock-table tr.stock-row-low { background: #fffaf1; }
+.product-stock-table tr.oos-row { opacity: .7; background: #fafafa; }
+.product-stock-table .stock-warn { display: inline-flex; width: fit-content; margin-top: 4px; color: #a46c18; font-size: 7px; font-style: normal; font-weight: 800; }
+.product-stock-table .stock-warn.empty { color: #aa453d; }
+.product-stock-table .restock-cell { display: flex; gap: 4px; align-items: center; }
+.product-stock-table .restock-cell .ghost-btn { min-height: 32px; padding: 0 7px; font-size: 8px; }
+.product-stock-table .shelf-toggle { min-width: 108px; }
+
+/* ---------- General commercial treatment for the remaining role pages ---------- */
+.product-page .page-title + .card,
+.product-page .page-hero + .card { margin-top: 12px; }
+.product-page .people-grid { grid-template-columns: repeat(auto-fit,minmax(270px,1fr)); gap: 11px; }
+.product-page .person-card { min-height: 190px; }
+.product-page .card-head { min-height: 38px; }
+.product-page .card-head h3 { font-size: 12px; }
+.product-page .card-head .eyebrow { font-size: 8px; }
+.product-page .kpi-row { gap: 10px; }
+.product-page .kpi,
+.product-page .mini-kpi,
+.product-page .stat-card { border-radius: 11px; border-color: #dbe5ea; background: #fff; }
+.product-page .soft-icon { width: 34px; height: 34px; border-radius: 9px; }
+.product-page .actions { gap: 6px; }
+.product-page .error-box,
+.product-page .success-box { border-radius: 9px; }
+.product-page textarea { line-height: 1.45; }
+.product-page .tabs { padding: 4px; border: 1px solid #dce6eb; border-radius: 9px; background: #f3f7f9; }
+.product-page .tabs button { border-radius: 7px; }
+.product-page .tabs button.active { box-shadow: 0 3px 10px rgba(6,30,49,.06); }
+
+/* Admin detail pages get denser operational framing */
+.role-admin .product-page .table,
+.role-admin .product-page .list-card,
+.role-admin .product-page .card { font-size: 10px; }
+.role-admin .product-page .table th { font-size: 8px; }
+.role-admin .product-page .table td { font-size: 9px; }
+.role-admin .product-page .appointment-row { min-height: 54px; }
+.role-admin .product-page .card { box-shadow: 0 3px 14px rgba(6,30,49,.04); }
+.role-admin .product-page .filters { background: #eef3f6; }
+
+/* Patient-facing product surfaces stay warmer and less dense */
+.role-patient .product-page .card,
+.role-patient .product-page .list-card { box-shadow: 0 5px 18px rgba(6,30,49,.05); }
+
+@media (max-width: 980px) {
+  .care-team-toolbar { grid-template-columns: 1fr; }
+  .care-team-status-filter { width: 100% !important; }
+  .prescription-card-foot { align-items: flex-start; flex-direction: column; }
+}
+
+@media (max-width: 720px) {
+  .care-person-grid { grid-template-columns: 1fr; }
+  .care-person-top { grid-template-columns: auto minmax(0,1fr); }
+  .team-badge { grid-column: 1 / -1; width: fit-content; }
+  .prescription-card-head { grid-template-columns: 34px minmax(0,1fr); }
+  .prescription-card-head > .status { grid-column: 1 / -1; width: fit-content; }
+  .prescription-actions { width: 100%; }
+  .prescription-actions > * { flex: 1; }
+  .stock-toolbar { align-items: flex-start; flex-direction: column; }
+}
