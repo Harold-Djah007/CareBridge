@@ -132,7 +132,7 @@ function NavRail({ children }) {
   };
 
   return (
-    <nav ref={railRef} className="nav-rail product-nav-rail" onMouseMove={onMove} onMouseLeave={() => { setGlow((g) => ({ ...g, visible: false })); setSpot((s) => ({ ...s, visible: false })); }}>
+    <nav ref={railRef} className="product-nav-rail" onMouseMove={onMove} onMouseLeave={() => { setGlow((g) => ({ ...g, visible: false })); setSpot((s) => ({ ...s, visible: false })); }}>
       <span className={`nav-follow ${glow.visible ? "on" : ""}`} style={{ transform: `translate3d(0, ${glow.y}px, 0)`, height: glow.h }} />
       <span className={`nav-spot ${spot.visible ? "on" : ""}`} style={{ transform: `translate3d(0, ${spot.y - 48}px, 0)` }} />
       {children}
@@ -221,10 +221,10 @@ export default function AppShell() {
   };
 
   return (
-    <div className={`app-layout portal-app carebridge-shell role-${user.role} ${collapsed ? "nav-collapsed" : ""}`} data-role={user.role}>
+    <div className={`carebridge-shell role-${user.role} ${collapsed ? "nav-collapsed" : ""}`} data-role={user.role}>
       <a className="skip-link" href="#main-content">Skip to main content</a>
 
-      <aside className={`sidebar product-sidebar sidebar-${user.role}`}>
+      <aside className={`product-sidebar sidebar-${user.role}`}>
         <div className="product-sidebar-head">
           <Link to={user.role === "admin" ? "/admin" : "/home"} className="product-brand" aria-label="CareBridge home">
             <span className="product-brand-mark"><HeartPulse size={20} /></span>
@@ -265,7 +265,7 @@ export default function AppShell() {
             <strong>{context.title}</strong>
           </div>
 
-          <form className="top-search product-search" onSubmit={onSearch}>
+          <form className="product-search" onSubmit={onSearch}>
             <Search size={16} />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} aria-label={searchPlaceholder} />
             <kbd>⌘ K</kbd>
@@ -293,7 +293,7 @@ export default function AppShell() {
           <div className="product-context-right"><Activity size={14} /><span>{topMeta}</span></div>
         </div>
 
-        <main className="main portal-main product-main" id="main-content" tabIndex="-1">
+        <main className="product-main" id="main-content" tabIndex="-1">
           {noticeOpen && (
             <aside className="product-notification-drawer" role="dialog" aria-label="Notifications">
               <div className="product-notification-head">
@@ -315,7 +315,7 @@ export default function AppShell() {
 
           <div className={`page-stage scene-${scene}`}>
             <PageAtmosphere scene={scene} />
-            <div className="page-wrap product-page"><Outlet /></div>
+            <div className="product-page"><Outlet /></div>
           </div>
         </main>
       </section>
