@@ -13,6 +13,7 @@ import { mountSupport } from "./support.js";
 import { mountCases } from "./cases.js";
 import { ensurePharmacy, mountPharmacy } from "./pharmacy.js";
 import { ensureCarts, mountCart, clearUserCart, removeCartKinds } from "./cart.js";
+import { mountWardAutomation } from "./wardAutomation.js";
 import { authUserFromRequest, ensurePasswordSecurity, hashPassword, issueSession, passwordMatches, revokeSession } from "./auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -156,14 +157,16 @@ const markRoomRead = (db, userId, roomId) => {
 };
 
 const notify = (db, userId, title, body) => {
-  db.notifications.push({
+  const notification = {
     id: `n${Date.now()}${Math.floor(Math.random() * 1000)}`,
     userId,
     title,
     body,
     read: false,
-  });
-  io.to(userId).emit("notification", { title, body });
+    createdAt: new Date().toISOString(),
+  };
+  db.notifications.push(notification);
+  io.to(userId).emit("notification", notification);
 };
 
 const emailPatient = async (db, userId, { type, subject, heading, intro, details, closing, text }) => {
@@ -324,6 +327,8 @@ app.use("/api", (req, res, next) => {
   }
   return next();
 });
+
+mountWardAutomation(app, { readDb, writeDb, safeUser, notify, emailPatient, io, wardFee, addInvoice });
 
 app.patch("/api/users/:id", requireAuth(), (req, res) => {
   const db = readDb();
@@ -532,6 +537,7 @@ app.patch("/api/wards/:id", (req, res) => {
   });
   if (Array.isArray(req.body.amenities)) ward.amenities = req.body.amenities;
   writeDb(db);
+  io.emit("ward-capacity", { ward: { id: ward.id, name: ward.name, available: ward.available, capacity: ward.capacity }, at: new Date().toISOString() });
   res.json(ward);
 });
 
@@ -649,8 +655,22 @@ app.get("/api/messages/:roomId", (req, res) => {
   if (req.authUser?.role !== "admin" && !roomMembers.includes(req.authUser?.id)) return res.status(403).json({ message: "You cannot open this conversation." });
   const db = readDb();
   const userId = req.authUser.id;
-  if (userId && markRoomRead(db, userId, req.params.roomId)) writeDb(db);
+  if (userId && markRoomRead(db, userId, req.params.roomId)) {
+    writeDb(db);
+    io.to(userId).emit("badges-updated", { messages: unreadMessages(db, userId) });
+  }
   res.json(db.messages.filter((m) => m.roomId === req.params.roomId));
+});
+
+app.patch("/api/messages/:roomId/read", (req, res) => {
+  const roomMembers = String(req.params.roomId || "").split("-");
+  if (req.authUser?.role !== "admin" && !roomMembers.includes(req.authUser?.id)) return res.status(403).json({ message: "You cannot update this conversation." });
+  const db = readDb();
+  const userId = req.authUser.id;
+  if (userId && markRoomRead(db, userId, req.params.roomId)) writeDb(db);
+  const messages = unreadMessages(db, userId);
+  io.to(userId).emit("badges-updated", { messages });
+  res.json({ ok: true, messages });
 });
 
 app.get("/api/badges", (req, res) => {
@@ -694,6 +714,7 @@ app.patch("/api/notifications/:userId/read", (req, res) => {
     if (n.userId === req.params.userId) n.read = true;
   });
   writeDb(db);
+  io.to(req.params.userId).emit("badges-updated", { notifications: 0 });
   res.json({ ok: true });
 });
 
@@ -890,7 +911,10 @@ io.on("connection", (socket) => {
     }
     writeDb(db);
     io.to(message.roomId).emit("chat-message", record);
-    if (recipientId) io.to(recipientId).emit("chat-message", record);
+    if (recipientId) {
+      io.to(recipientId).emit("chat-message", record);
+      io.to(recipientId).emit("badges-updated", { messages: unreadMessages(db, recipientId) });
+    }
     if (message.senderId) io.to(message.senderId).emit("chat-message", record);
   });
 
