@@ -1,6 +1,9 @@
 import fs from "fs";
 import { spawn } from "child_process";
-import { io } from "socket.io-client";
+import { createRequire } from "module";
+
+const clientRequire = createRequire(new URL("../client/package.json", import.meta.url));
+const { io } = clientRequire("socket.io-client");
 
 const dataFile = process.env.DATA_FILE;
 const port = Number(process.env.PORT || 5055);
