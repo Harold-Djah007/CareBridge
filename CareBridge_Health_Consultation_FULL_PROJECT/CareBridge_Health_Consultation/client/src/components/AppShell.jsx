@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  Activity, BedDouble, Bell, Building2, CalendarDays, ClipboardList, FolderKanban,
-  FolderOpen, HeartPulse, Inbox, LayoutDashboard, LifeBuoy, LogOut, Mail,
-  MessageCircle, Pill, Receipt, Search, ScrollText, ShieldCheck, ShoppingBag,
-  Stethoscope, UserRound, Users, Video, Wifi,
+  Activity, BedDouble, Bell, Building2, CalendarDays, ClipboardList, Command,
+  FolderKanban, FolderOpen, HeartPulse, Inbox, LayoutDashboard, LifeBuoy, LogOut,
+  Mail, MessageCircle, Pill, Receipt, Search, ScrollText, Settings2, ShieldCheck,
+  ShoppingBag, Sparkles, Stethoscope, UserRound, Users, Video, Wifi, X,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { CartMastButton, useCart } from "../ShopCart";
@@ -19,8 +19,8 @@ const NAV = {
   patient: [
     { to: "/home", icon: LayoutDashboard, label: "Home", end: true, primary: true },
     { to: "/appointments", icon: CalendarDays, label: "Appointments", primary: true },
-    { to: "/messages", icon: MessageCircle, label: "Messages", badge: "messages", primary: true },
     { to: "/records", icon: FolderOpen, label: "Health record", primary: true },
+    { to: "/messages", icon: MessageCircle, label: "Messages", badge: "messages", primary: true },
     { to: "/prescriptions", icon: ClipboardList, label: "Prescriptions" },
     { to: "/wards", icon: BedDouble, label: "Admissions", badge: "wards" },
     { to: "/pay", icon: ShoppingBag, label: "Shop & pay", primary: true },
@@ -44,7 +44,7 @@ const NAV = {
     { group: "Hospital", items: [
       { to: "/billing/tariff", icon: ScrollText, label: "Tariff" },
       { to: "/support", icon: LifeBuoy, label: "Support", badge: "tickets" },
-      { to: "/settings", icon: UserRound, label: "Account" },
+      { to: "/settings", icon: Settings2, label: "Preferences" },
     ]},
   ],
   nurse: [
@@ -55,7 +55,7 @@ const NAV = {
     ]},
     { group: "Account", items: [
       { to: "/support", icon: LifeBuoy, label: "Support" },
-      { to: "/settings", icon: UserRound, label: "Profile & shift" },
+      { to: "/settings", icon: Settings2, label: "Workspace settings" },
     ]},
   ],
   admin: [
@@ -75,7 +75,7 @@ const NAV = {
       { to: "/support", icon: LifeBuoy, label: "Support desk", badge: "tickets", primary: true },
       { to: "/messages", icon: MessageCircle, label: "Switchboard", badge: "messages" },
       { to: "/alerts", icon: Mail, label: "Patient notices" },
-      { to: "/settings", icon: UserRound, label: "Account" },
+      { to: "/settings", icon: Settings2, label: "System preferences" },
     ]},
   ],
 };
@@ -97,11 +97,21 @@ const PAGE_META = [
   ["/pay", "Shop & pay", "Bills, medicines and services"],
   ["/care", "Care team", "People involved in care"],
   ["/support", "Support", "Hospital support and assistance"],
-  ["/settings", "Account", "Identity, preferences and security"],
+  ["/settings", "Settings", "Identity, preferences, appearance and security"],
   ["/alerts", "Notifications", "Hospital notices and communications"],
   ["/billing/tariff", "Hospital tariff", "Published prices and service charges"],
   ["/home", "Home", "Your CareBridge workspace"],
 ];
+
+const DEFAULT_APPEARANCE = { theme: "pearl", density: "comfortable", motion: "full", nav: "floating" };
+
+function readAppearance() {
+  try {
+    return { ...DEFAULT_APPEARANCE, ...JSON.parse(localStorage.getItem("carebridge-appearance") || "{}") };
+  } catch {
+    return DEFAULT_APPEARANCE;
+  }
+}
 
 function pageMeta(pathname, role) {
   const hit = PAGE_META.find(([path]) => pathname === path || pathname.startsWith(`${path}/`));
@@ -126,7 +136,10 @@ export default function AppShell() {
   const [query, setQuery] = useState("");
   const [notes, setNotes] = useState([]);
   const [noticeOpen, setNoticeOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState("");
   const [connected, setConnected] = useState(false);
+  const [appearance, setAppearance] = useState(readAppearance);
   const [badges, setBadges] = useState({ visits: 0, wards: 0, messages: 0, tickets: 0, queue: 0, notifications: 0 });
 
   const isPatient = user.role === "patient";
@@ -156,7 +169,29 @@ export default function AppShell() {
   }, [user.id, user.role]);
 
   useEffect(() => {
+    const sync = () => setAppearance(readAppearance());
+    window.addEventListener("carebridge:appearance", sync);
+    const onKey = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+      if (event.key === "Escape") {
+        setPaletteOpen(false);
+        setNoticeOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("carebridge:appearance", sync);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  useEffect(() => {
     setNoticeOpen(false);
+    setPaletteOpen(false);
+    setPaletteQuery("");
     loadBadges();
   }, [location.pathname]);
 
@@ -195,51 +230,50 @@ export default function AppShell() {
         key={`${compact ? "compact-" : ""}${item.to}`}
         to={item.to}
         end={item.end}
-        className={({ isActive }) => `cbx-nav-link ${isActive ? "is-active" : ""}`}
+        className={({ isActive }) => `cbv6-nav-link ${isActive ? "is-active" : ""}`}
       >
-        <Icon size={compact ? 19 : 17} />
+        <span className="cbv6-nav-icon"><Icon size={compact ? 19 : 18} /></span>
         <span>{item.label}</span>
         {shown > 0 && <b>{shown > 99 ? "99+" : shown}</b>}
       </NavLink>
     );
   };
 
-  return (
-    <div className={`cbx-app cbx-role-${user.role}`}>
-      <a className="skip-link" href="#cbx-main">Skip to main content</a>
+  const paletteItems = allNav.filter((item) => item.label.toLowerCase().includes(paletteQuery.trim().toLowerCase()));
 
-      <header className="cbx-topbar">
-        <Link className="cbx-brand" to={user.role === "admin" ? "/admin" : "/home"}>
-          <span className="cbx-brand-mark"><HeartPulse size={21} /></span>
-          <span className="cbx-brand-copy"><strong>CareBridge</strong><small>{isPatient ? "My health" : "Hospital workspace"}</small></span>
+  return (
+    <div
+      className={`cbv6-app cbv6-role-${user.role} cbv6-theme-${appearance.theme} cbv6-density-${appearance.density} cbv6-motion-${appearance.motion} cbv6-nav-${appearance.nav}`}
+      style={{ "--cbv6-scene": `url(${scenePhoto})` }}
+    >
+      <a className="skip-link" href="#cbv6-main">Skip to main content</a>
+      <div className="cbv6-ambient" aria-hidden="true"><i /><i /><i /></div>
+
+      <header className="cbv6-topbar">
+        <Link className="cbv6-brand" to={user.role === "admin" ? "/admin" : "/home"}>
+          <span className="cbv6-brand-mark"><HeartPulse size={22} /></span>
+          <span><strong>CareBridge</strong><small>{isPatient ? "Care, beautifully connected" : "Health operating system"}</small></span>
         </Link>
 
-        <div className="cbx-top-title">
-          <small>{roleName}</small>
+        <div className="cbv6-page-identity">
+          <small>{roleName} workspace</small>
           <strong>{meta.title}</strong>
+          <span>{meta.description}</span>
         </div>
 
-        <form className="cbx-search" onSubmit={onSearch}>
-          <Search size={16} />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={user.role === "admin" ? "Search people" : user.role === "doctor" ? "Search patients" : user.role === "nurse" ? "Search dispensing" : "Find a doctor or service"}
-            aria-label="Search CareBridge"
-          />
-        </form>
-
-        <div className="cbx-top-actions">
-          <span className={`cbx-live ${connected ? "is-live" : ""}`} title={connected ? "Live services connected" : "Reconnecting"}>
-            <Wifi size={14} /><span>{connected ? "Live" : "Connecting"}</span>
+        <div className="cbv6-top-actions">
+          <button className="cbv6-command-trigger" type="button" onClick={() => setPaletteOpen(true)}>
+            <Command size={16} /><span>Jump anywhere</span><kbd>Ctrl K</kbd>
+          </button>
+          <span className={`cbv6-live ${connected ? "is-live" : ""}`} title={connected ? "Live services connected" : "Reconnecting"}>
+            <Wifi size={14} /><span>{connected ? "Live" : "Syncing"}</span>
           </span>
           <LiveClock />
           {isPatient && <CartMastButton />}
-          <button className="cbx-icon-btn" type="button" onClick={() => { setNoticeOpen((v) => !v); if (!noticeOpen && unread) markAllRead(); }} aria-label="Notifications">
-            <Bell size={18} />
-            {unread > 0 && <em>{unread > 99 ? "99+" : unread}</em>}
+          <button className="cbv6-icon-btn" type="button" onClick={() => { setNoticeOpen((v) => !v); if (!noticeOpen && unread) markAllRead(); }} aria-label="Notifications">
+            <Bell size={18} />{unread > 0 && <em>{unread > 99 ? "99+" : unread}</em>}
           </button>
-          <button className="cbx-profile" type="button" onClick={() => navigate("/settings")}>
+          <button className="cbv6-profile" type="button" onClick={() => navigate("/settings")}>
             <Avatar person={user} className="small" />
             <span><strong>{user.name}</strong><small>{userMeta}</small></span>
           </button>
@@ -247,21 +281,21 @@ export default function AppShell() {
       </header>
 
       {isPatient && (
-        <nav className="cbx-patient-nav" aria-label="Patient navigation">
-          <div>{allNav.map((item) => navLink(item))}</div>
+        <nav className="cbv6-patient-dock" aria-label="Patient navigation">
+          <div className="cbv6-patient-dock-inner">{allNav.map((item) => navLink(item))}</div>
         </nav>
       )}
 
-      <div className={`cbx-layout ${isPatient ? "cbx-layout-patient" : "cbx-layout-staff"}`}>
+      <div className={`cbv6-shell ${isPatient ? "cbv6-shell-patient" : "cbv6-shell-staff"}`}>
         {!isPatient && (
-          <aside className="cbx-side">
-            <div className="cbx-side-campus">
-              <span className="cbx-campus-photo" style={{ backgroundImage: `url(${scenePhoto})` }} />
+          <aside className="cbv6-rail">
+            <div className="cbv6-rail-scene">
+              <span className="cbv6-rail-photo" />
               <div><strong>{HOSPITAL.campus}</strong><small>{HOSPITAL.city}</small></div>
-              <span className={`cbx-status-dot ${connected ? "on" : ""}`} />
+              <span className={`cbv6-status-dot ${connected ? "on" : ""}`} />
             </div>
 
-            <nav className="cbx-side-nav" aria-label={`${roleName} navigation`}>
+            <nav className="cbv6-rail-nav" aria-label={`${roleName} navigation`}>
               {(NAV[user.role] || []).map((group) => (
                 <section key={group.group}>
                   <p>{group.group}</p>
@@ -270,34 +304,34 @@ export default function AppShell() {
               ))}
             </nav>
 
-            <div className="cbx-side-foot">
-              <button type="button" onClick={() => navigate("/settings")}>
+            <div className="cbv6-rail-footer">
+              <button type="button" className="cbv6-mini-profile" onClick={() => navigate("/settings")}>
                 <Avatar person={user} className="small" />
                 <span><strong>{user.name}</strong><small>{userMeta}</small></span>
               </button>
-              <button className="cbx-side-logout" type="button" title="Sign out" onClick={() => { logout(); navigate("/login"); }}><LogOut size={17} /></button>
+              <button className="cbv6-logout" type="button" title="Sign out" onClick={() => { logout(); navigate("/login"); }}><LogOut size={17} /></button>
             </div>
           </aside>
         )}
 
-        <main className="cbx-main" id="cbx-main" tabIndex="-1">
-          <div className="cbx-contextbar">
-            <div>
-              <ShieldCheck size={15} />
-              <span>{meta.description}</span>
-            </div>
-            <span className="cbx-context-photo" style={{ backgroundImage: `url(${scenePhoto})` }} aria-hidden="true" />
+        <main className="cbv6-main" id="cbv6-main" tabIndex="-1">
+          <div className="cbv6-context-strip">
+            <div><Sparkles size={14} /><span>{meta.description}</span></div>
+            <form onSubmit={onSearch} className="cbv6-inline-search">
+              <Search size={15} />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={user.role === "admin" ? "Search people" : user.role === "doctor" ? "Search patients" : user.role === "nurse" ? "Find medicine or queue" : "Find a doctor or service"} aria-label="Search CareBridge" />
+            </form>
+            <button type="button" onClick={() => navigate("/settings?tab=experience")}><Settings2 size={15} /> Personalize</button>
           </div>
 
           {noticeOpen && (
-            <aside className="cbx-notice-popover" role="dialog" aria-label="Notifications">
-              <header><div><small>Live feed</small><strong>Notifications</strong></div><button type="button" onClick={markAllRead}>Mark read</button></header>
-              <div className="cbx-notice-list">
-                {notes.length === 0 && <p>No new hospital notices.</p>}
+            <aside className="cbv6-notice-panel" role="dialog" aria-label="Notifications">
+              <header><div><small>Live feed</small><strong>Notifications</strong></div><button type="button" onClick={() => setNoticeOpen(false)}><X size={16} /></button></header>
+              <div>
+                {notes.length === 0 && <p className="cbv6-empty-copy">You are all caught up.</p>}
                 {notes.slice(0, 8).map((note) => (
                   <article key={note.id} className={note.read ? "" : "unread"}>
-                    <i />
-                    <div><strong>{note.title}</strong><p>{note.body}</p></div>
+                    <i /><div><strong>{note.title}</strong><p>{note.body}</p></div>
                   </article>
                 ))}
               </div>
@@ -305,13 +339,28 @@ export default function AppShell() {
             </aside>
           )}
 
-          <div className="cbx-content"><Outlet /></div>
+          <div className="cbv6-content">
+            <div key={location.pathname} className="cbv6-route-frame"><Outlet /></div>
+          </div>
         </main>
       </div>
 
-      <nav className="cbx-mobile-nav" aria-label="Primary navigation">
-        {mobileNav.map((item) => navLink(item, true))}
-      </nav>
+      <nav className="cbv6-mobile-nav" aria-label="Primary navigation">{mobileNav.map((item) => navLink(item, true))}</nav>
+
+      {paletteOpen && (
+        <div className="cbv6-palette-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setPaletteOpen(false); }}>
+          <section className="cbv6-palette" role="dialog" aria-modal="true" aria-label="CareBridge command palette">
+            <header><Command size={18} /><input autoFocus value={paletteQuery} onChange={(e) => setPaletteQuery(e.target.value)} placeholder="Type a page or workspace…" /><button type="button" onClick={() => setPaletteOpen(false)}><X size={17} /></button></header>
+            <div className="cbv6-palette-list">
+              {paletteItems.map((item) => {
+                const Icon = item.icon;
+                return <button key={item.to} type="button" onClick={() => navigate(item.to)}><span><Icon size={18} /></span><div><strong>{item.label}</strong><small>{pageMeta(item.to, user.role).description}</small></div></button>;
+              })}
+              <button type="button" onClick={() => navigate("/settings?tab=experience")}><span><Settings2 size={18} /></span><div><strong>Appearance & experience</strong><small>Theme, density, motion and navigation</small></div></button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
