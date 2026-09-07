@@ -10,15 +10,14 @@ import { HOSPITAL, roleLabel } from "../utils";
 import PhotoPicker from "../components/PhotoPicker";
 import DutyToggle from "../components/DutyToggle";
 import Avatar from "../components/Avatar";
-import PageHero from "../components/PageHero";
 
 const DEFAULT_APPEARANCE = { theme: "pearl", density: "comfortable", motion: "full", nav: "floating" };
 
 const FILE_NOTE = {
-  patient: "Used across receipts, admissions and the clinical record your care team sees.",
-  doctor: "Used across prescriptions, clinic queues and the staff directory.",
-  nurse: "Used across dispensing queues and hospital staff workflows.",
-  admin: "Used across operations, notices and hospital governance workflows.",
+  patient: "This identity follows you across receipts, admissions and your clinical record.",
+  doctor: "This identity appears on prescriptions, clinic queues and staff workflows.",
+  nurse: "This identity appears in dispensing, inventory and hospital staff workflows.",
+  admin: "This identity appears in operations, notices and governance workflows.",
 };
 
 function readAppearance() {
@@ -39,13 +38,34 @@ function tabFromParams(params, role) {
   return "profile";
 }
 
-function SettingChoice({ active, icon: Icon, title, text, onClick }) {
+function Segmented({ value, options, onChange, ariaLabel }) {
   return (
-    <button type="button" className={`cbv6-choice ${active ? "is-selected" : ""}`} onClick={onClick}>
-      <span><Icon size={18} /></span>
-      <div><strong>{title}</strong><small>{text}</small></div>
-      {active && <Check size={16} />}
-    </button>
+    <div className="cbx-settings-segment" role="group" aria-label={ariaLabel}>
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          className={value === option.id ? "is-selected" : ""}
+          onClick={() => onChange(option.id)}
+        >
+          {option.swatch && <i className={`cbx-settings-swatch ${option.swatch}`} />}
+          <span>{option.label}</span>
+          {value === option.id && <Check size={15} />}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PreferenceRow({ icon: Icon, title, description, children }) {
+  return (
+    <div className="cbx-settings-preference-row">
+      <div className="cbx-settings-preference-copy">
+        <span className="cbx-settings-row-icon"><Icon size={18} /></span>
+        <div><strong>{title}</strong><p>{description}</p></div>
+      </div>
+      <div className="cbx-settings-preference-control">{children}</div>
+    </div>
   );
 }
 
@@ -56,11 +76,11 @@ export default function Settings() {
   const [params, setParams] = useSearchParams();
   const prefs = user.paymentPrefs || {};
   const sections = [
-    { id: "profile", label: "Profile & identity", icon: UserRound, help: "Personal and clinical identity" },
-    { id: "experience", label: "Experience", icon: Sparkles, help: "Theme, motion and density" },
-    { id: "security", label: "Security", icon: Shield, help: "Password and access" },
-    ...(user.role === "patient" ? [{ id: "pay", label: "Payments", icon: Wallet, help: "Preferred payment defaults" }] : []),
-    { id: "notifications", label: "Notifications", icon: Bell, help: "Email and in-app alerts" },
+    { id: "profile", label: "Profile", icon: UserRound, help: "Identity & clinical details" },
+    { id: "experience", label: "Display", icon: MonitorCog, help: "Appearance & motion" },
+    { id: "security", label: "Security", icon: Shield, help: "Password & access" },
+    ...(user.role === "patient" ? [{ id: "pay", label: "Payments", icon: Wallet, help: "Checkout defaults" }] : []),
+    { id: "notifications", label: "Notifications", icon: Bell, help: "Email & app notices" },
   ];
 
   const [tab, setTab] = useState(() => tabFromParams(params, user.role));
@@ -99,7 +119,9 @@ export default function Settings() {
   const [busy, setBusy] = useState("");
 
   const fileNo = user.role === "patient" ? (user.mrn || "Pending MRN") : (user.employeeId || "Staff file");
-  const desk = user.role === "patient" ? (account.insurance || user.insurance || "Self-pay") : (user.department || account.specialty || user.specialty || roleLabel(user.role));
+  const desk = user.role === "patient"
+    ? (account.insurance || user.insurance || "Self-pay")
+    : (user.department || account.specialty || user.specialty || roleLabel(user.role));
 
   const goTab = (id) => {
     setTab(id);
@@ -121,8 +143,8 @@ export default function Settings() {
     window.dispatchEvent(new Event("carebridge:appearance"));
   };
 
-  const saveAccount = async (e) => {
-    e.preventDefault();
+  const saveAccount = async (event) => {
+    event.preventDefault();
     setBusy("profile");
     try {
       await patch({
@@ -143,8 +165,8 @@ export default function Settings() {
     } catch (err) { push(err.message, "error"); } finally { setBusy(""); }
   };
 
-  const savePassword = async (e) => {
-    e.preventDefault();
+  const savePassword = async (event) => {
+    event.preventDefault();
     if (security.password !== security.confirm) return push("New passwords do not match.", "error");
     setBusy("security");
     try {
@@ -153,16 +175,16 @@ export default function Settings() {
     } catch (err) { push(err.message, "error"); } finally { setBusy(""); }
   };
 
-  const savePay = async (e) => {
-    e.preventDefault();
+  const savePay = async (event) => {
+    event.preventDefault();
     setBusy("pay");
     try {
       await patch({ paymentPrefs: pay, insurance: pay.nhisNumber || user.insurance }, "Payment defaults saved.");
     } catch (err) { push(err.message, "error"); } finally { setBusy(""); }
   };
 
-  const saveAlerts = async (e) => {
-    e.preventDefault();
+  const saveAlerts = async (event) => {
+    event.preventDefault();
     setBusy("notifications");
     try {
       await patch(alerts, "Notification preferences saved.");
@@ -177,151 +199,205 @@ export default function Settings() {
   };
 
   return (
-    <div className="cbv6-settings">
-      <PageHero
-        scene="settings"
-        eyebrow="Personal workspace"
-        title="Settings"
-        lead="Control your identity, security, notifications and the way CareBridge feels to use."
-        actions={<button className="secondary-btn" type="button" onClick={() => { logout(); navigate("/login"); }}><LogOut size={16} /> Sign out</button>}
-      />
+    <div className="cbx-settings-page">
+      <header className="cbx-settings-masthead">
+        <div>
+          <span className="cbx-settings-kicker">System preferences</span>
+          <h1>Control centre</h1>
+          <p>Manage your identity, privacy, notifications and workspace experience from one clear settings console.</p>
+        </div>
+        <button className="cbx-settings-signout" type="button" onClick={() => { logout(); navigate("/login"); }}>
+          <LogOut size={17} /> Sign out
+        </button>
+      </header>
 
-      <div className="cbv6-settings-shell">
-        <aside className="cbv6-settings-nav">
-          <div className="cbv6-settings-identity">
+      <div className="cbx-settings-shell">
+        <aside className="cbx-settings-sidebar">
+          <div className="cbx-settings-person">
             <Avatar person={{ ...user, photo: account.photo, name: account.name }} className="large" />
-            <div><strong>{account.name || user.name}</strong><span>{account.email || user.email}</span></div>
+            <div>
+              <strong>{account.name || user.name}</strong>
+              <span>{roleLabel(user.role)}</span>
+              <small>{fileNo}</small>
+            </div>
           </div>
-          <div className="cbv6-settings-meta">
-            <span><IdCard size={14} /> {fileNo}</span>
-            <span><Building2 size={14} /> {HOSPITAL.campus}</span>
-            <span><HeartPulse size={14} /> {roleLabel(user.role)}</span>
+
+          <div className="cbx-settings-context">
+            <span><Building2 size={15} /> {HOSPITAL.campus}</span>
+            <span><HeartPulse size={15} /> {desk}</span>
           </div>
-          <nav>
+
+          <nav className="cbx-settings-nav" aria-label="Settings sections">
             {sections.map((section) => {
               const Icon = section.icon;
               return (
-                <button key={section.id} type="button" className={tab === section.id ? "is-active" : ""} onClick={() => goTab(section.id)}>
-                  <span><Icon size={17} /></span>
-                  <div><strong>{section.label}</strong><small>{section.help}</small></div>
+                <button
+                  key={section.id}
+                  type="button"
+                  className={tab === section.id ? "is-active" : ""}
+                  onClick={() => goTab(section.id)}
+                >
+                  <Icon size={18} />
+                  <span><strong>{section.label}</strong><small>{section.help}</small></span>
                 </button>
               );
             })}
           </nav>
         </aside>
 
-        <section className="cbv6-settings-workspace">
+        <main className="cbx-settings-main">
           {tab === "profile" && (
-            <form className="cbv6-settings-panel" onSubmit={saveAccount}>
-              <header><div><small>Hospital identity</small><h2>Profile & clinical identity</h2><p>{FILE_NOTE[user.role] || FILE_NOTE.patient}</p></div><span className="cbv6-panel-icon"><UserRound size={22} /></span></header>
-              <div className="cbv6-profile-row">
-                <PhotoPicker value={account.photo} name={account.name} onChange={(photo) => setAccount({ ...account, photo })} onError={(m) => push(m, "error")} />
-                <div><strong>{account.name || user.name}</strong><span>{desk}</span><small>{fileNo}</small></div>
+            <form className="cbx-settings-document" onSubmit={saveAccount}>
+              <div className="cbx-settings-document-head">
+                <div><span>Identity</span><h2>Profile & clinical identity</h2><p>{FILE_NOTE[user.role] || FILE_NOTE.patient}</p></div>
+                <IdCard size={24} />
               </div>
-              <div className="cbv6-form-section">
-                <div className="cbv6-section-title"><span>01</span><div><h3>Contact details</h3><p>Used for hospital communication and receipts.</p></div></div>
-                <div className="form-grid">
+
+              <section className="cbx-settings-section">
+                <div className="cbx-settings-section-head"><div><h3>Profile photo</h3><p>Your visual identity across CareBridge.</p></div></div>
+                <div className="cbx-settings-profile-line">
+                  <PhotoPicker value={account.photo} name={account.name} onChange={(photo) => setAccount({ ...account, photo })} onError={(message) => push(message, "error")} />
+                  <div><strong>{account.name || user.name}</strong><span>{desk}</span><small>{fileNo}</small></div>
+                </div>
+              </section>
+
+              <section className="cbx-settings-section">
+                <div className="cbx-settings-section-head"><div><h3>Contact details</h3><p>Used for hospital communication, receipts and account recovery.</p></div></div>
+                <div className="cbx-settings-form-grid">
                   <label>Full name<input value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} required /></label>
                   <label>Email<input type="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} required /></label>
                   <label>Phone<input value={account.phone} onChange={(e) => setAccount({ ...account, phone: e.target.value })} /></label>
                   <label>City<input value={account.city} onChange={(e) => setAccount({ ...account, city: e.target.value })} /></label>
                 </div>
-              </div>
+              </section>
+
               {user.role === "patient" && (
-                <div className="cbv6-form-section">
-                  <div className="cbv6-section-title"><span>02</span><div><h3>Clinical essentials</h3><p>High-value facts clinicians should see quickly.</p></div></div>
-                  <div className="form-grid">
+                <section className="cbx-settings-section">
+                  <div className="cbx-settings-section-head"><div><h3>Clinical essentials</h3><p>Important facts clinicians should be able to identify quickly.</p></div></div>
+                  <div className="cbx-settings-form-grid">
                     <label>Emergency contact<input value={account.emergencyContact} onChange={(e) => setAccount({ ...account, emergencyContact: e.target.value })} /></label>
                     <label>Allergies<input value={account.allergies} onChange={(e) => setAccount({ ...account, allergies: e.target.value })} /></label>
                     <label>Insurance / NHIS<input value={account.insurance} onChange={(e) => setAccount({ ...account, insurance: e.target.value })} /></label>
                     <label>Blood type<input value={account.bloodType} onChange={(e) => setAccount({ ...account, bloodType: e.target.value })} /></label>
                   </div>
-                </div>
+                </section>
               )}
-              {(user.role === "doctor" || user.role === "admin" || user.role === "nurse") && <label>Title / specialty<input value={account.specialty} onChange={(e) => setAccount({ ...account, specialty: e.target.value })} /></label>}
-              {user.role === "doctor" && <div className="cbv6-duty-row"><span><b>Directory availability</b><small>Controls whether patients see you as available.</small></span><DutyToggle available={account.available} onChange={async (available) => { setAccount({ ...account, available }); try { const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ available }) }); updateUser({ ...user, ...next }); push(available ? "You are now available." : "You are now marked busy."); } catch (err) { push(err.message, "error"); } }} /></div>}
-              <label>About<textarea rows="4" value={account.about} onChange={(e) => setAccount({ ...account, about: e.target.value })} /></label>
-              <footer><button className="primary-btn" disabled={busy === "profile"}>{busy === "profile" ? "Saving…" : "Save profile"}</button></footer>
+
+              {(user.role === "doctor" || user.role === "admin" || user.role === "nurse") && (
+                <section className="cbx-settings-section">
+                  <div className="cbx-settings-section-head"><div><h3>Professional identity</h3><p>Shown in clinical and hospital operations workflows.</p></div></div>
+                  <label>Title / specialty<input value={account.specialty} onChange={(e) => setAccount({ ...account, specialty: e.target.value })} /></label>
+                  {user.role === "doctor" && (
+                    <div className="cbx-settings-inline-setting">
+                      <div><strong>Directory availability</strong><p>Controls whether patients see you as currently available.</p></div>
+                      <DutyToggle available={account.available} onChange={async (available) => {
+                        setAccount({ ...account, available });
+                        try {
+                          const next = await api(`/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ available }) });
+                          updateUser({ ...user, ...next });
+                          push(available ? "You are now available." : "You are now marked busy.");
+                        } catch (err) { push(err.message, "error"); }
+                      }} />
+                    </div>
+                  )}
+                </section>
+              )}
+
+              <section className="cbx-settings-section">
+                <div className="cbx-settings-section-head"><div><h3>About</h3><p>A short description used where your profile is shown.</p></div></div>
+                <label>Profile description<textarea rows="4" value={account.about} onChange={(e) => setAccount({ ...account, about: e.target.value })} /></label>
+              </section>
+
+              <footer className="cbx-settings-actions"><button className="primary-btn" disabled={busy === "profile"}>{busy === "profile" ? "Saving…" : "Save profile"}</button></footer>
             </form>
           )}
 
           {tab === "experience" && (
-            <div className="cbv6-settings-panel cbv6-experience-panel">
-              <header><div><small>Interface engine</small><h2>Appearance & experience</h2><p>Personalize CareBridge without changing clinical or operational data.</p></div><span className="cbv6-panel-icon"><MonitorCog size={22} /></span></header>
-              <div className={`cbv6-experience-preview cbv6-preview-${appearance.theme}`}>
-                <div className="cbv6-preview-rail"><i /><i /><i /></div>
-                <div><span>CareBridge</span><strong>Preview your workspace</strong><small>{appearance.density} · {appearance.motion} motion</small></div>
+            <section className="cbx-settings-document">
+              <div className="cbx-settings-document-head">
+                <div><span>Display</span><h2>Workspace experience</h2><p>Choose the visual and interaction style that works best for you.</p></div>
+                <MonitorCog size={24} />
               </div>
-              <div className="cbv6-form-section">
-                <div className="cbv6-section-title"><span><Palette size={17} /></span><div><h3>Color atmosphere</h3><p>Choose the visual personality of your workspace.</p></div></div>
-                <div className="cbv6-choice-grid">
-                  <SettingChoice active={appearance.theme === "pearl"} icon={Sparkles} title="Pearl" text="Warm white, ink and emerald" onClick={() => saveAppearance({ ...appearance, theme: "pearl" })} />
-                  <SettingChoice active={appearance.theme === "midnight"} icon={Sparkles} title="Midnight" text="Deep navy clinical command" onClick={() => saveAppearance({ ...appearance, theme: "midnight" })} />
-                  <SettingChoice active={appearance.theme === "sage"} icon={Sparkles} title="Sage" text="Calm green healthcare palette" onClick={() => saveAppearance({ ...appearance, theme: "sage" })} />
-                </div>
+
+              <div className={`cbx-settings-preview cbx-settings-preview-${appearance.theme}`}>
+                <div><i /><i /><i /></div>
+                <span><small>Live preview</small><strong>CareBridge workspace</strong><em>{appearance.density} density · {appearance.motion} motion</em></span>
               </div>
-              <div className="cbv6-form-section">
-                <div className="cbv6-section-title"><span><Gauge size={17} /></span><div><h3>Information density</h3><p>Balance breathing room and operational throughput.</p></div></div>
-                <div className="cbv6-choice-grid">
-                  <SettingChoice active={appearance.density === "comfortable"} icon={Gauge} title="Comfortable" text="Premium spacing and larger controls" onClick={() => saveAppearance({ ...appearance, density: "comfortable" })} />
-                  <SettingChoice active={appearance.density === "compact"} icon={Gauge} title="Compact" text="More information on one screen" onClick={() => saveAppearance({ ...appearance, density: "compact" })} />
-                </div>
+
+              <div className="cbx-settings-preferences">
+                <PreferenceRow icon={Palette} title="Theme" description="Choose a calm clinical color system rather than decorative page styling.">
+                  <Segmented ariaLabel="Theme" value={appearance.theme} onChange={(theme) => saveAppearance({ ...appearance, theme })} options={[
+                    { id: "pearl", label: "Pearl", swatch: "pearl" },
+                    { id: "midnight", label: "Midnight", swatch: "midnight" },
+                    { id: "sage", label: "Sage", swatch: "sage" },
+                  ]} />
+                </PreferenceRow>
+                <PreferenceRow icon={Gauge} title="Information density" description="Control how much information appears on one screen.">
+                  <Segmented ariaLabel="Information density" value={appearance.density} onChange={(density) => saveAppearance({ ...appearance, density })} options={[
+                    { id: "comfortable", label: "Comfortable" },
+                    { id: "compact", label: "Compact" },
+                  ]} />
+                </PreferenceRow>
+                <PreferenceRow icon={Sparkles} title="Motion" description="Control transitions and ambient movement across CareBridge.">
+                  <Segmented ariaLabel="Motion" value={appearance.motion} onChange={(motion) => saveAppearance({ ...appearance, motion })} options={[
+                    { id: "full", label: "Cinematic" },
+                    { id: "subtle", label: "Subtle" },
+                    { id: "reduced", label: "Reduced" },
+                  ]} />
+                </PreferenceRow>
+                <PreferenceRow icon={MonitorCog} title="Navigation" description="Choose between layered floating navigation or a flatter enterprise frame.">
+                  <Segmented ariaLabel="Navigation" value={appearance.nav} onChange={(nav) => saveAppearance({ ...appearance, nav })} options={[
+                    { id: "floating", label: "Floating" },
+                    { id: "flush", label: "Flush" },
+                  ]} />
+                </PreferenceRow>
               </div>
-              <div className="cbv6-form-section">
-                <div className="cbv6-section-title"><span><Sparkles size={17} /></span><div><h3>Motion system</h3><p>Control page transitions and ambient movement.</p></div></div>
-                <div className="cbv6-choice-grid">
-                  <SettingChoice active={appearance.motion === "full"} icon={Sparkles} title="Cinematic" text="Premium transitions and live ambient motion" onClick={() => saveAppearance({ ...appearance, motion: "full" })} />
-                  <SettingChoice active={appearance.motion === "subtle"} icon={Sparkles} title="Subtle" text="Shorter, quieter transitions" onClick={() => saveAppearance({ ...appearance, motion: "subtle" })} />
-                  <SettingChoice active={appearance.motion === "reduced"} icon={Sparkles} title="Reduced" text="Minimal movement for accessibility" onClick={() => saveAppearance({ ...appearance, motion: "reduced" })} />
-                </div>
-              </div>
-              <div className="cbv6-form-section">
-                <div className="cbv6-section-title"><span><MonitorCog size={17} /></span><div><h3>Navigation character</h3><p>Choose how navigation feels on desktop.</p></div></div>
-                <div className="cbv6-choice-grid">
-                  <SettingChoice active={appearance.nav === "floating"} icon={MonitorCog} title="Floating" text="Layered premium navigation with glass depth" onClick={() => saveAppearance({ ...appearance, nav: "floating" })} />
-                  <SettingChoice active={appearance.nav === "flush"} icon={MonitorCog} title="Flush" text="Crisp enterprise edges with less depth" onClick={() => saveAppearance({ ...appearance, nav: "flush" })} />
-                </div>
-              </div>
-            </div>
+            </section>
           )}
 
           {tab === "security" && (
-            <form className="cbv6-settings-panel" onSubmit={savePassword}>
-              <header><div><small>Access control</small><h2>Password & sign-in</h2><p>Protect access to your {roleLabel(user.role).toLowerCase()} workspace.</p></div><span className="cbv6-panel-icon"><Shield size={22} /></span></header>
-              <div className="cbv6-security-banner"><Shield size={19} /><div><strong>Encrypted session protection</strong><span>Your browser stores only a session token, not your password.</span></div></div>
-              <label>Current password<input type="password" value={security.currentPassword} onChange={(e) => setSecurity({ ...security, currentPassword: e.target.value })} required autoComplete="current-password" /></label>
-              <div className="form-grid">
-                <label>New password<input type="password" value={security.password} onChange={(e) => setSecurity({ ...security, password: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
-                <label>Confirm new password<input type="password" value={security.confirm} onChange={(e) => setSecurity({ ...security, confirm: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
-              </div>
-              <footer><button className="primary-btn" disabled={busy === "security"}>{busy === "security" ? "Updating…" : "Update password"}</button></footer>
+            <form className="cbx-settings-document" onSubmit={savePassword}>
+              <div className="cbx-settings-document-head"><div><span>Security</span><h2>Password & access</h2><p>Protect access to your {roleLabel(user.role).toLowerCase()} workspace.</p></div><Shield size={24} /></div>
+              <div className="cbx-settings-security-note"><Shield size={19} /><div><strong>Protected session</strong><p>Your browser keeps a session token, not your password.</p></div></div>
+              <section className="cbx-settings-section">
+                <div className="cbx-settings-form-grid single">
+                  <label>Current password<input type="password" value={security.currentPassword} onChange={(e) => setSecurity({ ...security, currentPassword: e.target.value })} required autoComplete="current-password" /></label>
+                  <label>New password<input type="password" value={security.password} onChange={(e) => setSecurity({ ...security, password: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
+                  <label>Confirm new password<input type="password" value={security.confirm} onChange={(e) => setSecurity({ ...security, confirm: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
+                </div>
+              </section>
+              <footer className="cbx-settings-actions"><button className="primary-btn" disabled={busy === "security"}>{busy === "security" ? "Updating…" : "Update password"}</button></footer>
             </form>
           )}
 
           {tab === "pay" && user.role === "patient" && (
-            <form className="cbv6-settings-panel" onSubmit={savePay}>
-              <header><div><small>Checkout defaults</small><h2>Payment preferences</h2><p>These choices speed up Shop & pay; you can still change them at checkout.</p></div><span className="cbv6-panel-icon"><Wallet size={22} /></span></header>
-              <label>Preferred method<select value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}><option value="momo">Mobile money</option><option value="bank">Bank transfer</option><option value="nhis">NHIS / insurance</option><option value="cash">Cash at cashier</option></select></label>
-              <div className="form-grid">
-                <label>MoMo network<select value={pay.momoNetwork} onChange={(e) => setPay({ ...pay, momoNetwork: e.target.value })}><option value="mtn">MTN MoMo</option><option value="telecel">Telecel Cash</option><option value="at">AirtelTigo Money</option></select></label>
-                <label>Wallet number<input value={pay.momoNumber} onChange={(e) => setPay({ ...pay, momoNumber: e.target.value })} placeholder="024…" /></label>
-              </div>
-              <label>NHIS / policy number<input value={pay.nhisNumber} onChange={(e) => setPay({ ...pay, nhisNumber: e.target.value })} /></label>
-              <footer><button className="primary-btn" disabled={busy === "pay"}>{busy === "pay" ? "Saving…" : "Save payment defaults"}</button></footer>
+            <form className="cbx-settings-document" onSubmit={savePay}>
+              <div className="cbx-settings-document-head"><div><span>Payments</span><h2>Checkout preferences</h2><p>Save your usual payment details without locking you into one method.</p></div><Wallet size={24} /></div>
+              <section className="cbx-settings-section">
+                <div className="cbx-settings-form-grid">
+                  <label>Preferred method<select value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}><option value="momo">Mobile money</option><option value="bank">Bank transfer</option><option value="nhis">NHIS / insurance</option><option value="cash">Cash at cashier</option></select></label>
+                  <label>MoMo network<select value={pay.momoNetwork} onChange={(e) => setPay({ ...pay, momoNetwork: e.target.value })}><option value="mtn">MTN MoMo</option><option value="telecel">Telecel Cash</option><option value="at">AirtelTigo Money</option></select></label>
+                  <label>Wallet number<input value={pay.momoNumber} onChange={(e) => setPay({ ...pay, momoNumber: e.target.value })} placeholder="024…" /></label>
+                  <label>NHIS / policy number<input value={pay.nhisNumber} onChange={(e) => setPay({ ...pay, nhisNumber: e.target.value })} /></label>
+                </div>
+              </section>
+              <footer className="cbx-settings-actions"><button className="primary-btn" disabled={busy === "pay"}>{busy === "pay" ? "Saving…" : "Save payment defaults"}</button></footer>
             </form>
           )}
 
           {tab === "notifications" && (
-            <form className="cbv6-settings-panel" onSubmit={saveAlerts}>
-              <header><div><small>Communication control</small><h2>Notifications</h2><p>Choose which changes should reach your inbox as well as CareBridge.</p></div><span className="cbv6-panel-icon"><Bell size={22} /></span></header>
-              <label className="cbv6-switch-row"><div><strong>Email notifications</strong><small>Send hospital updates to {user.email}</small></div><input type="checkbox" checked={alerts.emailAlerts} onChange={(e) => setAlerts({ ...alerts, emailAlerts: e.target.checked })} /></label>
-              {[["appointments", "Appointments", "Consultations scheduled or changed"],["wards", "Admissions", "Bed requests and admission decisions"],["messages", "Messages", "New care-team communication"],["account", "Account", "Receipts and billing notices"],["support", "Support", "Help-desk replies and operations updates"]].map(([key, title, text]) => (
-                <label className="cbv6-switch-row" key={key}><div><strong>{title}</strong><small>{text}</small></div><input type="checkbox" checked={alerts.alertPrefs[key]} disabled={!alerts.emailAlerts} onChange={(e) => setAlerts((f) => ({ ...f, alertPrefs: { ...f.alertPrefs, [key]: e.target.checked } }))} /></label>
-              ))}
-              <footer><button className="primary-btn" disabled={busy === "notifications"}>{busy === "notifications" ? "Saving…" : "Save notifications"}</button><button type="button" className="secondary-btn" onClick={testEmail}>Send test notice</button></footer>
+            <form className="cbx-settings-document" onSubmit={saveAlerts}>
+              <div className="cbx-settings-document-head"><div><span>Notifications</span><h2>Communication preferences</h2><p>Choose which hospital events should reach your inbox.</p></div><Bell size={24} /></div>
+              <div className="cbx-settings-notification-list">
+                <label><span><strong>Email notifications</strong><small>Send hospital updates to {user.email}</small></span><input type="checkbox" checked={alerts.emailAlerts} onChange={(e) => setAlerts({ ...alerts, emailAlerts: e.target.checked })} /></label>
+                {[["appointments", "Appointments", "Consultations scheduled or changed"],["wards", "Admissions", "Bed requests and admission decisions"],["messages", "Messages", "New care-team communication"],["account", "Account", "Receipts and billing notices"],["support", "Support", "Help-desk replies and operations updates"]].map(([key, title, text]) => (
+                  <label key={key}><span><strong>{title}</strong><small>{text}</small></span><input type="checkbox" checked={alerts.alertPrefs[key]} disabled={!alerts.emailAlerts} onChange={(e) => setAlerts((current) => ({ ...current, alertPrefs: { ...current.alertPrefs, [key]: e.target.checked } }))} /></label>
+                ))}
+              </div>
+              <footer className="cbx-settings-actions"><button className="primary-btn" disabled={busy === "notifications"}>{busy === "notifications" ? "Saving…" : "Save notifications"}</button><button type="button" className="secondary-btn" onClick={testEmail}>Send test notice</button></footer>
             </form>
           )}
-        </section>
+        </main>
       </div>
     </div>
   );
