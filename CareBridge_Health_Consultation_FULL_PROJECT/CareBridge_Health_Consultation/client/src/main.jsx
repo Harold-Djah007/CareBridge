@@ -19,6 +19,7 @@ import "./carebridge-premium-admin.css";
 import "./carebridge-premium-finance.css";
 import "./carebridge-premium-ehr.css";
 import "./carebridge-premium-final.css";
+import "./carebridge-premium-readable.css";
 import { homeFor } from "./utils";
 import { AuthProvider, ToastProvider, useAuth } from "./state";
 import { CartProvider } from "./ShopCart";
