@@ -9,6 +9,7 @@ import "./carebridge-cart-fix.css";
 import "./carebridge-product.css";
 import "./carebridge-workflows.css";
 import "./carebridge-modules.css";
+import "./carebridge-enterprise.css";
 import "./carebridge-runtime-fix.css";
 import { homeFor } from "./utils";
 import { AuthProvider, ToastProvider, useAuth } from "./state";
@@ -77,7 +78,7 @@ function AppRoutes() {
         <Route path="/register" element={user ? <Navigate to={homeFor(user)} /> : <Register />} />
         <Route path="/help" element={user ? <Navigate to="/guide" replace /> : <Help />} />
         <Route path="/privacy" element={<Privacy />} />
-        <Route path="/tariff" element={user ? <Navigate to="/billing/tariff" replace /> : <Tariff />} />
+        <Route path="/tariff" element={user ? <Navigate to="/billing/tariff" replace />} />
         <Route element={user ? <AppShell /> : <Navigate to="/login" />}>
           <Route path="/home" element={<RoleRoute roles={["patient", "doctor", "nurse"]}><Dashboard /></RoleRoute>} />
           <Route path="/care" element={<RoleRoute roles={["patient", "doctor"]}><CareTeam /></RoleRoute>} />
