@@ -3,8 +3,8 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   Activity, BedDouble, Bell, Building2, CalendarDays, ClipboardList, Command,
   FolderKanban, FolderOpen, HeartPulse, Inbox, LayoutDashboard, LifeBuoy, LogOut,
-  Mail, MessageCircle, Pill, Receipt, Search, ScrollText, Settings2, ShieldCheck,
-  ShoppingBag, Sparkles, Stethoscope, UserRound, Users, Video, Wifi, X,
+  Mail, MessageCircle, Pill, Receipt, Search, ScrollText, Settings2,
+  ShoppingBag, Sparkles, Stethoscope, Users, Video, Wifi, X,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { CartMastButton, useCart } from "../ShopCart";
@@ -25,7 +25,7 @@ const NAV = {
     { to: "/wards", icon: BedDouble, label: "Admissions", badge: "wards" },
     { to: "/pay", icon: ShoppingBag, label: "Shop & pay", primary: true },
     { to: "/care", icon: Stethoscope, label: "Care team" },
-    { to: "/alerts", icon: Inbox, label: "Notifications" },
+    { to: "/alerts", icon: Inbox, label: "Notifications", badge: "notifications" },
     { to: "/support", icon: LifeBuoy, label: "Support", badge: "tickets" },
   ],
   doctor: [
@@ -74,7 +74,7 @@ const NAV = {
     { group: "Communications", items: [
       { to: "/support", icon: LifeBuoy, label: "Support desk", badge: "tickets", primary: true },
       { to: "/messages", icon: MessageCircle, label: "Switchboard", badge: "messages" },
-      { to: "/alerts", icon: Mail, label: "Patient notices" },
+      { to: "/alerts", icon: Mail, label: "Patient notices", badge: "notifications" },
       { to: "/settings", icon: Settings2, label: "System preferences" },
     ]},
   ],
@@ -104,6 +104,7 @@ const PAGE_META = [
 ];
 
 const DEFAULT_APPEARANCE = { theme: "pearl", density: "comfortable", motion: "full", nav: "floating" };
+const EMPTY_BADGES = { visits: 0, wards: 0, messages: 0, tickets: 0, queue: 0, notifications: 0 };
 
 function readAppearance() {
   try {
@@ -140,7 +141,7 @@ export default function AppShell() {
   const [paletteQuery, setPaletteQuery] = useState("");
   const [connected, setConnected] = useState(false);
   const [appearance, setAppearance] = useState(readAppearance);
-  const [badges, setBadges] = useState({ visits: 0, wards: 0, messages: 0, tickets: 0, queue: 0, notifications: 0 });
+  const [badges, setBadges] = useState(EMPTY_BADGES);
 
   const isPatient = user.role === "patient";
   const meta = pageMeta(location.pathname, user.role);
@@ -149,8 +150,8 @@ export default function AppShell() {
   const allNav = flatNav(user.role);
   const mobileNav = allNav.filter((item) => item.primary).slice(0, 5);
 
-  const loadNotes = () => api(`/notifications/${user.id}`).then(setNotes).catch(() => {});
-  const loadBadges = () => api(`/badges?userId=${user.id}&role=${user.role}`).then(setBadges).catch(() => {});
+  const loadNotes = () => api(`/notifications/${user.id}`).then((rows) => { setNotes(rows); return rows; }).catch(() => []);
+  const loadBadges = () => api(`/badges?userId=${user.id}&role=${user.role}`).then((next) => { setBadges({ ...EMPTY_BADGES, ...next }); return next; }).catch(() => EMPTY_BADGES);
 
   useEffect(() => {
     loadNotes();
@@ -160,9 +161,14 @@ export default function AppShell() {
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
     const refresh = () => { loadNotes(); loadBadges(); };
-    socket.on("notification", (n) => { push(n.title); refresh(); });
+    socket.on("notification", (notification) => { if (notification?.title) push(notification.title); refresh(); });
     socket.on("email-alert", refresh);
-    socket.on("chat-message", refresh);
+    socket.on("chat-message", loadBadges);
+    socket.on("badges-updated", (patch) => {
+      if (patch && typeof patch === "object") setBadges((current) => ({ ...current, ...patch }));
+      loadBadges();
+    });
+    socket.on("ward-capacity", loadBadges);
     socket.on("pharmacy-order", refresh);
     socket.on("pharmacy-stock", refresh);
     return () => socket.disconnect();
@@ -174,7 +180,7 @@ export default function AppShell() {
     const onKey = (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setPaletteOpen((v) => !v);
+        setPaletteOpen((value) => !value);
       }
       if (event.key === "Escape") {
         setPaletteOpen(false);
@@ -195,7 +201,7 @@ export default function AppShell() {
     loadBadges();
   }, [location.pathname]);
 
-  const unread = Number(badges.notifications || notes.filter((n) => !n.read).length);
+  const unread = Number(badges.notifications || 0);
   const roleName = user.role === "doctor" ? "Clinician" : user.role === "nurse" ? "Pharmacy" : user.role === "admin" ? "Operations" : "Patient";
   const userMeta = useMemo(() => {
     if (user.role === "patient") return `MRN ${user.mrn || "Pending"}`;
@@ -270,7 +276,7 @@ export default function AppShell() {
           </span>
           <LiveClock />
           {isPatient && <CartMastButton />}
-          <button className="cbv6-icon-btn" type="button" onClick={() => { setNoticeOpen((v) => !v); if (!noticeOpen && unread) markAllRead(); }} aria-label="Notifications">
+          <button className="cbv6-icon-btn" type="button" onClick={() => { setNoticeOpen((value) => !value); if (!noticeOpen && unread) markAllRead(); }} aria-label="Notifications">
             <Bell size={18} />{unread > 0 && <em>{unread > 99 ? "99+" : unread}</em>}
           </button>
           <button className="cbv6-profile" type="button" onClick={() => navigate("/settings")}>
@@ -319,7 +325,7 @@ export default function AppShell() {
             <div><Sparkles size={14} /><span>{meta.description}</span></div>
             <form onSubmit={onSearch} className="cbv6-inline-search">
               <Search size={15} />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={user.role === "admin" ? "Search people" : user.role === "doctor" ? "Search patients" : user.role === "nurse" ? "Find medicine or queue" : "Find a doctor or service"} aria-label="Search CareBridge" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={user.role === "admin" ? "Search people" : user.role === "doctor" ? "Search patients" : user.role === "nurse" ? "Find medicine or queue" : "Find a doctor or service"} aria-label="Search CareBridge" />
             </form>
             <button type="button" onClick={() => navigate("/settings?tab=experience")}><Settings2 size={15} /> Personalize</button>
           </div>
@@ -340,7 +346,9 @@ export default function AppShell() {
           )}
 
           <div className="cbv6-content">
-            <div key={location.pathname} className="cbv6-route-frame"><Outlet /></div>
+            <div key={location.pathname} className="cbv6-route-frame">
+              <Outlet context={{ badges, refreshBadges: loadBadges, refreshNotifications: loadNotes }} />
+            </div>
           </div>
         </main>
       </div>
@@ -348,9 +356,9 @@ export default function AppShell() {
       <nav className="cbv6-mobile-nav" aria-label="Primary navigation">{mobileNav.map((item) => navLink(item, true))}</nav>
 
       {paletteOpen && (
-        <div className="cbv6-palette-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setPaletteOpen(false); }}>
+        <div className="cbv6-palette-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPaletteOpen(false); }}>
           <section className="cbv6-palette" role="dialog" aria-modal="true" aria-label="CareBridge command palette">
-            <header><Command size={18} /><input autoFocus value={paletteQuery} onChange={(e) => setPaletteQuery(e.target.value)} placeholder="Type a page or workspace…" /><button type="button" onClick={() => setPaletteOpen(false)}><X size={17} /></button></header>
+            <header><Command size={18} /><input autoFocus value={paletteQuery} onChange={(event) => setPaletteQuery(event.target.value)} placeholder="Type a page or workspace…" /><button type="button" onClick={() => setPaletteOpen(false)}><X size={17} /></button></header>
             <div className="cbv6-palette-list">
               {paletteItems.map((item) => {
                 const Icon = item.icon;
