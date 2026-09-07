@@ -17,7 +17,6 @@ const METHODS = [
 ];
 const newCheckoutKey = () => (globalThis.crypto?.randomUUID?.() || `cb-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-
 export function useCart() {
   return useContext(CartContext);
 }
@@ -272,6 +271,8 @@ export function CartMastButton() {
       onClick={cart.toggleDrawer}
       title={cart.count ? `${cart.count} in cart · ${ghs(cart.total)}` : "Your cart"}
       aria-label={cart.count ? `Open cart, ${cart.count} items` : "Open cart"}
+      aria-controls="shop-basket"
+      aria-expanded={cart.open}
     >
       <ShoppingCart size={18} />
       {cart.count > 0 && <em className="bell-count cart-count">{cart.count > 99 ? "99+" : cart.count}</em>}
@@ -466,14 +467,20 @@ function CartDrawer() {
 
   return (
     <>
-      <button
-        type="button"
+      <div
         className={`cart-scrim ${cart.open ? "on" : ""}`}
-        aria-hidden={!cart.open}
-        tabIndex={cart.open ? 0 : -1}
+        aria-hidden="true"
         onClick={cart.closeDrawer}
       />
-      <aside className={`cart-drawer ${cart.open ? "open" : ""}`} id="shop-basket" aria-hidden={!cart.open} aria-label="Shopping cart" aria-live="polite">
+      <aside
+        className={`cart-drawer ${cart.open ? "open" : ""}`}
+        id="shop-basket"
+        inert={cart.open ? undefined : ""}
+        role="dialog"
+        aria-modal={cart.open ? "true" : undefined}
+        aria-label="Shopping cart"
+        aria-live="polite"
+      >
         <div className="cart-drawer-head">
           <div>
             <span className="eyebrow">Shop & pay</span>
