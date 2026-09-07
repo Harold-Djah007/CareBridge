@@ -1,0 +1,69 @@
+/* Small live-status details kept separate from the field layout layer. */
+.vital-head { display: flex; align-items: center; gap: 7px; }
+.vital-signal {
+  margin-left: auto;
+  height: 16px;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  opacity: .76;
+}
+.vital-signal i {
+  display: block;
+  width: 2px;
+  border-radius: 99px;
+  background: currentColor;
+  transform-origin: 50% 100%;
+  animation: cb-signal-bars 1.25s ease-in-out infinite;
+}
+.vital-signal i:nth-child(1) { height: 5px; animation-delay: -.4s; }
+.vital-signal i:nth-child(2) { height: 9px; animation-delay: -.2s; }
+.vital-signal i:nth-child(3) { height: 13px; animation-delay: 0s; }
+.vital-signal i:nth-child(4) { height: 16px; animation-delay: -.6s; }
+
+.vital-card:hover .vital-readout strong,
+.ops-radar-card:hover .radar-readout strong { transform: translateY(-1px) scale(1.035); }
+
+.portal-tools .bell-btn:has(.bell-count) svg {
+  transform-origin: 50% 12%;
+  animation: cb-bell-live 4.8s ease-in-out infinite;
+}
+
+.home-feature,
+.work-wrap { position: relative; overflow: hidden; }
+.home-feature::after,
+.work-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(112deg, transparent 35%, rgba(255,255,255,.26) 49%, transparent 63%);
+  transform: translateX(-120%);
+  animation: cb-panel-scan 9s ease-in-out infinite;
+  opacity: .34;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vital-signal i,
+  .portal-tools .bell-btn svg,
+  .home-feature::after,
+  .work-wrap::after { animation: none !important; }
+}
+
+@keyframes cb-signal-bars {
+  0%, 100% { transform: scaleY(.48); opacity: .45; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+@keyframes cb-bell-live {
+  0%, 86%, 100% { transform: rotate(0); }
+  89% { transform: rotate(8deg); }
+  92% { transform: rotate(-7deg); }
+  95% { transform: rotate(5deg); }
+  98% { transform: rotate(-3deg); }
+}
+@keyframes cb-panel-scan {
+  0%, 58% { transform: translateX(-120%); opacity: 0; }
+  68% { opacity: .36; }
+  82% { transform: translateX(120%); opacity: .28; }
+  100% { transform: translateX(120%); opacity: 0; }
+}
