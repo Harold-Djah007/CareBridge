@@ -1,0 +1,77 @@
+/* Runtime layout isolation for CareBridge Product OS.
+   The commercial shell must not inherit the old portal named-grid areas. */
+
+.portal-app.carebridge-shell,
+.app-layout.carebridge-shell {
+  grid-template-areas: none !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.carebridge-shell > .product-sidebar {
+  grid-area: auto !important;
+  min-width: 0;
+}
+
+.carebridge-shell > .product-workspace,
+.carebridge-shell > .portal-main.product-workspace,
+.carebridge-shell > .main.product-workspace {
+  grid-area: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.product-workspace > .product-main {
+  width: 100%;
+  min-width: 0;
+}
+
+.product-main .page-stage,
+.product-main .page-wrap,
+.product-page {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none;
+}
+
+.product-page {
+  max-width: 1500px !important;
+  margin-inline: auto !important;
+}
+
+/* Prevent legacy mobile portal rules from converting the new product sidebar
+   into the old bottom navigation before the Product OS breakpoint. */
+@media (min-width: 981px) {
+  .carebridge-shell > .product-sidebar {
+    position: sticky !important;
+    inset: auto !important;
+    top: 0 !important;
+    display: flex !important;
+    height: 100vh !important;
+    padding: 0 !important;
+    border-top: 0 !important;
+  }
+
+  .carebridge-shell .product-nav-rail {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .portal-app.carebridge-shell,
+  .app-layout.carebridge-shell {
+    display: block !important;
+  }
+
+  .carebridge-shell > .product-sidebar {
+    display: none !important;
+  }
+
+  .carebridge-shell > .product-workspace {
+    width: 100% !important;
+  }
+}
