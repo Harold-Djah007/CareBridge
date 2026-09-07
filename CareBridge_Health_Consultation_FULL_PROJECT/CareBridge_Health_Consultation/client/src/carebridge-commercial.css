@@ -1,0 +1,53 @@
+/* CareBridge Product OS — commercial finance / notices */
+.notice-centre-panel, .finance-console, .settlement-console { padding: 0; }
+.notice-centre-toolbar, .finance-toolbar { min-height: 58px; padding: 9px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #e1e9ed; background: #f9fbfc; }
+.notice-centre-toolbar h3 { margin: 3px 0 0; font-size: 13px; }
+.notice-timeline { display: grid; }
+.notice-record { min-height: 86px; padding: 11px 13px; display: grid; grid-template-columns: 38px minmax(0,1fr) auto; gap: 10px; align-items: start; border-bottom: 1px solid #e6edef; background: #fff; }
+.notice-record:hover { background: #fbfdfe; }
+.notice-record-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; color: #177f73; background: #eaf7f3; }
+.notice-record-body { min-width: 0; }
+.notice-record-body > div { display: flex; flex-direction: column; }
+.notice-record-body strong { margin-top: 3px; color: #203848; font-size: 10px; }
+.notice-record-body p { margin: 5px 0 3px; color: #607785; font-size: 9px; line-height: 1.45; }
+.notice-record-body small { color: #84949e; font-size: 7px; }
+.notice-record-state { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.notice-record-state .ghost-btn { font-size: 8px; }
+
+.finance-console { overflow: hidden; }
+.finance-table { min-width: 1000px; }
+.finance-table .secondary-btn, .finance-table .primary-btn { min-height: 31px; padding: 0 8px; font-size: 8px; }
+.finance-assurance { min-height: 39px; padding: 0 13px; display: flex; align-items: center; gap: 7px; color: #5f786d; border-top: 1px solid #dce9e4; background: #f1f8f5; font-size: 8px; }
+.finance-assurance svg { color: #168b78; }
+
+.tariff-os .settlement-console { margin-bottom: 13px; }
+.settlement-grid { padding: 12px; display: grid; grid-template-columns: repeat(3,1fr); gap: 9px; }
+.settlement-grid article { min-height: 150px; padding: 12px; display: grid; grid-template-columns: 36px minmax(0,1fr); gap: 9px; align-content: start; border: 1px solid #dfe8ec; border-radius: 11px; background: linear-gradient(180deg,#fff,#fbfdfe); }
+.settlement-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 9px; color: #127a6e; background: #e9f7f3; }
+.settlement-grid article > div { display: flex; flex-direction: column; min-width: 0; }
+.settlement-grid small { color: #7c8e98; font-size: 7px; font-weight: 850; text-transform: uppercase; letter-spacing: .08em; }
+.settlement-grid b { margin-top: 4px; color: #213a49; font-size: 10px; }
+.settlement-grid p { margin: 6px 0 0; color: #657b88; font-size: 8px; line-height: 1.55; }
+.tariff-editor-stack, .tariff-reader-stack { display: grid; gap: 12px; }
+.tariff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tariff-editor { padding: 0; }
+.tariff-editor-extra { padding: 10px 13px 0; display: grid; gap: 8px; }
+.tariff-table { min-width: 520px; }
+.tariff-table input { min-height: 32px; padding: 5px 7px; font-size: 8px; }
+.tariff-read-panel { padding: 0; }
+.tariff-pack { display: block; margin-top: 2px; color: #84949e; font-size: 7px; }
+.tariff-publish-bar { position: sticky; bottom: 10px; z-index: 8; min-height: 64px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #cfe3dd; border-radius: 12px; background: rgba(247,252,250,.96); box-shadow: 0 14px 38px rgba(6,30,49,.12); backdrop-filter: blur(14px); }
+.tariff-publish-bar > div:first-child { display: flex; align-items: center; gap: 8px; color: #267b68; }
+.tariff-publish-bar > div:first-child span { display: flex; flex-direction: column; }
+.tariff-publish-bar b { font-size: 9px; }
+.tariff-publish-bar small { margin-top: 2px; color: #71877e; font-size: 7px; }
+.tariff-publish-bar > div:last-child { display: flex; gap: 7px; }
+
+/* Existing account settings, checkout and receipt detail should read as Product OS surfaces. */
+.settings-desk .settings-work, .settings-desk .settings-layout { min-width: 0; }
+.settings-desk .chip-link { border-radius: 8px !important; }
+.settings-desk .settings-card input, .settings-desk .settings-card select, .settings-desk .settings-card textarea { background: #fbfdfe; }
+.pending-payments-strip, .role-patient .shop-layout > div > .card { border: 1px solid #dbe5ea !important; border-radius: 13px !important; box-shadow: 0 5px 18px rgba(6,30,49,.045) !important; background: #fff !important; }
+
+@media (max-width: 980px) { .settlement-grid, .tariff-grid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .notice-centre-toolbar, .finance-toolbar { align-items: stretch; flex-direction: column; } .notice-record { grid-template-columns: 34px minmax(0,1fr); } .notice-record-state { grid-column: 2; flex-direction: row; align-items: center; } .settlement-grid { padding: 9px; } .tariff-publish-bar { align-items: stretch; flex-direction: column; } .tariff-publish-bar > div:last-child > * { flex: 1; } }
