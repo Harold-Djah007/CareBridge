@@ -299,6 +299,12 @@ function CartDrawer() {
   const [checkoutKey, setCheckoutKey] = useState(() => newCheckoutKey());
   const [busy, setBusy] = useState(false);
 
+  const closeDrawer = () => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active.closest?.("#shop-basket")) active.blur();
+    cart.closeDrawer();
+  };
+
   useEffect(() => {
     if (!cart?.open) return;
     api("/finance/accounts").then(setAccounts).catch(() => {});
@@ -307,10 +313,10 @@ function CartDrawer() {
 
   useEffect(() => {
     if (!cart?.open) return undefined;
-    const onKey = (e) => { if (e.key === "Escape") cart.closeDrawer(); };
+    const onKey = (e) => { if (e.key === "Escape") closeDrawer(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [cart]);
+  }, [cart?.open]);
 
   const items = cart?.items || [];
   const meds = items.filter((c) => c.kind === "med");
@@ -390,7 +396,7 @@ function CartDrawer() {
         window.dispatchEvent(new CustomEvent(BILLS_EVENT));
         if (!next.length) {
           push("The dispensary has your list. Collect at Ridge Campus pharmacy when the nurse marks it ready.");
-          cart.closeDrawer();
+          closeDrawer();
         } else {
           push("Medicines queued at Ridge pharmacy. Pay bills, labs, and services in the cart.");
         }
@@ -440,7 +446,7 @@ function CartDrawer() {
       setPayment(next);
       if (next.status === "paid") {
         if (!silent) push("Payment verified. Your receipt is ready.");
-        cart.closeDrawer();
+        closeDrawer();
         window.dispatchEvent(new CustomEvent(BILLS_EVENT));
         navigate(`/receipts/${next.id}`);
       } else if (!silent && next.status === "failed") {
@@ -470,14 +476,14 @@ function CartDrawer() {
       <div
         className={`cart-scrim ${cart.open ? "on" : ""}`}
         aria-hidden="true"
-        onClick={cart.closeDrawer}
+        onClick={closeDrawer}
       />
       <aside
         className={`cart-drawer ${cart.open ? "open" : ""}`}
         id="shop-basket"
-        inert={cart.open ? undefined : ""}
+        inert={!cart.open}
         role="dialog"
-        aria-modal={cart.open ? "true" : undefined}
+        aria-modal={cart.open}
         aria-label="Shopping cart"
         aria-live="polite"
       >
@@ -493,7 +499,7 @@ function CartDrawer() {
             {items.length > 0 && !payment && (
               <button type="button" className="ghost-btn" onClick={cart.clear}>Empty</button>
             )}
-            <button type="button" className="icon-btn" onClick={cart.closeDrawer} aria-label="Close cart">
+            <button type="button" className="icon-btn" onClick={closeDrawer} aria-label="Close cart">
               <X size={18} />
             </button>
           </div>
@@ -510,7 +516,7 @@ function CartDrawer() {
               <ShoppingCart size={28} />
               <p>Your cart is empty.</p>
               <small>Add unpaid bills, medicines, labs, or hospital services. Leaving a page does not empty it.</small>
-              <button type="button" className="secondary-btn" onClick={() => { cart.closeDrawer(); navigate("/pay"); }}>
+              <button type="button" className="secondary-btn" onClick={() => { closeDrawer(); navigate("/pay"); }}>
                 Continue shopping
               </button>
             </div>
@@ -638,7 +644,7 @@ function CartDrawer() {
               <p className="eyebrow">Reference {payment.reference}</p>
               <h3>Payment not completed</h3>
               <p>No receipt was issued and the hospital bills remain unpaid. Return to Shop & pay to try again.</p>
-              <button className="secondary-btn full" type="button" onClick={() => { setPayment(null); cart.closeDrawer(); navigate("/pay?tab=bills"); }}>Return to unpaid bills</button>
+              <button className="secondary-btn full" type="button" onClick={() => { setPayment(null); closeDrawer(); navigate("/pay?tab=bills"); }}>Return to unpaid bills</button>
             </div>
           )}
 
@@ -646,7 +652,7 @@ function CartDrawer() {
             <div className="cart-pending">
               <p className="eyebrow">Verified payment</p>
               <h3>Receipt ready</h3>
-              <button className="primary-btn full" type="button" onClick={() => { cart.closeDrawer(); navigate(`/receipts/${payment.id}`); }}>Open receipt</button>
+              <button className="primary-btn full" type="button" onClick={() => { closeDrawer(); navigate(`/receipts/${payment.id}`); }}>Open receipt</button>
             </div>
           )}
         </div>
