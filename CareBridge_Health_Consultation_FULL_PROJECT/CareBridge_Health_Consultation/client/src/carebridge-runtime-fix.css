@@ -1,4 +1,5 @@
 @import "./carebridge-support.css";
+@import "./carebridge-commercial.css";
 
 /* Runtime layout isolation for CareBridge Product OS.
    The authenticated commercial shell is intentionally independent from the former portal grid. */
