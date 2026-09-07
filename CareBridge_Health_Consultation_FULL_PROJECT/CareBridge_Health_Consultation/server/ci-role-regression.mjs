@@ -80,6 +80,58 @@ async function socketCheck(role, token) {
   });
 }
 
+async function wardCapacityCheck(patientToken, adminToken) {
+  const before = await request("/api/wards", adminToken);
+  const target = before.find((ward) => Number(ward.available || 0) > 0);
+  if (!target) throw new Error("Ward capacity regression needs at least one available seeded bed");
+  const start = Number(target.available);
+
+  const booking = await request("/api/ward-bookings", patientToken, {
+    method: "POST",
+    body: JSON.stringify({
+      patientId: patientSeed.id,
+      ward: target.name,
+      roomType: "Shared Room",
+      date: "2099-12-20",
+      nights: 1,
+      notes: "CI live-capacity reservation",
+    }),
+  });
+  if (!booking?.capacityHeld) throw new Error("New ward booking did not hold capacity");
+
+  const afterHold = await request("/api/wards", adminToken);
+  const heldWard = afterHold.find((ward) => ward.id === target.id);
+  if (Number(heldWard?.available) !== start - 1) {
+    throw new Error(`Ward hold arithmetic failed: expected ${start - 1}, got ${heldWard?.available}`);
+  }
+
+  const confirmed = await request(`/api/ward-bookings/${booking.id}`, adminToken, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "confirmed" }),
+  });
+  if (confirmed.status !== "confirmed" || !confirmed.capacityHeld) throw new Error("Ward confirmation lost its held bed");
+
+  const afterConfirm = await request("/api/wards", adminToken);
+  const confirmedWard = afterConfirm.find((ward) => ward.id === target.id);
+  if (Number(confirmedWard?.available) !== start - 1) {
+    throw new Error(`Ward confirmation double-decremented capacity: expected ${start - 1}, got ${confirmedWard?.available}`);
+  }
+
+  const discharged = await request(`/api/ward-bookings/${booking.id}`, adminToken, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "discharged" }),
+  });
+  if (discharged.status !== "discharged" || discharged.capacityHeld) throw new Error("Ward discharge did not release the held bed");
+
+  const afterDischarge = await request("/api/wards", adminToken);
+  const releasedWard = afterDischarge.find((ward) => ward.id === target.id);
+  if (Number(releasedWard?.available) !== start) {
+    throw new Error(`Ward release arithmetic failed: expected ${start}, got ${releasedWard?.available}`);
+  }
+
+  console.log(`✓ live ward arithmetic (${start} → ${start - 1} → ${start - 1} → ${start})`);
+}
+
 try {
   await waitForHealth();
   const patientToken = await login(patientSeed, "patient");
@@ -122,6 +174,8 @@ try {
   await checkJson("admin payments", "/api/finance/payments", adminToken);
   await checkJson("admin cases", "/api/cases?status=open", adminToken);
   await checkJson("admin billing", "/api/billing?role=admin", adminToken);
+
+  await wardCapacityCheck(patientToken, adminToken);
 
   await socketCheck("patient", patientToken);
   await socketCheck("doctor", doctorToken);
