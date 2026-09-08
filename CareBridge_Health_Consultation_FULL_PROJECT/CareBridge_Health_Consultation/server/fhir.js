@@ -1,3 +1,5 @@
+import { smartScopeAllows } from "./smart.js";
+
 const FHIR_VERSION = "4.0.1";
 
 const refId = (value = "") => String(value).split("/").pop();
@@ -5,12 +7,12 @@ const isoDate = (value) => value ? new Date(value).toISOString() : undefined;
 const clean = (value) => Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined && item !== null && item !== ""));
 
 function bundle(req, resourceType, rows) {
-  const base = `${req.protocol}://${req.get("host")}${req.baseUrl || "/api/fhir/R4"}`.replace(/\/$/, "");
+  const base = `${req.protocol}://${req.get("host")}/api/fhir/R4`.replace(/\/$/, "");
   return {
     resourceType: "Bundle",
     type: "searchset",
     total: rows.length,
-    link: [{ relation: "self", url: `${base}${req.path}` }],
+    link: [{ relation: "self", url: `${base}${req.path.replace(/^\/api\/fhir\/R4/, "")}` }],
     entry: rows.map((resource) => ({ fullUrl: `${base}/${resourceType}/${resource.id}`, resource })),
   };
 }
@@ -73,7 +75,7 @@ function conditionResource(row = {}) {
     resourceType: "Condition",
     id: row.id,
     clinicalStatus: { coding: [{ system: "http://terminology.hl7.org/CodeSystem/condition-clinical", code: clinical }] },
-    code: { text: row.name },
+    code: { coding: row.code ? [{ system: row.codeSystem || "http://snomed.info/sct", code: row.code }] : undefined, text: row.name },
     subject: { reference: `Patient/${row.patientId}` },
     onsetDateTime: row.since ? isoDate(`${row.since}T00:00:00`) : undefined,
     recorder: row.clinician ? { display: row.clinician } : undefined,
@@ -168,24 +170,42 @@ function patientScope(req, requested) {
   return requested ? refId(requested) : "";
 }
 
+function operationOutcome(code, diagnostics) {
+  return { resourceType: "OperationOutcome", issue: [{ severity: "error", code, diagnostics }] };
+}
+
 export function mountFhir(app, { readDb }) {
   const root = "/api/fhir/R4";
 
-  app.get(`${root}/metadata`, (_req, res) => res.type("application/fhir+json").json({
+  app.get(`${root}/metadata`, (req, res) => res.type("application/fhir+json").json({
     resourceType: "CapabilityStatement",
     status: "active",
     date: new Date().toISOString(),
     kind: "instance",
-    software: { name: "CareBridge FHIR Gateway", version: "1.0" },
-    implementation: { description: "CareBridge authenticated FHIR R4 interoperability gateway" },
+    software: { name: "CareBridge FHIR Gateway", version: "1.1" },
+    implementation: { description: "CareBridge FHIR R4 gateway with authenticated CareBridge sessions and SMART Backend Services scopes." },
     fhirVersion: FHIR_VERSION,
     format: ["json"],
     rest: [{
       mode: "server",
-      security: { service: [{ coding: [{ system: "http://terminology.hl7.org/CodeSystem/restful-security-service", code: "OAuth" }] }], description: "Bearer-authenticated CareBridge session access." },
+      security: {
+        service: [{ coding: [{ system: "http://terminology.hl7.org/CodeSystem/restful-security-service", code: "SMART-on-FHIR" }] }],
+        description: "CareBridge session bearer tokens or scoped SMART Backend Services bearer tokens.",
+        extension: [{ url: "http://fhir-registry.smarthealthit.org/StructureDefinition/oauth-uris", extension: [{ url: "token", valueUri: `${req.protocol}://${req.get("host")}/api/smart/token` }] }],
+      },
       resource: ["Patient", "Practitioner", "Appointment", "Observation", "Condition", "MedicationRequest", "Encounter"].map((type) => ({ type, interaction: [{ code: "read" }, { code: "search-type" }] })),
     }],
   }));
+
+  app.use(root, (req, res, next) => {
+    const relative = req.path.replace(/^\/api\/fhir\/R4\/?/, "");
+    if (!relative || relative === "metadata" || relative === ".well-known/smart-configuration") return next();
+    if (req.authUser) return next();
+    const resourceType = relative.split("/")[0];
+    if (!req.smartAuth) return res.status(401).type("application/fhir+json").json(operationOutcome("login", "A CareBridge session or SMART access token is required."));
+    if (!smartScopeAllows(req.smartAuth, resourceType, "read")) return res.status(403).type("application/fhir+json").json(operationOutcome("forbidden", `SMART token does not include system/${resourceType}.read.`));
+    return next();
+  });
 
   app.get(`${root}/Patient`, (req, res) => {
     const db = readDb();
@@ -197,10 +217,10 @@ export function mountFhir(app, { readDb }) {
   });
 
   app.get(`${root}/Patient/:id`, (req, res) => {
-    if (req.authUser?.role === "patient" && req.params.id !== req.authUser.id) return res.status(403).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "forbidden", diagnostics: "Patients can only read their own Patient resource." }] });
+    if (req.authUser?.role === "patient" && req.params.id !== req.authUser.id) return res.status(403).type("application/fhir+json").json(operationOutcome("forbidden", "Patients can only read their own Patient resource."));
     const db = readDb();
     const user = (db.users || []).find((item) => item.id === req.params.id && item.role === "patient");
-    if (!user) return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found" }] });
+    if (!user) return res.status(404).type("application/fhir+json").json(operationOutcome("not-found", "Patient resource not found."));
     res.type("application/fhir+json").json(patientResource(user));
   });
 
@@ -214,7 +234,7 @@ export function mountFhir(app, { readDb }) {
   app.get(`${root}/Practitioner/:id`, (req, res) => {
     const db = readDb();
     const user = (db.users || []).find((item) => item.id === req.params.id && ["doctor", "nurse"].includes(item.role));
-    if (!user) return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found" }] });
+    if (!user) return res.status(404).type("application/fhir+json").json(operationOutcome("not-found", "Practitioner resource not found."));
     res.type("application/fhir+json").json(practitionerResource(user));
   });
 
@@ -233,8 +253,8 @@ export function mountFhir(app, { readDb }) {
   app.get(`${root}/Appointment/:id`, (req, res) => {
     const db = readDb();
     const row = (db.appointments || []).find((item) => item.id === req.params.id);
-    if (!row) return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found" }] });
-    if (req.authUser?.role === "patient" && row.patientId !== req.authUser.id) return res.status(403).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "forbidden" }] });
+    if (!row) return res.status(404).type("application/fhir+json").json(operationOutcome("not-found", "Appointment resource not found."));
+    if (req.authUser?.role === "patient" && row.patientId !== req.authUser.id) return res.status(403).type("application/fhir+json").json(operationOutcome("forbidden", "Patients can only read their own appointment resources."));
     res.type("application/fhir+json").json(appointmentResource(row));
   });
 
