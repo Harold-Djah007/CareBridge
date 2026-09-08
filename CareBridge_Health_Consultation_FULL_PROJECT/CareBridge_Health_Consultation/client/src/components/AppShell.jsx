@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  Activity, BedDouble, Bell, Building2, CalendarDays, ClipboardList, Command,
+  Activity, BedDouble, Bell, Building2, CalendarDays, ChevronRight, ClipboardList, Command,
   FolderKanban, FolderOpen, HeartPulse, Inbox, LayoutDashboard, LifeBuoy, LogOut,
   Mail, MessageCircle, Pill, Receipt, Search, ScrollText, Settings2,
   ShoppingBag, Sparkles, Stethoscope, Users, Video, Wifi, X,
@@ -13,6 +13,7 @@ import { api, socketOptions, socketUrl } from "../api";
 import { HOSPITAL } from "../utils";
 import { LiveClock } from "./LiveMeter";
 import Avatar from "./Avatar";
+import NotificationReader, { normalizeNotification } from "./NotificationReader";
 import { photoFor, sceneFor } from "../imagery";
 
 const NAV = {
@@ -137,6 +138,7 @@ export default function AppShell() {
   const [query, setQuery] = useState("");
   const [notes, setNotes] = useState([]);
   const [noticeOpen, setNoticeOpen] = useState(false);
+  const [selectedNotice, setSelectedNotice] = useState(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState("");
   const [connected, setConnected] = useState(false);
@@ -218,9 +220,12 @@ export default function AppShell() {
     else navigate(q ? `/care?q=${encodeURIComponent(q)}` : "/care");
   };
 
-  const markAllRead = async () => {
+  const openLiveNotice = async (note) => {
+    setNoticeOpen(false);
+    setSelectedNotice(normalizeNotification({ ...note, source: "live" }, user));
+    if (note.read) return;
     try {
-      await api(`/notifications/${user.id}/read`, { method: "PATCH" });
+      await api(`/notifications/${user.id}/${note.id}/read`, { method: "PATCH" });
       await Promise.all([loadNotes(), loadBadges()]);
     } catch {}
   };
@@ -276,7 +281,7 @@ export default function AppShell() {
           </span>
           <LiveClock />
           {isPatient && <CartMastButton />}
-          <button className="cbv6-icon-btn" type="button" onClick={() => { setNoticeOpen((value) => !value); if (!noticeOpen && unread) markAllRead(); }} aria-label="Notifications">
+          <button className="cbv6-icon-btn" type="button" onClick={() => setNoticeOpen((value) => !value)} aria-label="Notifications">
             <Bell size={18} />{unread > 0 && <em>{unread > 99 ? "99+" : unread}</em>}
           </button>
           <button className="cbv6-profile" type="button" onClick={() => navigate("/settings")}>
@@ -336,9 +341,9 @@ export default function AppShell() {
               <div>
                 {notes.length === 0 && <p className="cbv6-empty-copy">You are all caught up.</p>}
                 {notes.slice(0, 8).map((note) => (
-                  <article key={note.id} className={note.read ? "" : "unread"}>
-                    <i /><div><strong>{note.title}</strong><p>{note.body}</p></div>
-                  </article>
+                  <button key={note.id} type="button" className={`cbv6-notice-item ${note.read ? "" : "unread"}`} onClick={() => openLiveNotice(note)}>
+                    <i /><div><strong>{note.title}</strong><p>{note.body}</p></div><ChevronRight size={16} />
+                  </button>
                 ))}
               </div>
               <footer><button type="button" onClick={() => { setNoticeOpen(false); navigate("/alerts"); }}>Open notification centre</button></footer>
@@ -354,6 +359,8 @@ export default function AppShell() {
       </div>
 
       <nav className="cbv6-mobile-nav" aria-label="Primary navigation">{mobileNav.map((item) => navLink(item, true))}</nav>
+
+      <NotificationReader notice={selectedNotice} onClose={() => setSelectedNotice(null)} />
 
       {paletteOpen && (
         <div className="cbv6-palette-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPaletteOpen(false); }}>
