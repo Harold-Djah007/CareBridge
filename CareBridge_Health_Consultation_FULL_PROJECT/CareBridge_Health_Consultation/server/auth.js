@@ -69,12 +69,15 @@ export function ensurePasswordSecurity(db) {
 }
 
 export function issueSession(db, user, req = null) {
-  if (mfaEnabled(db, user.id)) {
+  if (mfaEnabled(db, user.id) && req?.mfaVerified !== true) {
     const mfaCode = String(req?.body?.mfaCode || "").trim();
     if (!mfaCode) return { token: MFA_REQUIRED_TOKEN, expiresAt: null, mfaRequired: true };
     const verified = verifyUserMfa(db, user.id, mfaCode);
     if (!verified.ok) return { token: MFA_INVALID_TOKEN, expiresAt: null, mfaRequired: true, mfaInvalid: true };
-    req.mfaMethod = verified.method;
+    if (req) {
+      req.mfaVerified = true;
+      req.mfaMethod = verified.method;
+    }
   }
 
   db.sessions = Array.isArray(db.sessions) ? db.sessions : [];
@@ -87,9 +90,10 @@ export function issueSession(db, user, req = null) {
     .slice(0, Math.max(0, SESSION_MAX_PER_USER - 1));
   const otherUsers = db.sessions.filter((session) => session.userId !== user.id && new Date(session.expiresAt || 0).getTime() > Date.now());
   const userAgent = String(req?.headers?.["user-agent"] || "");
+  const sessionId = `sess_${crypto.randomUUID()}`;
   db.sessions = [...otherUsers, ...activeForUser];
   db.sessions.push({
-    id: `sess_${crypto.randomUUID()}`,
+    id: sessionId,
     userId: user.id,
     tokenHash: hashToken(raw),
     createdAt: createdAt.toISOString(),
@@ -98,7 +102,13 @@ export function issueSession(db, user, req = null) {
     ip: String(req?.ip || req?.socket?.remoteAddress || "").replace(/^::ffff:/, ""),
     mfaMethod: req?.mfaMethod || null,
   });
-  return { token: raw, expiresAt: expiresAt.toISOString(), mfaRequired: false, mfaMethod: req?.mfaMethod || null };
+  return {
+    id: sessionId,
+    token: raw,
+    expiresAt: expiresAt.toISOString(),
+    mfaRequired: false,
+    mfaMethod: req?.mfaMethod || null,
+  };
 }
 
 export function authSessionFromRequest(db, req) {
