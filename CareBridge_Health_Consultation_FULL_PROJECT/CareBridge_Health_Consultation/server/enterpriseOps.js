@@ -67,13 +67,22 @@ function integrityChecks(db) {
 
 function environmentChecks() {
   const production = process.env.NODE_ENV === "production";
+  const hasOrigins = Boolean(process.env.CLIENT_URL || process.env.CLIENT_URLS);
+  const hasPostgres = Boolean(process.env.DATABASE_URL);
   const checks = [
-    process.env.CLIENT_URL || process.env.CLIENT_URLS ? ok("env.origin", "Origin allow-list", "Client origin configuration is present.") : warn("env.origin", "Origin allow-list", "CLIENT_URL/CLIENT_URLS is not configured."),
+    hasOrigins ? ok("env.origin", "Origin allow-list", "Client origin configuration is present.") : warn("env.origin", "Origin allow-list", "CLIENT_URL/CLIENT_URLS is not configured."),
     process.env.FLW_SECRET_KEY ? ok("env.payments", "Payment provider secret", "Flutterwave server secret is configured.") : warn("env.payments", "Payment provider secret", "Flutterwave secret is not configured; hosted payments cannot be production-ready."),
     process.env.SMTP_HOST ? ok("env.smtp", "SMTP delivery", "SMTP host is configured for real email delivery.") : warn("env.smtp", "SMTP delivery", "SMTP_HOST is not configured; production email delivery is not ready."),
     process.env.SESSION_DAYS ? ok("env.sessions", "Session lifetime", "Explicit session lifetime is configured.") : warn("env.sessions", "Session lifetime", "Using default session lifetime."),
+    process.env.SESSION_MAX_PER_USER ? ok("env.session-cap", "Concurrent-session cap", `Maximum ${process.env.SESSION_MAX_PER_USER} active session(s) per user.`) : warn("env.session-cap", "Concurrent-session cap", "Using the built-in concurrent-session cap."),
+    hasPostgres ? ok("env.postgres", "PostgreSQL connection", "DATABASE_URL is configured and the transactional adapter is available.") : warn("env.postgres", "PostgreSQL connection", "DATABASE_URL is not configured. Atomic JSON remains the local/demo runtime store."),
+    ok("security.headers", "Browser security policy", "CSP, frame denial, no-sniff, permissions policy and API no-store controls are installed."),
+    ok("security.throttle", "Abuse throttling", "Login, registration, contact and API request classes are rate-limited."),
+    ok("observability.http", "HTTP observability", "Request IDs and structured request telemetry are active."),
   ];
-  if (production && !process.env.CLIENT_URL && !process.env.CLIENT_URLS) checks[0] = fail("env.origin", "Origin allow-list", "Production requires CLIENT_URL or CLIENT_URLS.");
+  if (production && !hasOrigins) checks[0] = fail("env.origin", "Origin allow-list", "Production requires CLIENT_URL or CLIENT_URLS.");
+  if (production && !hasPostgres) checks[5] = fail("env.postgres", "PostgreSQL connection", "Production 9.5 readiness requires DATABASE_URL and migration to PostgreSQL as the primary system of record.");
+  if (production && !process.env.SMTP_HOST) checks[2] = fail("env.smtp", "SMTP delivery", "Production requires a real SMTP provider.");
   return checks;
 }
 
@@ -82,6 +91,9 @@ function capabilitySummary(db) {
     interoperability: {
       fhir: { version: "R4 4.0.1", resources: ["Patient", "Practitioner", "Appointment", "Observation", "Condition", "MedicationRequest", "Encounter"] },
       terminology: ["LOINC", "UCUM", "HL7 terminology"],
+      smartOnFhir: false,
+      hl7v2: false,
+      dicomPacs: false,
     },
     clinical: {
       chart: true,
@@ -89,9 +101,58 @@ function capabilitySummary(db) {
       orderTypes: ["lab", "imaging", "medication", "procedure"],
       orders: (db.clinicalOrders || []).length,
     },
+    persistence: {
+      localRuntime: "atomic-json",
+      atomicRename: true,
+      checksum: true,
+      retainedBackups: true,
+      journal: true,
+      postgresAdapter: true,
+      postgresTransactional: true,
+      postgresPrimaryRuntime: false,
+      outbox: true,
+      optimisticConcurrency: true,
+      tamperEvidentPostgresAudit: true,
+    },
+    security: {
+      scryptPasswords: true,
+      boundedSessions: true,
+      revokeOtherSessions: true,
+      passwordPolicy: true,
+      rateLimiting: true,
+      csp: true,
+      requestIds: true,
+      mfa: false,
+    },
+    observability: { structuredHttpLogs: true, requestIds: true, processMetrics: true, distributedTracing: false },
     realtime: { socketIo: true, wards: true, messages: true, pharmacy: true },
     finance: { flutterwave: true, momo: true, bank: true, nhis: true, receipts: true },
     communications: { smtp: Boolean(process.env.SMTP_HOST), inAppNotifications: true },
+  };
+}
+
+function processMetrics(app) {
+  const memory = process.memoryUsage();
+  const http = app.locals.securityMetrics || {};
+  return {
+    at: new Date().toISOString(),
+    uptimeSeconds: Math.round(process.uptime()),
+    process: {
+      pid: process.pid,
+      node: process.version,
+      rssBytes: memory.rss,
+      heapUsedBytes: memory.heapUsed,
+      heapTotalBytes: memory.heapTotal,
+      externalBytes: memory.external,
+    },
+    http: {
+      requests: Number(http.requests || 0),
+      responses4xx: Number(http.responses4xx || 0),
+      responses5xx: Number(http.responses5xx || 0),
+      rateLimited: Number(http.rateLimited || 0),
+      startedAt: http.startedAt || null,
+      lastRequestAt: http.lastRequestAt || null,
+    },
   };
 }
 
@@ -102,8 +163,8 @@ export function mountEnterpriseOps(app, { readDb }) {
     const checks = integrityChecks(db);
     const failed = checks.filter((check) => check.status === "fail").length;
     const warnings = checks.filter((check) => check.status === "warn").length;
-    const digest = crypto.createHash("sha256").update(JSON.stringify({ users: db.users?.length || 0, appointments: db.appointments?.length || 0, audit: db.audit || [] })).digest("hex");
-    res.json({ status: failed ? "failed" : warnings ? "warning" : "healthy", failed, warnings, checks, digest, checkedAt: new Date().toISOString() });
+    const digestValue = crypto.createHash("sha256").update(JSON.stringify({ users: db.users?.length || 0, appointments: db.appointments?.length || 0, audit: db.audit || [] })).digest("hex");
+    res.json({ status: failed ? "failed" : warnings ? "warning" : "healthy", failed, warnings, checks, digest: digestValue, checkedAt: new Date().toISOString() });
   });
 
   app.get("/api/admin/system/readiness", (req, res) => {
@@ -119,6 +180,7 @@ export function mountEnterpriseOps(app, { readDb }) {
       summary: { passed, warnings, failed, total: checks.length },
       checks,
       capabilities: capabilitySummary(db),
+      metrics: processMetrics(app),
       checkedAt: new Date().toISOString(),
     });
   });
@@ -127,5 +189,10 @@ export function mountEnterpriseOps(app, { readDb }) {
     if (req.authUser?.role !== "admin") return res.status(403).json({ message: "Hospital operations access is required." });
     const db = readDb();
     res.json({ ...capabilitySummary(db), generatedAt: new Date().toISOString() });
+  });
+
+  app.get("/api/admin/system/metrics", (req, res) => {
+    if (req.authUser?.role !== "admin") return res.status(403).json({ message: "Hospital operations access is required." });
+    res.json(processMetrics(app));
   });
 }
