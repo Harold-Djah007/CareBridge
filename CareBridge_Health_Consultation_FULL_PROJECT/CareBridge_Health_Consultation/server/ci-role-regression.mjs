@@ -132,6 +132,36 @@ async function wardCapacityCheck(patientToken, adminToken) {
   console.log(`✓ live ward arithmetic (${start} → ${start - 1} → ${start - 1} → ${start})`);
 }
 
+async function patientExperienceCheck(patientToken, adminToken) {
+  const before = await request("/api/patient-experience", patientToken);
+  if (!before?.modules || !before?.home) throw new Error("Patient experience policy returned an invalid shape");
+
+  const changed = await request("/api/admin/patient-experience", adminToken, {
+    method: "PATCH",
+    body: JSON.stringify({
+      modules: { support: false },
+      home: { quickActions: false },
+    }),
+  });
+  if (changed.modules?.support !== false || changed.home?.quickActions !== false) {
+    throw new Error("Admin patient experience update was not persisted");
+  }
+
+  const patientView = await request("/api/patient-experience", patientToken);
+  if (patientView.modules?.support !== false || patientView.home?.quickActions !== false) {
+    throw new Error("Patient did not receive the published visibility policy");
+  }
+
+  await request("/api/admin/patient-experience", adminToken, {
+    method: "PATCH",
+    body: JSON.stringify({
+      modules: { support: before.modules.support !== false },
+      home: { quickActions: before.home.quickActions !== false },
+    }),
+  });
+  console.log("✓ admin-controlled patient experience policy");
+}
+
 try {
   await waitForHealth();
   const patientToken = await login(patientSeed, "patient");
@@ -153,6 +183,7 @@ try {
   await checkJson("patient chart", `/api/chart/${patientSeed.id}`, patientToken);
   await checkJson("patient notifications", `/api/notifications/${patientSeed.id}`, patientToken);
   await checkJson("patient badges", `/api/badges?userId=${patientSeed.id}&role=patient`, patientToken);
+  await checkJson("patient experience", "/api/patient-experience", patientToken);
 
   await checkJson("doctor appointments", `/api/appointments?userId=${doctorSeed.id}&role=doctor`, doctorToken);
   await checkJson("doctor contacts", `/api/contacts?userId=${doctorSeed.id}&role=doctor`, doctorToken);
@@ -175,6 +206,7 @@ try {
   await checkJson("admin cases", "/api/cases?status=open", adminToken);
   await checkJson("admin billing", "/api/billing?role=admin", adminToken);
 
+  await patientExperienceCheck(patientToken, adminToken);
   await wardCapacityCheck(patientToken, adminToken);
 
   await socketCheck("patient", patientToken);
