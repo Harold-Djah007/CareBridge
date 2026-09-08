@@ -159,7 +159,7 @@ export function mfaStatus(db, userId) {
   };
 }
 
-export function verifyUserMfa(db, userId, input, { consumeRecovery = true } = {}) {
+export function verifyUserMfa(db, userId, input, { consumeRecovery = false } = {}) {
   const record = account(db, userId);
   if (!record?.enabled || !record.secret) return { ok: false, method: "none" };
   const candidate = String(input || "").trim();
