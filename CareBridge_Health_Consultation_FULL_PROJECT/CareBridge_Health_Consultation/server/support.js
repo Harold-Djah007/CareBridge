@@ -2,6 +2,10 @@ import { mountPatientExperience } from "./patientExperience.js";
 import { mountFhir } from "./fhir.js";
 import { mountClinicalOrders } from "./clinicalOrders.js";
 import { mountEnterpriseOps } from "./enterpriseOps.js";
+import { mountSmart } from "./smart.js";
+import { mountInterop } from "./interop.js";
+import { mountClinicalSafety } from "./clinicalSafety.js";
+import { mountRevenueCycle } from "./revenueCycle.js";
 
 const nid = (p) => `${p}${Date.now()}${Math.floor(Math.random() * 900)}`;
 
@@ -26,8 +30,12 @@ async function pingAdmins(db, { notify, emailPatient }, { title, body, email }) 
 
 export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPatient }) {
   mountPatientExperience(app, { readDb, writeDb });
+  mountSmart(app, { readDb, writeDb });
   mountFhir(app, { readDb });
   mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, emailPatient });
+  mountClinicalSafety(app, { readDb, writeDb, safeUser, notify });
+  mountInterop(app, { readDb, writeDb });
+  mountRevenueCycle(app, { readDb, writeDb, notify });
   mountEnterpriseOps(app, { readDb });
 
   app.get("/api/tickets", (req, res) => {
