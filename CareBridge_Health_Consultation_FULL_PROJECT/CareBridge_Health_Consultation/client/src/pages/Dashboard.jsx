@@ -29,17 +29,29 @@ function Signal({ label, value, detail, tone = "default" }) {
   return <div className={`cbv6-signal tone-${tone}`}><small>{label}</small><strong>{value}</strong><span>{detail}</span></div>;
 }
 
-function PatientHome({ user, appointments, wards, due, doctors, badges }) {
+function PatientHome({ user, appointments, wards, due, doctors, badges, patientExperience }) {
+  const experience = patientExperience || { modules: {}, home: {} };
+  const moduleOn = (key) => experience.modules?.[key] !== false;
+  const homeOn = (key) => experience.home?.[key] !== false;
   const next = appointments.filter(isUpcoming).sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))[0];
   const admission = wards.find((w) => !["declined", "cancelled", "discharged", "completed"].includes(w.status));
   const dueTotal = due.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const chosen = doctors.find((doctor) => doctor.id === user.preferredDoctorId);
-  const nextAction = due.length ? { title: "Review your hospital balance", copy: `${ghs(dueTotal)} is outstanding across ${due.length} item${due.length === 1 ? "" : "s"}.`, to: "/pay", cta: "Review & pay", icon: CreditCard } : next ? { title: "Your next consultation is ready", copy: `${formatDate(next.date)} at ${formatTime(next.time)} with ${next.doctor?.name || "your clinician"}.`, to: next.mode === "video" ? `/video?with=${next.doctorId}` : "/appointments", cta: next.mode === "video" ? "Open consultation" : "View appointment", icon: CalendarDays } : { title: "Your care plan is open", copy: "Book a clinician when you need care. Your record and care team stay connected.", to: "/appointments", cta: "Book care", icon: Stethoscope };
+  const nextAction = (
+    (due.length && moduleOn("shop") && { title: "Review your hospital balance", copy: `${ghs(dueTotal)} is outstanding across ${due.length} item${due.length === 1 ? "" : "s"}.`, to: "/pay", cta: "Review & pay", icon: CreditCard })
+    || (next && moduleOn("appointments") && { title: "Your next consultation is ready", copy: `${formatDate(next.date)} at ${formatTime(next.time)} with ${next.doctor?.name || "your clinician"}.`, to: next.mode === "video" && moduleOn("video") ? `/video?with=${next.doctorId}` : "/appointments", cta: next.mode === "video" && moduleOn("video") ? "Open consultation" : "View appointment", icon: CalendarDays })
+    || (moduleOn("appointments") && { title: "Your care plan is open", copy: "Book a clinician when you need care. Your record and care team stay connected.", to: "/appointments", cta: "Book care", icon: Stethoscope })
+    || (moduleOn("records") && { title: "Your health record is ready", copy: "Review your longitudinal clinical information and care history.", to: "/records", cta: "Open record", icon: FolderOpen })
+    || (moduleOn("support") && { title: "Hospital support is available", copy: "Contact operations whenever you need help with your CareBridge experience.", to: "/support", cta: "Get support", icon: LifeBuoy })
+    || { title: "Your CareBridge account", copy: "Your hospital has simplified this patient workspace. You can still manage your identity and preferences.", to: "/settings", cta: "Open settings", icon: HeartPulse }
+  );
   const NextIcon = nextAction.icon;
+  const hasCareStream = ["appointments", "records", "prescriptions", "admissions", "shop"].some(moduleOn);
+  const hasQuickActions = ["appointments", "records", "messages", "shop", "support"].some(moduleOn);
 
   return (
     <div className="cbv6-home cbv6-patient-home">
-      <section className="cbv6-patient-welcome">
+      {homeOn("welcome") && <section className="cbv6-patient-welcome">
         <div className="cbv6-patient-welcome-copy">
           <span className="cbv6-kicker"><Sparkles size={14} /> Personal care space</span>
           <h1>{greeting(firstName(user.name))}</h1>
@@ -54,54 +66,54 @@ function PatientHome({ user, appointments, wards, due, doctors, badges }) {
           <div className="cbv6-patient-photo" />
           <div className="cbv6-patient-avatar"><Avatar person={user} className="large" /><span><b>{user.name}</b><small>Ridge Campus patient</small></span></div>
         </div>
-      </section>
+      </section>}
 
-      <section className="cbv6-care-focus">
+      {homeOn("recommended") && <section className="cbv6-care-focus">
         <div className="cbv6-care-focus-icon"><NextIcon size={25} /></div>
         <div><small>Recommended next step</small><h2>{nextAction.title}</h2><p>{nextAction.copy}</p></div>
         <Link className="primary-btn" to={nextAction.to}>{nextAction.cta}<ArrowRight size={16} /></Link>
-      </section>
+      </section>}
 
-      <div className="cbv6-patient-signal-row">
-        <Signal label="Next visit" value={next ? formatTime(next.time) : "No visit"} detail={next ? formatDate(next.date) : "Book when you need care"} tone="blue" />
-        <Signal label="Account" value={due.length ? ghs(dueTotal) : "Clear"} detail={due.length ? `${due.length} item${due.length === 1 ? "" : "s"} due` : "No unpaid charges"} tone={due.length ? "amber" : "green"} />
-        <Signal label="Admission" value={admission ? admission.ward : "None"} detail={admission ? admission.status : "No active bed request"} tone="violet" />
-        <Signal label="Care team" value={chosen ? chosen.name.replace("Dr. ", "") : "Choose"} detail={chosen?.specialty || "Select a preferred clinician"} tone="teal" />
-      </div>
+      {homeOn("summary") && <div className="cbv6-patient-signal-row">
+        {moduleOn("appointments") && <Signal label="Next visit" value={next ? formatTime(next.time) : "No visit"} detail={next ? formatDate(next.date) : "Book when you need care"} tone="blue" />}
+        {moduleOn("shop") && <Signal label="Account" value={due.length ? ghs(dueTotal) : "Clear"} detail={due.length ? `${due.length} item${due.length === 1 ? "" : "s"} due` : "No unpaid charges"} tone={due.length ? "amber" : "green"} />}
+        {moduleOn("admissions") && <Signal label="Admission" value={admission ? admission.ward : "None"} detail={admission ? admission.status : "No active bed request"} tone="violet" />}
+        {moduleOn("careTeam") && <Signal label="Care team" value={chosen ? chosen.name.replace("Dr. ", "") : "Choose"} detail={chosen?.specialty || "Select a preferred clinician"} tone="teal" />}
+      </div>}
 
-      <div className="cbv6-patient-grid">
-        <section className="cbv6-panel cbv6-care-stream">
+      {(homeOn("careStream") || homeOn("clinician")) && <div className="cbv6-patient-grid">
+        {homeOn("careStream") && hasCareStream && <section className="cbv6-panel cbv6-care-stream">
           <header><div><small>Your care stream</small><h2>What is happening around you</h2></div><span className="cbv6-live-chip"><i /> Live</span></header>
           <div className="cbv6-stream-list">
-            <Link to="/appointments" className={next ? "is-current" : ""}><span><CalendarDays size={18} /></span><div><strong>Consultation</strong><small>{next ? `${formatDate(next.date)} · ${formatTime(next.time)} · ${next.doctor?.name || "Clinician"}` : "No upcoming appointment"}</small></div><ArrowRight size={16} /></Link>
-            <Link to="/records"><span><FileHeart size={18} /></span><div><strong>Health record</strong><small>Vitals, notes, labs and clinical history</small></div><ArrowRight size={16} /></Link>
-            <Link to="/prescriptions"><span><ClipboardList size={18} /></span><div><strong>Prescriptions</strong><small>Medication orders and pharmacy fulfilment</small></div><ArrowRight size={16} /></Link>
-            <Link to="/wards" className={admission ? "is-current" : ""}><span><BedDouble size={18} /></span><div><strong>Admission</strong><small>{admission ? `${admission.ward} · ${admission.status}` : "No current reservation"}</small></div><ArrowRight size={16} /></Link>
-            <Link to="/pay" className={due.length ? "needs-attention" : ""}><span><CreditCard size={18} /></span><div><strong>Hospital account</strong><small>{due.length ? `${ghs(dueTotal)} outstanding` : "No unpaid charges"}</small></div><ArrowRight size={16} /></Link>
+            {moduleOn("appointments") && <Link to="/appointments" className={next ? "is-current" : ""}><span><CalendarDays size={18} /></span><div><strong>Consultation</strong><small>{next ? `${formatDate(next.date)} · ${formatTime(next.time)} · ${next.doctor?.name || "Clinician"}` : "No upcoming appointment"}</small></div><ArrowRight size={16} /></Link>}
+            {moduleOn("records") && <Link to="/records"><span><FileHeart size={18} /></span><div><strong>Health record</strong><small>Vitals, notes, labs and clinical history</small></div><ArrowRight size={16} /></Link>}
+            {moduleOn("prescriptions") && <Link to="/prescriptions"><span><ClipboardList size={18} /></span><div><strong>Prescriptions</strong><small>Medication orders and pharmacy fulfilment</small></div><ArrowRight size={16} /></Link>}
+            {moduleOn("admissions") && <Link to="/wards" className={admission ? "is-current" : ""}><span><BedDouble size={18} /></span><div><strong>Admission</strong><small>{admission ? `${admission.ward} · ${admission.status}` : "No current reservation"}</small></div><ArrowRight size={16} /></Link>}
+            {moduleOn("shop") && <Link to="/pay" className={due.length ? "needs-attention" : ""}><span><CreditCard size={18} /></span><div><strong>Hospital account</strong><small>{due.length ? `${ghs(dueTotal)} outstanding` : "No unpaid charges"}</small></div><ArrowRight size={16} /></Link>}
           </div>
-        </section>
+        </section>}
 
-        <section className="cbv6-panel cbv6-next-clinician">
+        {homeOn("clinician") && (moduleOn("careTeam") || moduleOn("appointments") || moduleOn("messages") || moduleOn("video")) && <section className="cbv6-panel cbv6-next-clinician">
           <header><div><small>Your clinician</small><h2>{next ? "Upcoming consultation" : "Care relationship"}</h2></div></header>
           {next ? (
             <div className="cbv6-clinician-card">
               <Avatar person={next.doctor} className="large" />
               <div><h3>{next.doctor?.name}</h3><p>{next.doctor?.specialty}</p><span><Clock3 size={14} /> {formatDate(next.date)} · {formatTime(next.time)}</span></div>
-              <div><Link className="secondary-btn" to={`/messages?with=${next.doctorId}`}>Message</Link>{next.mode === "video" && <Link className="primary-btn" to={`/video?with=${next.doctorId}`}><Video size={15} /> Join</Link>}</div>
+              <div>{moduleOn("messages") && <Link className="secondary-btn" to={`/messages?with=${next.doctorId}`}>Message</Link>}{next.mode === "video" && moduleOn("video") && <Link className="primary-btn" to={`/video?with=${next.doctorId}`}><Video size={15} /> Join</Link>}</div>
             </div>
           ) : chosen ? (
-            <div className="cbv6-clinician-card"><Avatar person={chosen} className="large" /><div><h3>{chosen.name}</h3><p>{chosen.specialty}</p><Presence person={chosen} /></div><Link className="primary-btn" to="/appointments">Book visit</Link></div>
+            <div className="cbv6-clinician-card"><Avatar person={chosen} className="large" /><div><h3>{chosen.name}</h3><p>{chosen.specialty}</p><Presence person={chosen} /></div>{moduleOn("appointments") && <Link className="primary-btn" to="/appointments">Book visit</Link>}</div>
           ) : <EmptyPlate compact scene="clinic" title="Build your care team" hint="Choose a preferred clinician for faster access." />}
-        </section>
-      </div>
+        </section>}
+      </div>}
 
-      <section className="cbv6-patient-actions">
-        <ActionTile to="/appointments" icon={CalendarDays} title="Book care" text="In-person or video consultation" tone="blue" />
-        <ActionTile to="/records" icon={FolderOpen} title="Health record" text="Your complete clinical timeline" tone="teal" />
-        <ActionTile to="/messages" icon={MessageCircle} title="Messages" text="Secure care-team communication" badge={badges?.messages} tone="violet" />
-        <ActionTile to="/pay" icon={ShoppingBag} title="Shop & pay" text="Bills, medicines and services" badge={due.length || undefined} tone="amber" />
-        <ActionTile to="/support" icon={LifeBuoy} title="Hospital support" text="Get help from operations" tone="green" />
-      </section>
+      {homeOn("quickActions") && hasQuickActions && <section className="cbv6-patient-actions">
+        {moduleOn("appointments") && <ActionTile to="/appointments" icon={CalendarDays} title="Book care" text="In-person or video consultation" tone="blue" />}
+        {moduleOn("records") && <ActionTile to="/records" icon={FolderOpen} title="Health record" text="Your complete clinical timeline" tone="teal" />}
+        {moduleOn("messages") && <ActionTile to="/messages" icon={MessageCircle} title="Messages" text="Secure care-team communication" badge={badges?.messages} tone="violet" />}
+        {moduleOn("shop") && <ActionTile to="/pay" icon={ShoppingBag} title="Shop & pay" text="Bills, medicines and services" badge={due.length || undefined} tone="amber" />}
+        {moduleOn("support") && <ActionTile to="/support" icon={LifeBuoy} title="Hospital support" text="Get help from operations" tone="green" />}
+      </section>}
     </div>
   );
 }
@@ -261,5 +273,5 @@ export default function Dashboard() {
 
   if (user.role === "doctor") return <DoctorBoard user={user} appointments={appointments} wards={wards} />;
   if (user.role === "nurse") return <NurseBoard user={user} />;
-  return <PatientHome user={user} appointments={appointments} wards={wards} due={due} doctors={doctors} badges={badges} />;
+  return <PatientHome user={user} appointments={appointments} wards={wards} due={due} doctors={doctors} badges={badges} patientExperience={shell.patientExperience} />;
 }
