@@ -1,5 +1,6 @@
 import fs from "fs";
 import { spawn } from "child_process";
+import { totp } from "./mfa.js";
 
 const dataFile = process.env.DATA_FILE;
 const port = Number(process.env.PORT || 5056);
@@ -14,7 +15,7 @@ if (!admin?.email || !admin?.password) throw new Error("Missing seeded admin cre
 
 const server = spawn(process.execPath, ["index.js"], {
   cwd: new URL(".", import.meta.url),
-  env: { ...process.env, DATA_FILE: dataFile, PORT: String(port), LOG_LEVEL: "silent" },
+  env: { ...process.env, DATA_FILE: dataFile, PORT: String(port), LOG_LEVEL: "silent", MFA_ENCRYPTION_KEY: "ci-mfa-key-rotate-in-production" },
   stdio: ["ignore", "pipe", "pipe"],
 });
 let serverLog = "";
@@ -50,13 +51,14 @@ async function json(path, token = "", init = {}) {
   return { response, body, text };
 }
 
-async function login(user, role) {
+async function login(user, role, extra = {}) {
   const { response, body, text } = await json("/api/login", "", {
     method: "POST",
-    body: JSON.stringify({ email: user.email, password: user.password, expectedRole: role }),
+    headers: extra.headers || {},
+    body: JSON.stringify({ email: user.email, password: user.password, expectedRole: role, ...(extra.body || {}) }),
   });
   if (!response.ok || !body?.token) throw new Error(`${role} login failed: ${response.status} ${text}`);
-  return body.token;
+  return { token: body.token, body };
 }
 
 try {
@@ -86,9 +88,12 @@ try {
   }
   console.log("✓ weak password rejected");
 
-  const token1 = await login(patient, "patient");
-  const token2 = await login(patient, "patient");
-  const adminToken = await login(admin, "admin");
+  const login1 = await login(patient, "patient");
+  const login2 = await login(patient, "patient");
+  const token1 = login1.token;
+  const token2 = login2.token;
+  const adminLogin = await login(admin, "admin");
+  const adminToken = adminLogin.token;
 
   const sessionsBefore = await json("/api/security/sessions", token2);
   if (!sessionsBefore.response.ok || !Array.isArray(sessionsBefore.body?.sessions) || sessionsBefore.body.sessions.length < 2) {
@@ -112,6 +117,41 @@ try {
   }
   console.log("✓ admin readiness + process/HTTP telemetry");
 
+  const enroll = await json("/api/security/mfa/enroll", token2, {
+    method: "POST",
+    body: JSON.stringify({ currentPassword: patient.password }),
+  });
+  if (!enroll.response.ok || !enroll.body?.secret || !enroll.body?.otpauthUri) throw new Error(`MFA enrollment failed: ${enroll.text}`);
+  const setupCode = totp(enroll.body.secret);
+  const confirmed = await json("/api/security/mfa/confirm", token2, {
+    method: "POST",
+    body: JSON.stringify({ code: setupCode }),
+  });
+  if (!confirmed.response.ok || confirmed.body?.enabled !== true || confirmed.body?.recoveryCodes?.length !== 8) {
+    throw new Error(`MFA confirmation failed: ${confirmed.text}`);
+  }
+  const recoveryCode = confirmed.body.recoveryCodes[0];
+
+  const firstFactor = await login(patient, "patient", { headers: { "X-Forwarded-For": "198.51.100.20" } });
+  if (firstFactor.token !== "CAREBRIDGE_MFA_REQUIRED") throw new Error("MFA-enabled password login issued a normal session without a second factor");
+  const secondFactor = await login(patient, "patient", {
+    headers: { "X-Forwarded-For": "198.51.100.20" },
+    body: { mfaCode: totp(enroll.body.secret) },
+  });
+  if (["CAREBRIDGE_MFA_REQUIRED", "CAREBRIDGE_MFA_INVALID"].includes(secondFactor.token)) throw new Error("Valid TOTP did not issue a real session");
+
+  const recoveryLogin = await login(patient, "patient", {
+    headers: { "X-Forwarded-For": "198.51.100.21" },
+    body: { mfaCode: recoveryCode },
+  });
+  if (["CAREBRIDGE_MFA_REQUIRED", "CAREBRIDGE_MFA_INVALID"].includes(recoveryLogin.token)) throw new Error("Valid recovery code did not issue a real session");
+  const reusedRecovery = await login(patient, "patient", {
+    headers: { "X-Forwarded-For": "198.51.100.22" },
+    body: { mfaCode: recoveryCode },
+  });
+  if (reusedRecovery.token !== "CAREBRIDGE_MFA_INVALID") throw new Error("Recovery code was reusable");
+  console.log("✓ TOTP MFA + one-time recovery login");
+
   let limited = null;
   for (let attempt = 1; attempt <= 9; attempt += 1) {
     const result = await json("/api/login", "", {
@@ -134,7 +174,7 @@ try {
   if (!journalLines.length) throw new Error("Persistence journal is empty");
   console.log("✓ atomic persistence checksum + backup + journal");
 
-  console.log("CareBridge security + persistence regression passed.");
+  console.log("CareBridge security + persistence + MFA regression passed.");
 } finally {
   stop();
 }
