@@ -2,7 +2,7 @@ import fs from "fs";
 import { spawn } from "child_process";
 
 const dataFile = process.env.DATA_FILE;
-const port = Number(process.env.PORT || 5060);
+const port = Number(process.env.PORT || 5062);
 const base = `http://127.0.0.1:${port}`;
 if (!dataFile) throw new Error("DATA_FILE is required");
 const seed = JSON.parse(fs.readFileSync(dataFile, "utf8"));
