@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Bell, Building2, Check, Gauge, HeartPulse, IdCard, LogOut, MonitorCog,
-  Palette, Shield, Sparkles, UserRound, Wallet,
+  Bell, Building2, Check, Copy, Gauge, HeartPulse, IdCard, KeyRound, LogOut, MonitorCog,
+  Palette, RefreshCw, Shield, ShieldCheck, Smartphone, Sparkles, UserRound, Wallet,
 } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
@@ -69,6 +69,21 @@ function PreferenceRow({ icon: Icon, title, description, children }) {
   );
 }
 
+function RecoveryCodes({ codes, onCopy }) {
+  if (!codes?.length) return null;
+  return (
+    <div className="cbx-settings-section" role="status" aria-live="polite">
+      <div className="cbx-settings-section-head">
+        <div><h3>Save your recovery codes now</h3><p>Each code works once. Store them somewhere private and separate from this device.</p></div>
+        <button type="button" className="secondary-btn" onClick={onCopy}><Copy size={16} /> Copy codes</button>
+      </div>
+      <div className="cbx-settings-form-grid">
+        {codes.map((code) => <code key={code} style={{ fontSize: "1rem", fontWeight: 700, letterSpacing: ".04em" }}>{code}</code>)}
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { user, updateUser, logout } = useAuth();
   const { push } = useToast();
@@ -78,7 +93,7 @@ export default function Settings() {
   const sections = [
     { id: "profile", label: "Profile", icon: UserRound, help: "Identity & clinical details" },
     { id: "experience", label: "Display", icon: MonitorCog, help: "Appearance & motion" },
-    { id: "security", label: "Security", icon: Shield, help: "Password & access" },
+    { id: "security", label: "Security", icon: Shield, help: "Password, MFA & sessions" },
     ...(user.role === "patient" ? [{ id: "pay", label: "Payments", icon: Wallet, help: "Checkout defaults" }] : []),
     { id: "notifications", label: "Notifications", icon: Bell, help: "Email & app notices" },
   ];
@@ -100,6 +115,13 @@ export default function Settings() {
     bloodType: user.bloodType || "",
   });
   const [security, setSecurity] = useState({ currentPassword: "", password: "", confirm: "" });
+  const [mfa, setMfa] = useState({ enabled: false, recoveryCodesRemaining: 0, enrollmentPending: false, encryptionConfigured: false });
+  const [mfaSetup, setMfaSetup] = useState(null);
+  const [mfaPassword, setMfaPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [disablePassword, setDisablePassword] = useState("");
+  const [recoveryCodes, setRecoveryCodes] = useState([]);
+  const [sessions, setSessions] = useState({ currentSessionId: "", sessions: [] });
   const [pay, setPay] = useState({
     method: prefs.method || "momo",
     momoNetwork: prefs.momoNetwork || "mtn",
@@ -122,6 +144,20 @@ export default function Settings() {
   const desk = user.role === "patient"
     ? (account.insurance || user.insurance || "Self-pay")
     : (user.department || account.specialty || user.specialty || roleLabel(user.role));
+
+  const loadSecurityState = async () => {
+    try {
+      const [mfaState, sessionState] = await Promise.all([api("/security/mfa"), api("/security/sessions")]);
+      setMfa(mfaState);
+      setSessions(sessionState);
+    } catch (err) {
+      push(err.message, "error");
+    }
+  };
+
+  useEffect(() => {
+    if (tab === "security") loadSecurityState();
+  }, [tab]);
 
   const goTab = (id) => {
     setTab(id);
@@ -170,9 +206,81 @@ export default function Settings() {
     if (security.password !== security.confirm) return push("New passwords do not match.", "error");
     setBusy("security");
     try {
-      await patch({ currentPassword: security.currentPassword, password: security.password }, "Password updated.");
+      await patch({ currentPassword: security.currentPassword, password: security.password }, "Password updated. Other signed-in devices were revoked.");
       setSecurity({ currentPassword: "", password: "", confirm: "" });
+      await loadSecurityState();
     } catch (err) { push(err.message, "error"); } finally { setBusy(""); }
+  };
+
+  const startMfa = async () => {
+    if (!mfaPassword) return push("Enter your current password before starting MFA setup.", "error");
+    setBusy("mfa-start");
+    try {
+      const setup = await api("/security/mfa/enroll", { method: "POST", body: JSON.stringify({ currentPassword: mfaPassword }) });
+      setMfaSetup(setup);
+      setMfaCode("");
+      setRecoveryCodes([]);
+      push("Authenticator setup started.");
+      await loadSecurityState();
+    } catch (err) { push(err.message, "error"); } finally { setBusy(""); }
+  };
+
+  const confirmMfa = async () => {
+    if (!mfaCode.trim()) return push("Enter the six-digit authenticator code.", "error");
+    setBusy("mfa-confirm");
+    try {
+      const result = await api("/security/mfa/confirm", { method: "POST", body: JSON.stringify({ code: mfaCode }) });
+      setRecoveryCodes(result.recoveryCodes || []);
+      setMfaSetup(null);
+      setMfaCode("");
+      setMfaPassword("");
+      push("Multi-factor authentication enabled.");
+      await loadSecurityState();
+    } catch (err) { push(err.message, "error"); } finally { setBusy(""); }
+  };
+
+  const replaceRecoveryCodes = async () => {
+    if (!mfaCode.trim()) return push("Enter a current authenticator code first.", "error");
+    setBusy("mfa-recovery");
+    try {
+      const result = await api("/security/mfa/recovery-codes", { method: "POST", body: JSON.stringify({ code: mfaCode }) });
+      setRecoveryCodes(result.recoveryCodes || []);
+      setMfaCode("");
+      push("Old recovery codes are invalid. Save the new set.");
+      await loadSecurityState();
+    } catch (err) { push(err.message, "error"); } finally { setBusy(""); }
+  };
+
+  const turnOffMfa = async () => {
+    if (!disablePassword || !mfaCode.trim()) return push("Enter your password and authenticator or recovery code.", "error");
+    setBusy("mfa-disable");
+    try {
+      await api("/security/mfa/disable", { method: "POST", body: JSON.stringify({ currentPassword: disablePassword, code: mfaCode }) });
+      setMfaSetup(null);
+      setRecoveryCodes([]);
+      setMfaCode("");
+      setDisablePassword("");
+      push("Multi-factor authentication disabled. Other sessions were revoked.");
+      await loadSecurityState();
+    } catch (err) { push(err.message, "error"); } finally { setBusy(""); }
+  };
+
+  const revokeOthers = async () => {
+    setBusy("sessions");
+    try {
+      const result = await api("/security/sessions/revoke-others", { method: "POST" });
+      push(`${result.revoked || 0} other session${result.revoked === 1 ? "" : "s"} revoked.`);
+      await loadSecurityState();
+    } catch (err) { push(err.message, "error"); } finally { setBusy(""); }
+  };
+
+  const copyRecoveryCodes = async () => {
+    try {
+      await navigator.clipboard.writeText(recoveryCodes.join("\n"));
+      push("Recovery codes copied.");
+    } catch {
+      push("Copy was blocked by the browser. Save the codes manually.", "error");
+    }
   };
 
   const savePay = async (event) => {
@@ -356,18 +464,70 @@ export default function Settings() {
           )}
 
           {tab === "security" && (
-            <form className="cbx-settings-document" onSubmit={savePassword}>
-              <div className="cbx-settings-document-head"><div><span>Security</span><h2>Password & access</h2><p>Protect access to your {roleLabel(user.role).toLowerCase()} workspace.</p></div><Shield size={24} /></div>
-              <div className="cbx-settings-security-note"><Shield size={19} /><div><strong>Protected session</strong><p>Your browser keeps a session token, not your password.</p></div></div>
-              <section className="cbx-settings-section">
+            <section className="cbx-settings-document">
+              <div className="cbx-settings-document-head"><div><span>Security</span><h2>Password, MFA & sessions</h2><p>Control every layer that protects your {roleLabel(user.role).toLowerCase()} workspace.</p></div><Shield size={24} /></div>
+              <div className="cbx-settings-security-note"><ShieldCheck size={19} /><div><strong>{mfa.enabled ? "Multi-factor protection is on" : "Protected session"}</strong><p>{mfa.enabled ? `Authenticator MFA is active with ${mfa.recoveryCodesRemaining || 0} recovery codes remaining.` : "Your browser keeps a revocable session token, not your password."}</p></div></div>
+
+              <form className="cbx-settings-section" onSubmit={savePassword}>
+                <div className="cbx-settings-section-head"><div><h3>Password</h3><p>Changing your password revokes other active devices.</p></div><KeyRound size={19} /></div>
                 <div className="cbx-settings-form-grid single">
                   <label>Current password<input type="password" value={security.currentPassword} onChange={(e) => setSecurity({ ...security, currentPassword: e.target.value })} required autoComplete="current-password" /></label>
-                  <label>New password<input type="password" value={security.password} onChange={(e) => setSecurity({ ...security, password: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
-                  <label>Confirm new password<input type="password" value={security.confirm} onChange={(e) => setSecurity({ ...security, confirm: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
+                  <label>New password<input type="password" value={security.password} onChange={(e) => setSecurity({ ...security, password: e.target.value })} required minLength={10} autoComplete="new-password" /></label>
+                  <label>Confirm new password<input type="password" value={security.confirm} onChange={(e) => setSecurity({ ...security, confirm: e.target.value })} required minLength={10} autoComplete="new-password" /></label>
                 </div>
+                <footer className="cbx-settings-actions"><button className="primary-btn" disabled={busy === "security"}>{busy === "security" ? "Updating…" : "Update password"}</button></footer>
+              </form>
+
+              <section className="cbx-settings-section">
+                <div className="cbx-settings-section-head">
+                  <div><h3>Authenticator MFA</h3><p>Require a rotating six-digit code after your password. Recovery codes provide one-time emergency access.</p></div>
+                  <span className={`status ${mfa.enabled ? "complete" : "pending"}`}>{mfa.enabled ? "Enabled" : "Off"}</span>
+                </div>
+
+                {!mfa.enabled && !mfaSetup && (
+                  <div className="cbx-settings-form-grid single">
+                    <label>Current password<input type="password" value={mfaPassword} onChange={(e) => setMfaPassword(e.target.value)} autoComplete="current-password" placeholder="Confirm your identity" /></label>
+                    <div className="cbx-settings-actions"><button type="button" className="primary-btn" onClick={startMfa} disabled={busy === "mfa-start"}><Smartphone size={17} /> {busy === "mfa-start" ? "Starting…" : "Set up authenticator"}</button></div>
+                  </div>
+                )}
+
+                {!mfa.enabled && mfaSetup && (
+                  <div className="cbx-settings-form-grid single">
+                    <div className="cbx-settings-security-note"><Smartphone size={19} /><div><strong>Add CareBridge to your authenticator app</strong><p>Scan/import the URI or enter the setup key manually. The setup expires automatically.</p></div></div>
+                    <label>Setup key<input value={mfaSetup.secret || ""} readOnly aria-label="Authenticator setup key" /></label>
+                    <label>Authenticator URI<textarea rows="3" value={mfaSetup.otpauthUri || ""} readOnly aria-label="Authenticator URI" /></label>
+                    <label>Six-digit verification code<input inputMode="numeric" autoComplete="one-time-code" value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} placeholder="123456" /></label>
+                    <div className="cbx-settings-actions"><button type="button" className="primary-btn" onClick={confirmMfa} disabled={busy === "mfa-confirm"}><ShieldCheck size={17} /> {busy === "mfa-confirm" ? "Verifying…" : "Verify & enable MFA"}</button><button type="button" className="secondary-btn" onClick={() => { setMfaSetup(null); setMfaCode(""); }}>Cancel setup</button></div>
+                  </div>
+                )}
+
+                {mfa.enabled && (
+                  <div className="cbx-settings-form-grid single">
+                    <div className="cbx-settings-inline-setting"><div><strong>Recovery codes</strong><p>{mfa.recoveryCodesRemaining || 0} unused code{mfa.recoveryCodesRemaining === 1 ? "" : "s"} remain.</p></div><ShieldCheck size={20} /></div>
+                    <label>Authenticator code<input inputMode="numeric" autoComplete="one-time-code" value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} placeholder="123456" /></label>
+                    <div className="cbx-settings-actions"><button type="button" className="secondary-btn" onClick={replaceRecoveryCodes} disabled={busy === "mfa-recovery"}><RefreshCw size={16} /> Replace recovery codes</button></div>
+                    <label>Password to disable MFA<input type="password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} autoComplete="current-password" /></label>
+                    <div className="cbx-settings-actions"><button type="button" className="secondary-btn" onClick={turnOffMfa} disabled={busy === "mfa-disable"}>Disable MFA</button></div>
+                  </div>
+                )}
               </section>
-              <footer className="cbx-settings-actions"><button className="primary-btn" disabled={busy === "security"}>{busy === "security" ? "Updating…" : "Update password"}</button></footer>
-            </form>
+
+              <RecoveryCodes codes={recoveryCodes} onCopy={copyRecoveryCodes} />
+
+              <section className="cbx-settings-section">
+                <div className="cbx-settings-section-head"><div><h3>Active sessions</h3><p>Review devices currently allowed to use your CareBridge account.</p></div><button type="button" className="secondary-btn" onClick={loadSecurityState}><RefreshCw size={15} /> Refresh</button></div>
+                <div className="cbx-settings-notification-list">
+                  {(sessions.sessions || []).map((session) => (
+                    <div key={session.id} className="cbx-settings-inline-setting">
+                      <div><strong>{session.id === sessions.currentSessionId ? "This device" : "Signed-in device"}</strong><p>{session.createdAt ? new Date(session.createdAt).toLocaleString() : "Session"} · expires {session.expiresAt ? new Date(session.expiresAt).toLocaleString() : "later"}{session.ip ? ` · ${session.ip}` : ""}</p></div>
+                      <span className={`status ${session.id === sessions.currentSessionId ? "complete" : "pending"}`}>{session.id === sessions.currentSessionId ? "Current" : "Active"}</span>
+                    </div>
+                  ))}
+                  {!sessions.sessions?.length && <p className="muted">Session inventory is loading.</p>}
+                </div>
+                <footer className="cbx-settings-actions"><button type="button" className="secondary-btn" onClick={revokeOthers} disabled={busy === "sessions"}>{busy === "sessions" ? "Revoking…" : "Sign out every other device"}</button></footer>
+              </section>
+            </section>
           )}
 
           {tab === "pay" && user.role === "patient" && (
