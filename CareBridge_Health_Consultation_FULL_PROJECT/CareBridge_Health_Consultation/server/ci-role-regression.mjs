@@ -143,10 +143,7 @@ async function patientExperienceCheck(patientToken, adminToken) {
 
   const globalChanged = await request("/api/admin/patient-experience", adminToken, {
     method: "PATCH",
-    body: JSON.stringify({
-      modules: { support: false },
-      home: { quickActions: false },
-    }),
+    body: JSON.stringify({ modules: { support: false }, home: { quickActions: false } }),
   });
   if (globalChanged.modules?.support !== false || globalChanged.home?.quickActions !== false) {
     throw new Error("All-patient experience update was not persisted");
@@ -159,10 +156,7 @@ async function patientExperienceCheck(patientToken, adminToken) {
 
   const individual = await request(`/api/admin/patient-experience/${patientSeed.id}`, adminToken, {
     method: "PATCH",
-    body: JSON.stringify({
-      modules: { support: true },
-      home: { quickActions: true },
-    }),
+    body: JSON.stringify({ modules: { support: true }, home: { quickActions: true } }),
   });
   if (!individual.hasOverride || individual.override?.modules?.support !== true || individual.override?.home?.quickActions !== true) {
     throw new Error("Individual patient override was not persisted");
@@ -195,10 +189,7 @@ async function patientExperienceCheck(patientToken, adminToken) {
 
   await request("/api/admin/patient-experience", adminToken, {
     method: "PATCH",
-    body: JSON.stringify({
-      modules: globalBefore.modules,
-      home: globalBefore.home,
-    }),
+    body: JSON.stringify({ modules: globalBefore.modules, home: globalBefore.home }),
   });
 
   if (individualBefore.hasOverride) {
@@ -209,6 +200,74 @@ async function patientExperienceCheck(patientToken, adminToken) {
   }
 
   console.log("✓ dual-scope patient experience policy (all patients + individual override + inheritance)");
+}
+
+async function fhirCheck(patientToken, doctorToken) {
+  const metadata = await request("/api/fhir/R4/metadata", patientToken);
+  if (metadata?.resourceType !== "CapabilityStatement" || metadata?.fhirVersion !== "4.0.1") {
+    throw new Error("FHIR R4 CapabilityStatement is invalid");
+  }
+
+  const patient = await request(`/api/fhir/R4/Patient/${patientSeed.id}`, patientToken);
+  if (patient?.resourceType !== "Patient" || patient?.id !== patientSeed.id) throw new Error("FHIR Patient read failed");
+
+  const resources = [
+    ["Appointment", `/api/fhir/R4/Appointment?patient=Patient/${patientSeed.id}`],
+    ["Observation", `/api/fhir/R4/Observation?patient=Patient/${patientSeed.id}`],
+    ["Condition", `/api/fhir/R4/Condition?patient=Patient/${patientSeed.id}`],
+    ["MedicationRequest", `/api/fhir/R4/MedicationRequest?patient=Patient/${patientSeed.id}`],
+    ["Encounter", `/api/fhir/R4/Encounter?patient=Patient/${patientSeed.id}`],
+  ];
+  for (const [name, path] of resources) {
+    const result = await request(path, patientToken);
+    if (result?.resourceType !== "Bundle" || !Array.isArray(result.entry)) throw new Error(`FHIR ${name} search failed`);
+  }
+
+  const practitioners = await request("/api/fhir/R4/Practitioner", doctorToken);
+  if (practitioners?.resourceType !== "Bundle" || !Array.isArray(practitioners.entry)) throw new Error("FHIR Practitioner search failed");
+  console.log("✓ authenticated FHIR R4 gateway");
+}
+
+async function clinicalOrderCheck(patientToken, doctorToken, nurseToken) {
+  const created = await request("/api/orders", doctorToken, {
+    method: "POST",
+    body: JSON.stringify({
+      patientId: patientSeed.id,
+      type: "lab",
+      title: "CI Full blood count",
+      code: "58410-2",
+      codeSystem: "http://loinc.org",
+      priority: "urgent",
+      status: "draft",
+      specimen: "Whole blood",
+      clinicalReason: "Enterprise CPOE regression",
+    }),
+  });
+  if (!created?.id || created.status !== "draft" || created.type !== "lab") throw new Error("Clinical order creation failed");
+
+  const active = await request(`/api/orders/${created.id}`, doctorToken, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "active" }),
+  });
+  if (active.status !== "active") throw new Error("Clinical order activation failed");
+
+  const progressing = await request(`/api/orders/${created.id}`, nurseToken, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "in_progress" }),
+  });
+  if (progressing.status !== "in_progress") throw new Error("Clinical order in-progress transition failed");
+
+  const completed = await request(`/api/orders/${created.id}`, nurseToken, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "completed", result: "Hb 13.4 g/dL · WBC 6.0 · Plt 251", resultFlag: "normal" }),
+  });
+  if (completed.status !== "completed" || !completed.completedAt || !completed.result) throw new Error("Clinical order completion/result failed");
+
+  const patientOrders = await request("/api/orders", patientToken);
+  if (!patientOrders.some((order) => order.id === created.id && order.status === "completed")) {
+    throw new Error("Patient could not see completed clinical order");
+  }
+  console.log("✓ CPOE clinical order lifecycle (draft → active → in progress → completed)");
 }
 
 try {
@@ -255,6 +314,8 @@ try {
   await checkJson("admin cases", "/api/cases?status=open", adminToken);
   await checkJson("admin billing", "/api/billing?role=admin", adminToken);
 
+  await fhirCheck(patientToken, doctorToken);
+  await clinicalOrderCheck(patientToken, doctorToken, nurseToken);
   await patientExperienceCheck(patientToken, adminToken);
   await wardCapacityCheck(patientToken, adminToken);
 
@@ -262,7 +323,7 @@ try {
   await socketCheck("doctor", doctorToken);
   await socketCheck("nurse", nurseToken);
   await socketCheck("admin", adminToken);
-  console.log("Premium V6 multi-role runtime regression passed.");
+  console.log("Premium V6 multi-role + enterprise runtime regression passed.");
 } finally {
   stop();
 }
