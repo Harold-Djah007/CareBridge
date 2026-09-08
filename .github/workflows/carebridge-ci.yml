@@ -126,4 +126,4 @@ jobs:
         run: |
           set -euo pipefail
           cp server/data/db.json /tmp/carebridge-load-ci-db.json
-          DATA_FILE=/tmp/carebridge-load-ci-db.json PORT=5060 LOG_LEVEL=silent CI_P95_BUDGET_MS=1000 node server/ci-load-slo-regression.mjs
+          DATA_FILE=/tmp/carebridge-load-ci-db.json PORT=5062 LOG_LEVEL=silent CI_P95_BUDGET_MS=1000 node server/ci-load-slo-regression.mjs
