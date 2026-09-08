@@ -8,7 +8,9 @@ if (!dataFile) throw new Error("DATA_FILE is required");
 
 const seed = JSON.parse(fs.readFileSync(dataFile, "utf8"));
 const patient = seed.users.find((user) => user.role === "patient" && user.status !== "inactive");
+const admin = seed.users.find((user) => user.role === "admin" && user.status !== "inactive");
 if (!patient?.email || !patient?.password) throw new Error("Missing seeded patient credentials");
+if (!admin?.email || !admin?.password) throw new Error("Missing seeded admin credentials");
 
 const server = spawn(process.execPath, ["index.js"], {
   cwd: new URL(".", import.meta.url),
@@ -48,12 +50,12 @@ async function json(path, token = "", init = {}) {
   return { response, body, text };
 }
 
-async function login() {
+async function login(user, role) {
   const { response, body, text } = await json("/api/login", "", {
     method: "POST",
-    body: JSON.stringify({ email: patient.email, password: patient.password, expectedRole: "patient" }),
+    body: JSON.stringify({ email: user.email, password: user.password, expectedRole: role }),
   });
-  if (!response.ok || !body?.token) throw new Error(`Patient login failed: ${response.status} ${text}`);
+  if (!response.ok || !body?.token) throw new Error(`${role} login failed: ${response.status} ${text}`);
   return body.token;
 }
 
@@ -84,8 +86,10 @@ try {
   }
   console.log("✓ weak password rejected");
 
-  const token1 = await login();
-  const token2 = await login();
+  const token1 = await login(patient, "patient");
+  const token2 = await login(patient, "patient");
+  const adminToken = await login(admin, "admin");
+
   const sessionsBefore = await json("/api/security/sessions", token2);
   if (!sessionsBefore.response.ok || !Array.isArray(sessionsBefore.body?.sessions) || sessionsBefore.body.sessions.length < 2) {
     throw new Error("Session inventory did not expose concurrent sessions");
@@ -97,6 +101,16 @@ try {
   const currentSession = await json(`/api/badges?userId=${patient.id}&role=patient`, token2);
   if (!currentSession.response.ok) throw new Error("Current session was revoked accidentally");
   console.log("✓ bounded session inventory + revoke-others");
+
+  const systemReadiness = await json("/api/admin/system/readiness", adminToken);
+  if (!systemReadiness.response.ok || !systemReadiness.body?.capabilities?.security?.rateLimiting || !systemReadiness.body?.capabilities?.persistence?.postgresAdapter) {
+    throw new Error(`Admin system readiness is missing enterprise capabilities: ${systemReadiness.text}`);
+  }
+  const metrics = await json("/api/admin/system/metrics", adminToken);
+  if (!metrics.response.ok || !Number.isFinite(metrics.body?.process?.rssBytes) || Number(metrics.body?.http?.requests || 0) < 1) {
+    throw new Error(`Admin system metrics are invalid: ${metrics.text}`);
+  }
+  console.log("✓ admin readiness + process/HTTP telemetry");
 
   let limited = null;
   for (let attempt = 1; attempt <= 9; attempt += 1) {
