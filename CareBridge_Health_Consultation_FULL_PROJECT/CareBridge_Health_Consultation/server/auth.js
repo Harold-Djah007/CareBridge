@@ -72,7 +72,7 @@ export function issueSession(db, user, req = null) {
   if (mfaEnabled(db, user.id) && req?.mfaVerified !== true) {
     const mfaCode = String(req?.body?.mfaCode || "").trim();
     if (!mfaCode) return { token: MFA_REQUIRED_TOKEN, expiresAt: null, mfaRequired: true };
-    const verified = verifyUserMfa(db, user.id, mfaCode);
+    const verified = verifyUserMfa(db, user.id, mfaCode, { consumeRecovery: true });
     if (!verified.ok) return { token: MFA_INVALID_TOKEN, expiresAt: null, mfaRequired: true, mfaInvalid: true };
     if (req) {
       req.mfaVerified = true;
