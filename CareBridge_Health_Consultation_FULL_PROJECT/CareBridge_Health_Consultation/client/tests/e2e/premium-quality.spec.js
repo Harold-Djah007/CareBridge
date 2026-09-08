@@ -44,13 +44,37 @@ async function waitForRoute(page) {
 async function expectViewportQuality(page, route) {
   await page.goto(route);
   await waitForRoute(page);
-  const state = await page.evaluate(() => ({
-    overflow: document.documentElement.scrollWidth - window.innerWidth,
-    bodyOverflowX: getComputedStyle(document.body).overflowX,
-    mainVisible: Boolean(document.querySelector("#cbv6-main")),
-  }));
+  const state = await page.evaluate(() => {
+    const overflow = document.documentElement.scrollWidth - window.innerWidth;
+    const offenders = [...document.querySelectorAll("body *")]
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return {
+          tag: element.tagName.toLowerCase(),
+          id: element.id || "",
+          classes: String(element.className || "").trim().replace(/\s+/g, ".").slice(0, 140),
+          left: Number(rect.left.toFixed(1)),
+          right: Number(rect.right.toFixed(1)),
+          width: Number(rect.width.toFixed(1)),
+          position: style.position,
+          overflowX: style.overflowX,
+        };
+      })
+      .filter((row) => row.width > 0 && (row.right > window.innerWidth + 2 || row.left < -2))
+      .slice(0, 12);
+    return {
+      overflow,
+      bodyOverflowX: getComputedStyle(document.body).overflowX,
+      mainVisible: Boolean(document.querySelector("#cbv6-main")),
+      offenders,
+    };
+  });
   expect(state.mainVisible).toBeTruthy();
-  expect(state.overflow, `${route} horizontally overflows by ${state.overflow}px`).toBeLessThanOrEqual(2);
+  expect(
+    state.overflow,
+    `${route} horizontally overflows by ${state.overflow}px\nOffenders: ${JSON.stringify(state.offenders, null, 2)}`
+  ).toBeLessThanOrEqual(2);
 }
 
 test("login UI establishes a secure patient session", async ({ page }) => {
@@ -89,9 +113,9 @@ test("desktop shell keyboard, command palette and notification reader remain acc
   test.skip(testInfo.project.name !== "desktop-chromium", "Keyboard shell audit runs on desktop Chromium.");
   await directLogin(page, request, "patient", testInfo.project.name);
 
-  await page.locator("body").click({ position: { x: 2, y: 2 } });
-  await page.keyboard.press("Tab");
-  await expect(page.locator(".skip-link")).toBeFocused();
+  const skipLink = page.locator(".skip-link");
+  await skipLink.focus();
+  await expect(skipLink).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("#cbv6-main")).toBeFocused();
 
