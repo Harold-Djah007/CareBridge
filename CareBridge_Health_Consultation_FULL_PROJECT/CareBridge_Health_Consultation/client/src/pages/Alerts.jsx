@@ -1,25 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   BedDouble, Bell, CalendarDays, CheckCircle2, ChevronRight, Mail, MessageCircle,
-  Search, Sparkles, UserRound, X,
+  Search, Sparkles, UserRound,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useOutletContext } from "react-router-dom";
 import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { prettyDate } from "../utils";
+import NotificationReader, { inferNotificationType, normalizeNotification } from "../components/NotificationReader";
 
 const icons = { appointment: CalendarDays, ward: BedDouble, message: MessageCircle, account: UserRound, test: Mail, support: Mail, live: Bell };
-
-const inferLiveType = (note) => {
-  const text = `${note?.title || ""} ${note?.body || ""}`.toLowerCase();
-  if (text.includes("ward") || text.includes("bed") || text.includes("admission")) return "ward";
-  if (text.includes("message") || text.includes("chat")) return "message";
-  if (text.includes("appointment") || text.includes("consultation") || text.includes("visit")) return "appointment";
-  if (text.includes("support") || text.includes("ticket")) return "support";
-  if (text.includes("payment") || text.includes("billing") || text.includes("account") || text.includes("receipt")) return "account";
-  return "live";
-};
 
 export default function Alerts() {
   const { user } = useAuth();
@@ -59,15 +50,6 @@ export default function Alerts() {
     return () => socket.disconnect();
   }, [user.id, user.role]);
 
-  useEffect(() => {
-    if (!selected) return undefined;
-    const close = (event) => {
-      if (event.key === "Escape") setSelected(null);
-    };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [selected]);
-
   const test = async () => {
     await api("/emails/test", { method: "POST", body: JSON.stringify({ userId: user.id }) });
     push("Test notice sent");
@@ -90,7 +72,7 @@ export default function Alerts() {
   const visibleLive = useMemo(() => {
     const q = query.trim().toLowerCase();
     return liveNotes.filter((note) => {
-      const type = inferLiveType(note);
+      const type = inferNotificationType(note);
       if (filter !== "all" && filter !== type) return false;
       if (!q) return true;
       return `${note.title || ""} ${note.body || ""}`.toLowerCase().includes(q);
@@ -98,22 +80,18 @@ export default function Alerts() {
   }, [liveNotes, filter, query]);
 
   const openNotice = (email) => {
-    setSelected(email);
+    setSelected(normalizeNotification(email, user));
     setShowPreview(false);
   };
 
-  const openLive = (note) => {
-    const type = inferLiveType(note);
-    openNotice({
-      id: note.id,
-      type,
-      subject: note.title || "CareBridge notification",
-      text: note.body || "",
-      status: note.read ? "read" : "unread",
-      sentAt: note.createdAt || "",
-      to: user.email || "your CareBridge account",
-      source: "live",
-    });
+  const openLive = async (note) => {
+    setSelected(normalizeNotification({ ...note, source: "live" }, user));
+    setShowPreview(false);
+    if (note.read) return;
+    try {
+      await api(`/notifications/${user.id}/${note.id}/read`, { method: "PATCH" });
+      await load();
+    } catch {}
   };
 
   const unread = Number(badges.notifications || 0);
@@ -147,7 +125,7 @@ export default function Alerts() {
         <div className="px-live-alert-list">
           {visibleLive.length === 0 && <div className="px-empty compact"><Bell size={24} /><h3>No live alerts in this view</h3></div>}
           {visibleLive.slice(0, 8).map((note) => {
-            const type = inferLiveType(note);
+            const type = inferNotificationType(note);
             const Icon = icons[type] || Bell;
             return <button key={note.id} type="button" className={`px-live-alert ${note.read ? "" : "unread"}`} onClick={() => openLive(note)}><span className="px-live-alert-icon"><Icon size={17} /></span><span className="px-live-alert-copy"><strong>{note.title}</strong><small>{note.body}</small></span><span className="px-live-alert-state">{note.read ? "Read" : "New"}<ChevronRight size={14} /></span></button>;
           })}
@@ -190,65 +168,12 @@ export default function Alerts() {
         })}
       </section>
 
-      {selected && (
-        <div className="px-notice-detail-backdrop" role="presentation" onMouseDown={() => setSelected(null)}>
-          <aside
-            className="px-notice-detail"
-            role="dialog"
-            aria-modal="true"
-            aria-label={selected.subject || "Notification details"}
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <header className="px-notice-detail-head">
-              <div className="px-notice-detail-icon">
-                {React.createElement(icons[selected.type] || Mail, { size: 22 })}
-              </div>
-              <div>
-                <span className="px-kicker">{selected.source === "live" ? "Live alert" : selected.type || "notice"}</span>
-                <h2>{selected.subject || "Hospital notification"}</h2>
-                <p>{selected.sentAt ? prettyDate(selected.sentAt) : "CareBridge activity"}</p>
-              </div>
-              <button type="button" onClick={() => setSelected(null)} aria-label="Close notification"><X size={20} /></button>
-            </header>
-
-            <div className="px-notice-detail-body">
-              <div className="px-notice-detail-status">
-                <span><CheckCircle2 size={16} /> {String(selected.status || "sent").replaceAll("_", " ")}</span>
-                <span>To {selected.to || "your CareBridge account"}</span>
-              </div>
-
-              <section className="px-notice-message-sheet">
-                <span>Message</span>
-                <p>{selected.text || "No additional message content was included."}</p>
-              </section>
-
-              {selected.previewUrl && (
-                <section className="px-notice-preview-section">
-                  <div>
-                    <div>
-                      <strong>Rendered email</strong>
-                      <small>View the formatted hospital message without leaving this page.</small>
-                    </div>
-                    <button type="button" className="px-secondary" onClick={() => setShowPreview((value) => !value)}>
-                      {showPreview ? "Hide preview" : "Show preview"}
-                    </button>
-                  </div>
-                  {showPreview && (
-                    <div className="px-notice-preview-frame">
-                      <iframe src={selected.previewUrl} title={`${selected.subject || "Notification"} preview`} />
-                    </div>
-                  )}
-                </section>
-              )}
-            </div>
-
-            <footer className="px-notice-detail-footer">
-              <small>Press Esc or click outside this panel to close.</small>
-              <button type="button" className="px-primary" onClick={() => setSelected(null)}>Done</button>
-            </footer>
-          </aside>
-        </div>
-      )}
+      <NotificationReader
+        notice={selected}
+        onClose={() => setSelected(null)}
+        showPreview={showPreview}
+        onTogglePreview={() => setShowPreview((value) => !value)}
+      />
     </div>
   );
 }
