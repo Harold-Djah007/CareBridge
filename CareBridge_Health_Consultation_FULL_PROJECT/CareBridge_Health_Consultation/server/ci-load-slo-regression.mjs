@@ -15,17 +15,34 @@ const server = spawn(process.execPath, ["index.js"], {
   stdio: ["ignore", "pipe", "pipe"],
 });
 let log = "";
+let childExit = null;
 server.stdout.on("data", (chunk) => { log += chunk; });
 server.stderr.on("data", (chunk) => { log += chunk; });
-const stop = () => { if (!server.killed) server.kill("SIGTERM"); };
+server.on("exit", (code, signal) => { childExit = { code, signal, at: new Date().toISOString() }; });
+const stop = () => { if (server.exitCode == null && server.signalCode == null) server.kill("SIGTERM"); };
 process.on("exit", stop);
+
+function errorDetail(error) {
+  const cause = error?.cause;
+  return [
+    error?.message || String(error),
+    cause?.code ? `code=${cause.code}` : "",
+    cause?.errno ? `errno=${cause.errno}` : "",
+    cause?.syscall ? `syscall=${cause.syscall}` : "",
+    cause?.address ? `address=${cause.address}` : "",
+    cause?.port ? `port=${cause.port}` : "",
+    cause?.message ? `cause=${cause.message}` : "",
+  ].filter(Boolean).join(" ");
+}
 
 async function waitForReady() {
   let lastStatus = 0;
   let lastBody = "";
   let lastError = "";
   for (let attempt = 0; attempt < 40; attempt += 1) {
-    if (server.exitCode != null) throw new Error(`Server exited early\n${log}`);
+    if (server.exitCode != null || server.signalCode != null || childExit) {
+      throw new Error(`Server exited early ${JSON.stringify(childExit || { code: server.exitCode, signal: server.signalCode })}\n${log}`);
+    }
     try {
       const response = await fetch(`${base}/api/ready`);
       lastStatus = response.status;
@@ -33,11 +50,11 @@ async function waitForReady() {
       lastError = "";
       if (response.ok) return;
     } catch (error) {
-      lastError = error.message;
+      lastError = errorDetail(error);
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Server not ready (status=${lastStatus}, body=${lastBody || "<empty>"}, fetchError=${lastError || "<none>"})\n${log}`);
+  throw new Error(`Server not ready (status=${lastStatus}, body=${lastBody || "<empty>"}, fetchError=${lastError || "<none>"}, child=${JSON.stringify(childExit || { exitCode: server.exitCode, signalCode: server.signalCode })})\n${log}`);
 }
 
 async function request(path, token = "") {
