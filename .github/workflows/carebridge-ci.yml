@@ -26,6 +26,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: CareBridge_Health_Consultation_FULL_PROJECT/CareBridge_Health_Consultation
@@ -81,3 +90,23 @@ jobs:
           set -euo pipefail
           cp server/data/db.json /tmp/carebridge-postgres-ci-db.json
           DATA_FILE=/tmp/carebridge-postgres-ci-db.json node server/ci-postgres-regression.mjs
+
+      - name: Enterprise 9.5 interoperability clinical finance and Redis regression
+        shell: bash
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+          MFA_ENCRYPTION_KEY: ci-carebridge-mfa-encryption-key-2026
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-enterprise95-ci-db.json
+          DATA_FILE=/tmp/carebridge-enterprise95-ci-db.json PORT=5057 LOG_LEVEL=silent node server/ci-enterprise95-regression.mjs
+
+      - name: PostgreSQL primary runtime restart regression
+        shell: bash
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carebridge_ci
+          MFA_ENCRYPTION_KEY: ci-carebridge-mfa-encryption-key-2026
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-runtime-postgres-ci-db.json
+          DATA_FILE=/tmp/carebridge-runtime-postgres-ci-db.json LOG_LEVEL=silent node server/ci-runtime-postgres.mjs
