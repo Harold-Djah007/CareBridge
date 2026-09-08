@@ -12,6 +12,20 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: carebridge_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d carebridge_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: CareBridge_Health_Consultation_FULL_PROJECT/CareBridge_Health_Consultation
@@ -58,3 +72,12 @@ jobs:
           set -euo pipefail
           cp server/data/db.json /tmp/carebridge-security-ci-db.json
           DATA_FILE=/tmp/carebridge-security-ci-db.json PORT=5056 LOG_LEVEL=silent node server/ci-security-regression.mjs
+
+      - name: PostgreSQL enterprise persistence regression
+        shell: bash
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carebridge_ci
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-postgres-ci-db.json
+          DATA_FILE=/tmp/carebridge-postgres-ci-db.json node server/ci-postgres-regression.mjs
