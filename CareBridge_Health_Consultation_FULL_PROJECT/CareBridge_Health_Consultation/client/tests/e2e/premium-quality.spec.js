@@ -77,6 +77,63 @@ async function expectViewportQuality(page, route) {
   ).toBeLessThanOrEqual(2);
 }
 
+async function semanticIssues(page) {
+  return page.evaluate(() => {
+    const issues = [];
+    const visible = (element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+    };
+    const referenceText = (element, attribute) => String(element.getAttribute(attribute) || "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)?.textContent?.trim() || "")
+      .join(" ")
+      .trim();
+    const labelText = (element) => [...(element.labels || [])].map((label) => label.textContent?.trim() || "").join(" ").trim();
+    const nameOf = (element) => [
+      element.getAttribute("aria-label"),
+      referenceText(element, "aria-labelledby"),
+      labelText(element),
+      element.textContent,
+      element.getAttribute("title"),
+    ].map((value) => String(value || "").trim()).find(Boolean) || "";
+    const describe = (element) => {
+      const id = element.id ? `#${element.id}` : "";
+      const classes = String(element.className || "").trim().split(/\s+/).filter(Boolean).slice(0, 3).map((value) => `.${value}`).join("");
+      return `${element.tagName.toLowerCase()}${id}${classes}`;
+    };
+
+    for (const element of document.querySelectorAll("button, a[href]")) {
+      if (!visible(element)) continue;
+      if (!nameOf(element)) issues.push(`${describe(element)} has no accessible name`);
+    }
+
+    for (const element of document.querySelectorAll("input, select, textarea")) {
+      if (!visible(element) || element.type === "hidden") continue;
+      const hasName = Boolean(element.getAttribute("aria-label") || referenceText(element, "aria-labelledby") || labelText(element));
+      if (!hasName) issues.push(`${describe(element)} is a visible form control without a label`);
+    }
+
+    for (const image of document.querySelectorAll("img")) {
+      if (visible(image) && !image.hasAttribute("alt")) issues.push(`${describe(image)} has no alt attribute`);
+    }
+
+    for (const dialog of document.querySelectorAll('[role="dialog"], dialog')) {
+      if (!visible(dialog)) continue;
+      if (!dialog.getAttribute("aria-label") && !referenceText(dialog, "aria-labelledby")) {
+        issues.push(`${describe(dialog)} has no accessible dialog name`);
+      }
+    }
+
+    const ids = [...document.querySelectorAll("[id]")].map((element) => element.id).filter(Boolean);
+    const duplicates = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+    duplicates.slice(0, 10).forEach((id) => issues.push(`duplicate id #${id}`));
+    return issues.slice(0, 30);
+  });
+}
+
 test("login UI establishes a secure patient session", async ({ page }) => {
   await page.goto("/login");
   await page.getByRole("tab", { name: "Patient" }).click();
@@ -107,6 +164,25 @@ test("critical role workspaces render without browser crashes or viewport overfl
 
   expect(pageErrors, `Unhandled browser errors:\n${pageErrors.join("\n")}`).toEqual([]);
   expect(serverErrors, `HTTP 5xx responses:\n${serverErrors.join("\n")}`).toEqual([]);
+});
+
+test("critical desktop routes meet semantic accessibility basics", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "Semantic audit runs once on desktop Chromium.");
+  const failures = [];
+  for (const role of Object.keys(ACCOUNTS)) {
+    await directLogin(page, request, role, testInfo.project.name);
+    for (const route of ROUTES[role]) {
+      await page.goto(route);
+      await waitForRoute(page);
+      const issues = await semanticIssues(page);
+      if (issues.length) failures.push(`${role} ${route}:\n  - ${issues.join("\n  - ")}`);
+    }
+    await page.evaluate(() => {
+      localStorage.removeItem("carebridge-user");
+      localStorage.removeItem("carebridge-token");
+    });
+  }
+  expect(failures, `Semantic accessibility regressions:\n${failures.join("\n")}`).toEqual([]);
 });
 
 test("desktop shell keyboard, command palette and notification reader remain accessible", async ({ page, request }, testInfo) => {
