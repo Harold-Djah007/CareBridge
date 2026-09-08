@@ -94,6 +94,26 @@ async function emailOperations(db, emailPatient, item, patient) {
 }
 
 export function mountWardAutomation(app, { readDb, writeDb, safeUser, notify, emailPatient, io, wardFee, addInvoice }) {
+  // Shared live-notification read endpoint. This is mounted early with the realtime helpers
+  // so opening one notification can update every badge without marking the whole feed read.
+  app.patch("/api/notifications/:userId/:notificationId/read", (req, res) => {
+    if (req.authUser?.role !== "admin" && req.params.userId !== req.authUser?.id) {
+      return res.status(403).json({ message: "You cannot update another account's notifications." });
+    }
+    const db = readDb();
+    const note = (db.notifications || []).find(
+      (notification) => notification.id === req.params.notificationId && notification.userId === req.params.userId
+    );
+    if (!note) return res.status(404).json({ message: "Notification not found." });
+    note.read = true;
+    writeDb(db);
+    const remaining = (db.notifications || []).filter(
+      (notification) => notification.userId === req.params.userId && !notification.read
+    ).length;
+    io.to(req.params.userId).emit("badges-updated", { notifications: remaining });
+    res.json({ ok: true, notification: note, notifications: remaining });
+  });
+
   // These handlers are mounted before the legacy ward mutation routes in index.js.
   // They intentionally own POST/PATCH booking mutations so capacity is atomic and idempotent.
   app.post("/api/ward-bookings", async (req, res) => {
