@@ -14,14 +14,28 @@ import { mountCases } from "./cases.js";
 import { ensurePharmacy, mountPharmacy } from "./pharmacy.js";
 import { ensureCarts, mountCart, clearUserCart, removeCartKinds } from "./cart.js";
 import { mountWardAutomation } from "./wardAutomation.js";
-import { authUserFromRequest, ensurePasswordSecurity, hashPassword, issueSession, passwordMatches, revokeSession } from "./auth.js";
+import {
+  activeSessionsForUser,
+  authSessionFromRequest,
+  authUserFromRequest,
+  ensurePasswordSecurity,
+  hashPassword,
+  issueSession,
+  passwordMatches,
+  revokeAllUserSessions,
+  revokeSession,
+  validatePassword,
+} from "./auth.js";
+import { createDurableJsonStore } from "./persistence.js";
+import { installSecurity } from "./security.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_FILE = process.env.DATA_FILE ? path.resolve(process.env.DATA_FILE) : path.join(__dirname, "data", "db.json");
+const store = createDurableJsonStore(DATA_FILE);
 
 const readDb = () => {
-  const db = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+  const db = store.read();
   db.emails = db.emails || [];
   db.wards = db.wards || [];
   db.payments = db.payments || [];
@@ -29,10 +43,10 @@ const readDb = () => {
   db.messageReads = db.messageReads || {};
   ensureClinical(db);
   const dirty = ensurePharmacy(db) | ensureTariff(db) | ensureCarts(db) | ensurePasswordSecurity(db);
-  if (dirty) fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
+  if (dirty) store.write(db);
   return db;
 };
-const writeDb = (db) => fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
+const writeDb = (db) => store.write(db);
 
 const app = express();
 const server = http.createServer(app);
@@ -55,13 +69,12 @@ const io = new Server(server, {
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
-app.use((_req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "SAMEORIGIN");
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "camera=(self), microphone=(self), geolocation=()");
-  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-  next();
+installSecurity(app, {
+  readiness: () => ({
+    persistence: store.health(),
+    environment: process.env.NODE_ENV || "development",
+    configuredOrigins: allowedOrigins.length,
+  }),
 });
 app.use(cors(corsOptions));
 app.use(express.json({
@@ -74,7 +87,10 @@ app.use(express.json({
 app.use("/api", (req, _res, next) => {
   if (!req.headers.authorization) return next();
   const db = readDb();
-  req.authUser = authUserFromRequest(db, req);
+  req.authSession = authSessionFromRequest(db, req);
+  req.authUser = req.authSession
+    ? (db.users || []).find((user) => user.id === req.authSession.userId && user.status !== "inactive") || null
+    : null;
   return next();
 });
 
@@ -215,7 +231,13 @@ const enrichBooking = (db, w) => {
 
 const requireFields = (body, fields) => fields.filter((f) => !String(body[f] ?? "").trim());
 
-app.get("/api/health", (_, res) => res.json({ ok: true, name: "CareBridge API" }));
+app.get("/api/health", (req, res) => res.json({
+  ok: true,
+  name: "CareBridge API",
+  requestId: req.id,
+  uptimeSeconds: Math.round(process.uptime()),
+  persistence: store.health().provider,
+}));
 
 app.post("/api/login", (req, res) => {
   const { email, password } = req.body;
@@ -236,7 +258,7 @@ app.post("/api/login", (req, res) => {
     }[user.role] || "Choose the matching portal.";
     return res.status(403).json({ message: `This account is a ${user.role}. ${hint}` });
   }
-  const session = issueSession(db, user);
+  const session = issueSession(db, user, req);
   audit(db, { actorId: user.id, action: "login", entity: "user", entityId: user.id, detail: `${user.role} signed in` });
   writeDb(db);
   res.json({ user: safeUser(user), token: session.token, expiresAt: session.expiresAt });
@@ -252,6 +274,8 @@ app.post("/api/logout", requireAuth(), (req, res) => {
 app.post("/api/register", async (req, res) => {
   const missing = requireFields(req.body, ["name", "email", "password"]);
   if (missing.length) return res.status(400).json({ message: `Please fill in ${missing.join(", ")}.` });
+  const policy = validatePassword(req.body.password);
+  if (!policy.ok) return res.status(400).json({ message: policy.message, passwordPolicy: policy });
   const db = readDb();
   if (db.users.some((u) => u.email.toLowerCase() === String(req.body.email).toLowerCase())) {
     return res.status(409).json({ message: "An account with that email already exists." });
@@ -292,7 +316,7 @@ app.post("/api/register", async (req, res) => {
     ],
     closing: "Keep email alerts on so you never miss a scheduled visit or ward update.",
   });
-  const session = issueSession(db, user);
+  const session = issueSession(db, user, req);
   writeDb(db);
   res.status(201).json({ user: safeUser(user), token: session.token, expiresAt: session.expiresAt });
 });
@@ -328,6 +352,22 @@ app.use("/api", (req, res, next) => {
   return next();
 });
 
+app.get("/api/security/sessions", requireAuth(), (req, res) => {
+  const db = readDb();
+  res.json({
+    currentSessionId: req.authSession?.id || "",
+    sessions: activeSessionsForUser(db, req.authUser.id),
+  });
+});
+
+app.post("/api/security/sessions/revoke-others", requireAuth(), (req, res) => {
+  const db = readDb();
+  const revoked = revokeAllUserSessions(db, req.authUser.id, req.authSession?.id || "");
+  audit(db, { actorId: req.authUser.id, action: "sessions.revoke-others", entity: "user", entityId: req.authUser.id, detail: `${revoked} other session(s) revoked` });
+  writeDb(db);
+  res.json({ ok: true, revoked });
+});
+
 mountWardAutomation(app, { readDb, writeDb, safeUser, notify, emailPatient, io, wardFee, addInvoice });
 
 app.patch("/api/users/:id", requireAuth(), (req, res) => {
@@ -339,10 +379,11 @@ app.patch("/api/users/:id", requireAuth(), (req, res) => {
     if (!req.body.currentPassword || !passwordMatches(req.body.currentPassword, user.password)) {
       return res.status(400).json({ message: "Current password is incorrect." });
     }
-    if (String(req.body.password).length < 6) {
-      return res.status(400).json({ message: "New password must be at least 6 characters." });
-    }
+    const policy = validatePassword(req.body.password);
+    if (!policy.ok) return res.status(400).json({ message: policy.message, passwordPolicy: policy });
     user.password = hashPassword(req.body.password);
+    revokeAllUserSessions(db, user.id, req.authSession?.id || "");
+    audit(db, { actorId: req.authUser.id, action: "password.change", entity: "user", entityId: user.id, detail: "Password changed; other sessions revoked" });
   }
   if (req.body.email !== undefined) {
     const email = String(req.body.email).trim();
@@ -613,7 +654,7 @@ app.patch("/api/ward-bookings/:id", async (req, res) => {
     if (accepted) {
       const ward = (db.wards || []).find((w) => w.name === item.ward);
       if (ward && ward.available > 0) ward.available -= 1;
-      const fee = wardFee(item, db);
+      const fee = wardFee(db, item);
       addInvoice(db, {
         patientId: item.patientId,
         item: `${item.ward} · ${item.roomType} × ${item.nights} night(s)`,
@@ -811,6 +852,8 @@ app.get("/api/admin/users", (_, res) => {
 app.post("/api/admin/users", (req, res) => {
   const missing = requireFields(req.body, ["name", "email", "password", "role"]);
   if (missing.length) return res.status(400).json({ message: "Name, email, password, and role are required." });
+  const policy = validatePassword(req.body.password);
+  if (!policy.ok) return res.status(400).json({ message: policy.message, passwordPolicy: policy });
   const role = req.body.role;
   if (!["patient", "doctor", "nurse", "admin"].includes(role)) {
     return res.status(400).json({ message: "Role must be patient, doctor, nurse, or admin." });
@@ -842,6 +885,7 @@ app.post("/api/admin/users", (req, res) => {
   const photoErr = applyPhoto(user, req.body.photo);
   if (photoErr) return res.status(400).json({ message: photoErr });
   db.users.push(user);
+  audit(db, { actorId: req.authUser.id, action: "user.create", entity: "user", entityId: user.id, detail: `${role} account created` });
   writeDb(db);
   res.status(201).json(safeUser(user));
 });
@@ -854,8 +898,11 @@ app.patch("/api/admin/users/:id", (req, res) => {
     if (req.body[key] !== undefined && req.body[key] !== "") user[key] = req.body[key];
   });
   if (req.body.password) {
-    if (String(req.body.password).length < 6) return res.status(400).json({ message: "Password must be at least 6 characters." });
+    const policy = validatePassword(req.body.password);
+    if (!policy.ok) return res.status(400).json({ message: policy.message, passwordPolicy: policy });
     user.password = hashPassword(req.body.password);
+    revokeAllUserSessions(db, user.id);
+    audit(db, { actorId: req.authUser.id, action: "password.admin-reset", entity: "user", entityId: user.id, detail: "Administrator reset password and revoked sessions" });
   }
   const photoErr = applyPhoto(user, req.body.photo);
   if (photoErr) return res.status(400).json({ message: photoErr });
@@ -867,7 +914,7 @@ app.patch("/api/admin/users/:id", (req, res) => {
 io.use((socket, next) => {
   const token = String(socket.handshake.auth?.token || "");
   const db = readDb();
-  const user = authUserFromRequest(db, { headers: { authorization: token ? `Bearer ${token}` : "" } });
+  const user = authUserFromRequest(db, { headers: { authorization: token ? `Bearer ${token}` : "", "user-agent": socket.handshake.headers?.["user-agent"] || "" } });
   if (!user) return next(new Error("Unauthorized socket connection"));
   socket.data.user = user;
   return next();
@@ -931,3 +978,14 @@ if (fs.existsSync(dist)) {
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`CareBridge server running on http://localhost:${PORT}`));
+
+let shuttingDown = false;
+const shutdown = (signal) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(JSON.stringify({ level: "info", event: "server_shutdown", signal, at: new Date().toISOString() }));
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 5000).unref();
+};
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
