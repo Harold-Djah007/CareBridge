@@ -48,7 +48,20 @@ function validateCode(type, body) {
   return "";
 }
 
-export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, emailPatient, audit, io }) {
+function writeAudit(db, entry) {
+  db.audit = db.audit || [];
+  db.audit.unshift({
+    id: nid("au"),
+    at: new Date().toISOString(),
+    actorId: entry.actorId || "",
+    action: entry.action,
+    entity: entry.entity,
+    entityId: entry.entityId || "",
+    detail: entry.detail || "",
+  });
+}
+
+export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, emailPatient }) {
   app.get("/api/orders", (req, res) => {
     const db = readDb();
     let rows = ensureOrders(db).slice();
@@ -110,7 +123,7 @@ export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, em
       resultFlag: "",
     };
     db.clinicalOrders.push(order);
-    audit(db, { actorId: req.authUser.id, action: "order.create", entity: "clinical-order", entityId: order.id, detail: `${type}: ${title} for ${patientId}` });
+    writeAudit(db, { actorId: req.authUser.id, action: "order.create", entity: "clinical-order", entityId: order.id, detail: `${type}: ${title} for ${patientId}` });
     if (order.status === "active") {
       notify(db, patientId, `${type === "lab" ? "Lab" : type === "imaging" ? "Imaging" : type === "medication" ? "Medication" : "Procedure"} order placed`, `${title} was added to your care plan.`);
       await emailPatient(db, patientId, {
@@ -128,7 +141,6 @@ export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, em
       });
     }
     writeDb(db);
-    io.to(patientId).emit("clinical-order", { id: order.id, patientId, type, status: order.status, title, at: now });
     res.status(201).json(enrich(db, order, safeUser));
   });
 
@@ -162,7 +174,7 @@ export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, em
     order.updatedAt = new Date().toISOString();
     if (nextStatus === "completed") order.completedAt = order.completedAt || order.updatedAt;
 
-    audit(db, { actorId: req.authUser.id, action: statusChanged ? `order.${nextStatus}` : "order.update", entity: "clinical-order", entityId: order.id, detail: `${order.type}: ${order.title}` });
+    writeAudit(db, { actorId: req.authUser.id, action: statusChanged ? `order.${nextStatus}` : "order.update", entity: "clinical-order", entityId: order.id, detail: `${order.type}: ${order.title}` });
     if (statusChanged && ["completed", "cancelled"].includes(nextStatus)) {
       notify(db, order.patientId, nextStatus === "completed" ? "Clinical result available" : "Clinical order cancelled", nextStatus === "completed" ? `${order.title} is complete${order.result ? `: ${order.result}` : "."}` : `${order.title} was cancelled.`);
       await emailPatient(db, order.patientId, {
@@ -179,7 +191,6 @@ export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, em
     }
 
     writeDb(db);
-    io.to(order.patientId).emit("clinical-order", { id: order.id, patientId: order.patientId, type: order.type, status: order.status, title: order.title, at: order.updatedAt });
     res.json(enrich(db, order, safeUser));
   });
 }
