@@ -1,9 +1,13 @@
 import crypto from "crypto";
+import { mfaEnabled, verifyUserMfa } from "./mfa.js";
 
 const SESSION_DAYS = Math.max(1, Number(process.env.SESSION_DAYS || 7));
 const SESSION_MAX_PER_USER = Math.max(1, Number(process.env.SESSION_MAX_PER_USER || 8));
 const PASSWORD_MIN_LENGTH = Math.max(8, Number(process.env.PASSWORD_MIN_LENGTH || 10));
 const SCRYPT_KEY_LENGTH = 64;
+
+export const MFA_REQUIRED_TOKEN = "CAREBRIDGE_MFA_REQUIRED";
+export const MFA_INVALID_TOKEN = "CAREBRIDGE_MFA_INVALID";
 
 const hashToken = (token) => crypto.createHash("sha256").update(String(token)).digest("hex");
 const hashUserAgent = (value) => crypto.createHash("sha256").update(String(value || "")).digest("hex");
@@ -65,6 +69,14 @@ export function ensurePasswordSecurity(db) {
 }
 
 export function issueSession(db, user, req = null) {
+  if (mfaEnabled(db, user.id)) {
+    const mfaCode = String(req?.body?.mfaCode || "").trim();
+    if (!mfaCode) return { token: MFA_REQUIRED_TOKEN, expiresAt: null, mfaRequired: true };
+    const verified = verifyUserMfa(db, user.id, mfaCode);
+    if (!verified.ok) return { token: MFA_INVALID_TOKEN, expiresAt: null, mfaRequired: true, mfaInvalid: true };
+    req.mfaMethod = verified.method;
+  }
+
   db.sessions = Array.isArray(db.sessions) ? db.sessions : [];
   const raw = crypto.randomBytes(32).toString("base64url");
   const createdAt = new Date();
@@ -84,14 +96,15 @@ export function issueSession(db, user, req = null) {
     expiresAt: expiresAt.toISOString(),
     userAgentHash: userAgent ? hashUserAgent(userAgent) : "",
     ip: String(req?.ip || req?.socket?.remoteAddress || "").replace(/^::ffff:/, ""),
+    mfaMethod: req?.mfaMethod || null,
   });
-  return { token: raw, expiresAt: expiresAt.toISOString() };
+  return { token: raw, expiresAt: expiresAt.toISOString(), mfaRequired: false, mfaMethod: req?.mfaMethod || null };
 }
 
 export function authSessionFromRequest(db, req) {
   const header = String(req.headers.authorization || "");
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  if (!token) return null;
+  if (!token || token === MFA_REQUIRED_TOKEN || token === MFA_INVALID_TOKEN) return null;
   const digest = hashToken(token);
   const now = Date.now();
   const session = (db.sessions || []).find(
