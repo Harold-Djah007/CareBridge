@@ -26,13 +26,31 @@ import {
   revokeSession,
   validatePassword,
 } from "./auth.js";
-import { createDurableJsonStore } from "./persistence.js";
+import { createRuntimeStore } from "./runtimeStore.js";
 import { installSecurity } from "./security.js";
+import { createCoordination } from "./coordination.js";
+import {
+  beginEnrollment,
+  confirmEnrollment,
+  disableMfa,
+  mfaEnabled,
+  mfaEncryptionConfigured,
+  mfaStatus,
+  regenerateRecoveryCodes,
+  verifyUserMfa,
+} from "./mfa.js";
+import { smartAuthFromRequest } from "./smart.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_FILE = process.env.DATA_FILE ? path.resolve(process.env.DATA_FILE) : path.join(__dirname, "data", "db.json");
-const store = createDurableJsonStore(DATA_FILE);
+const store = await createRuntimeStore(DATA_FILE);
+const coordination = await createCoordination();
+let coordinationStatus = await coordination.ping().catch((error) => ({ ok: false, provider: "redis", error: error.message }));
+const coordinationTimer = setInterval(async () => {
+  coordinationStatus = await coordination.ping().catch((error) => ({ ok: false, provider: "redis", error: error.message }));
+}, 30000);
+coordinationTimer.unref?.();
 
 const readDb = () => {
   const db = store.read();
@@ -47,6 +65,16 @@ const readDb = () => {
   return db;
 };
 const writeDb = (db) => store.write(db);
+
+if (coordination.enabled) {
+  const bootDb = readDb();
+  for (const session of bootDb.sessions || []) {
+    if (new Date(session.expiresAt || 0).getTime() > Date.now()) {
+      await coordination.registerSession(session.id, session.userId, session.expiresAt);
+    }
+  }
+  await store.flush();
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -72,8 +100,10 @@ app.set("trust proxy", 1);
 installSecurity(app, {
   readiness: () => ({
     persistence: store.health(),
+    coordination: coordinationStatus,
     environment: process.env.NODE_ENV || "development",
     configuredOrigins: allowedOrigins.length,
+    mfa: { available: true, encryptionConfigured: mfaEncryptionConfigured() },
   }),
 });
 app.use(cors(corsOptions));
@@ -83,14 +113,50 @@ app.use(express.json({
     req.rawBody = buffer.toString("utf8");
   },
 }));
+app.use(express.urlencoded({ extended: false, limit: "256kb" }));
 
-app.use("/api", (req, _res, next) => {
+app.use("/api", async (req, res, next) => {
+  try {
+    await store.refresh();
+    return next();
+  } catch (error) {
+    return res.status(503).json({ message: "CareBridge data services are temporarily unavailable.", requestId: req.id, detail: process.env.NODE_ENV === "production" ? undefined : error.message });
+  }
+});
+
+app.use((req, res, next) => {
+  const originalEnd = res.end.bind(res);
+  let ending = false;
+  res.end = (...args) => {
+    if (ending) return originalEnd(...args);
+    ending = true;
+    Promise.resolve(store.flush())
+      .then(() => originalEnd(...args))
+      .catch((error) => {
+        if (!res.headersSent) {
+          res.statusCode = error?.code === "CAREBRIDGE_STALE_WRITE" ? 409 : 503;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          return originalEnd(JSON.stringify({ message: error?.code === "CAREBRIDGE_STALE_WRITE" ? "This record changed in another session. Refresh and retry." : "CareBridge could not durably save this request.", requestId: req.id }));
+        }
+        return originalEnd(...args);
+      });
+    return res;
+  };
+  next();
+});
+
+app.use("/api", async (req, _res, next) => {
   if (!req.headers.authorization) return next();
   const db = readDb();
   req.authSession = authSessionFromRequest(db, req);
+  if (req.authSession && coordination.enabled && process.env.REDIS_SESSION_ENFORCE === "true") {
+    const active = await coordination.sessionActive(req.authSession.id).catch(() => false);
+    if (!active) req.authSession = null;
+  }
   req.authUser = req.authSession
     ? (db.users || []).find((user) => user.id === req.authSession.userId && user.status !== "inactive") || null
     : null;
+  req.smartAuth = req.authUser ? null : smartAuthFromRequest(db, req);
   return next();
 });
 
@@ -203,6 +269,7 @@ const emailPatient = async (db, userId, { type, subject, heading, intro, details
     type,
   });
   io.to(userId).emit("email-alert", { subject, type, id: record.id });
+  if (coordination.enabled) await coordination.enqueue("email-audit", { emailId: record.id, userId, type }, { idempotencyKey: record.id }).catch(() => {});
   return record;
 };
 
@@ -230,6 +297,8 @@ const enrichBooking = (db, w) => {
 };
 
 const requireFields = (body, fields) => fields.filter((f) => !String(body[f] ?? "").trim());
+const MFA_REQUIRED_TOKEN = "CAREBRIDGE_MFA_REQUIRED";
+const MFA_INVALID_TOKEN = "CAREBRIDGE_MFA_INVALID";
 
 app.get("/api/health", (req, res) => res.json({
   ok: true,
@@ -237,9 +306,10 @@ app.get("/api/health", (req, res) => res.json({
   requestId: req.id,
   uptimeSeconds: Math.round(process.uptime()),
   persistence: store.health().provider,
+  coordination: coordinationStatus.provider || "none",
 }));
 
-app.post("/api/login", (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
   const db = readDb();
   const user = db.users.find(
@@ -258,16 +328,25 @@ app.post("/api/login", (req, res) => {
     }[user.role] || "Choose the matching portal.";
     return res.status(403).json({ message: `This account is a ${user.role}. ${hint}` });
   }
+  if (mfaEnabled(db, user.id)) {
+    if (!String(req.body.mfaCode || "").trim()) return res.json({ token: MFA_REQUIRED_TOKEN, mfaRequired: true, method: "totp" });
+    const verified = verifyUserMfa(db, user.id, req.body.mfaCode);
+    if (!verified.ok) return res.json({ token: MFA_INVALID_TOKEN, mfaRequired: true, method: "totp" });
+    audit(db, { actorId: user.id, action: `mfa.verify.${verified.method}`, entity: "user", entityId: user.id, detail: verified.method === "recovery" ? "Recovery code used" : "Authenticator code verified" });
+  }
   const session = issueSession(db, user, req);
-  audit(db, { actorId: user.id, action: "login", entity: "user", entityId: user.id, detail: `${user.role} signed in` });
-  writeDb(db);
-  res.json({ user: safeUser(user), token: session.token, expiresAt: session.expiresAt });
+  audit(db, { actorId: user.id, action: "login", entity: "user", entityId: user.id, detail: `${user.role} signed in${mfaEnabled(db, user.id) ? " with MFA" : ""}` });
+  await writeDb(db);
+  if (coordination.enabled) await coordination.registerSession(session.id, user.id, session.expiresAt);
+  res.json({ user: safeUser(user), token: session.token, expiresAt: session.expiresAt, mfa: mfaStatus(db, user.id) });
 });
 
-app.post("/api/logout", requireAuth(), (req, res) => {
+app.post("/api/logout", requireAuth(), async (req, res) => {
   const db = readDb();
+  const sessionId = req.authSession?.id || "";
   revokeSession(db, req);
-  writeDb(db);
+  await writeDb(db);
+  if (coordination.enabled) await coordination.revokeSession(sessionId).catch(() => {});
   res.json({ ok: true });
 });
 
@@ -317,7 +396,8 @@ app.post("/api/register", async (req, res) => {
     closing: "Keep email alerts on so you never miss a scheduled visit or ward update.",
   });
   const session = issueSession(db, user, req);
-  writeDb(db);
+  await writeDb(db);
+  if (coordination.enabled) await coordination.registerSession(session.id, user.id, session.expiresAt);
   res.status(201).json({ user: safeUser(user), token: session.token, expiresAt: session.expiresAt });
 });
 
@@ -328,11 +408,17 @@ const isPublicApiRequest = (req) => {
     || (req.method === "POST" && pathname === "/api/contact")
     || (req.method === "POST" && pathname === "/api/payments/webhook")
     || (req.method === "POST" && pathname === "/api/finance/webhook")
+    || (req.method === "POST" && pathname === "/api/smart/token")
+    || (req.method === "GET" && pathname === "/api/smart/authorize")
+    || (req.method === "GET" && pathname === "/api/fhir/R4/metadata")
+    || (req.method === "GET" && pathname === "/api/fhir/R4/.well-known/smart-configuration")
   );
 };
 
 app.use("/api", (req, res, next) => {
   if (isPublicApiRequest(req)) return next();
+  const pathname = String(req.originalUrl || "").split("?")[0];
+  if (req.smartAuth && pathname.startsWith("/api/fhir/R4/")) return next();
   if (!req.authUser) return res.status(401).json({ message: "Your session has expired. Please sign in again." });
 
   const claimedActorId = req.body?.actorId || req.body?.userId;
@@ -360,17 +446,66 @@ app.get("/api/security/sessions", requireAuth(), (req, res) => {
   });
 });
 
-app.post("/api/security/sessions/revoke-others", requireAuth(), (req, res) => {
+app.post("/api/security/sessions/revoke-others", requireAuth(), async (req, res) => {
   const db = readDb();
+  const otherIds = (db.sessions || []).filter((row) => row.userId === req.authUser.id && row.id !== req.authSession?.id).map((row) => row.id);
   const revoked = revokeAllUserSessions(db, req.authUser.id, req.authSession?.id || "");
   audit(db, { actorId: req.authUser.id, action: "sessions.revoke-others", entity: "user", entityId: req.authUser.id, detail: `${revoked} other session(s) revoked` });
-  writeDb(db);
+  await writeDb(db);
+  if (coordination.enabled) await Promise.all(otherIds.map((id) => coordination.revokeSession(id).catch(() => {})));
   res.json({ ok: true, revoked });
+});
+
+app.get("/api/security/mfa", requireAuth(), (req, res) => {
+  const db = readDb();
+  res.json({ ...mfaStatus(db, req.authUser.id), encryptionConfigured: mfaEncryptionConfigured() });
+});
+
+app.post("/api/security/mfa/enroll", requireAuth(), async (req, res) => {
+  const db = readDb();
+  const user = db.users.find((row) => row.id === req.authUser.id);
+  if (!user || !passwordMatches(req.body.currentPassword, user.password)) return res.status(400).json({ message: "Current password is incorrect." });
+  const setup = beginEnrollment(db, user);
+  audit(db, { actorId: user.id, action: "mfa.enroll.begin", entity: "user", entityId: user.id, detail: "TOTP enrollment started" });
+  await writeDb(db);
+  res.json(setup);
+});
+
+app.post("/api/security/mfa/confirm", requireAuth(), async (req, res) => {
+  const db = readDb();
+  const result = confirmEnrollment(db, req.authUser, req.body.code);
+  if (!result.ok) return res.status(400).json({ message: result.message });
+  const revoked = revokeAllUserSessions(db, req.authUser.id, req.authSession?.id || "");
+  audit(db, { actorId: req.authUser.id, action: "mfa.enable", entity: "user", entityId: req.authUser.id, detail: `TOTP enabled; ${revoked} other session(s) revoked` });
+  await writeDb(db);
+  res.json({ enabled: true, recoveryCodes: result.recoveryCodes, enabledAt: result.enabledAt });
+});
+
+app.post("/api/security/mfa/recovery-codes", requireAuth(), async (req, res) => {
+  const db = readDb();
+  const result = regenerateRecoveryCodes(db, req.authUser.id, req.body.code);
+  if (!result.ok) return res.status(400).json({ message: result.message });
+  audit(db, { actorId: req.authUser.id, action: "mfa.recovery.regenerate", entity: "user", entityId: req.authUser.id, detail: "Recovery codes replaced" });
+  await writeDb(db);
+  res.json({ recoveryCodes: result.recoveryCodes });
+});
+
+app.post("/api/security/mfa/disable", requireAuth(), async (req, res) => {
+  const db = readDb();
+  const user = db.users.find((row) => row.id === req.authUser.id);
+  if (!user || !passwordMatches(req.body.currentPassword, user.password)) return res.status(400).json({ message: "Current password is incorrect." });
+  const verified = verifyUserMfa(db, user.id, req.body.code, { consumeRecovery: false });
+  if (!verified.ok) return res.status(400).json({ message: "Verify with your authenticator or recovery code before disabling MFA." });
+  disableMfa(db, user.id);
+  const revoked = revokeAllUserSessions(db, user.id, req.authSession?.id || "");
+  audit(db, { actorId: user.id, action: "mfa.disable", entity: "user", entityId: user.id, detail: `MFA disabled; ${revoked} other session(s) revoked` });
+  await writeDb(db);
+  res.json({ enabled: false });
 });
 
 mountWardAutomation(app, { readDb, writeDb, safeUser, notify, emailPatient, io, wardFee, addInvoice });
 
-app.patch("/api/users/:id", requireAuth(), (req, res) => {
+app.patch("/api/users/:id", requireAuth(), async (req, res) => {
   const db = readDb();
   const user = db.users.find((u) => u.id === req.params.id);
   if (!user) return res.status(404).json({ message: "User not found" });
@@ -409,7 +544,7 @@ app.patch("/api/users/:id", requireAuth(), (req, res) => {
   const photoErr = applyPhoto(user, req.body.photo);
   if (photoErr) return res.status(400).json({ message: photoErr });
   if (req.body.name) user.avatar = initials(req.body.name);
-  writeDb(db);
+  await writeDb(db);
   if (user.role === "doctor" && req.body.available !== undefined) {
     io.emit("doctor-status", { id: user.id, available: user.available !== false, name: user.name, specialty: user.specialty, photo: safeUser(user).photo });
   }
@@ -654,7 +789,7 @@ app.patch("/api/ward-bookings/:id", async (req, res) => {
     if (accepted) {
       const ward = (db.wards || []).find((w) => w.name === item.ward);
       if (ward && ward.available > 0) ward.available -= 1;
-      const fee = wardFee(db, item);
+      const fee = wardFee(item, db);
       addInvoice(db, {
         patientId: item.patientId,
         item: `${item.ward} · ${item.roomType} × ${item.nights} night(s)`,
@@ -977,14 +1112,18 @@ if (fs.existsSync(dist)) {
 }
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`CareBridge server running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`CareBridge server running on http://localhost:${PORT} · ${store.provider}${coordination.enabled ? " · Redis" : ""}`));
 
 let shuttingDown = false;
-const shutdown = (signal) => {
+const shutdown = async (signal) => {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(JSON.stringify({ level: "info", event: "server_shutdown", signal, at: new Date().toISOString() }));
-  server.close(() => process.exit(0));
+  clearInterval(coordinationTimer);
+  server.close(async () => {
+    await Promise.allSettled([store.close(), coordination.close()]);
+    process.exit(0);
+  });
   setTimeout(() => process.exit(1), 5000).unref();
 };
 process.on("SIGTERM", () => shutdown("SIGTERM"));
