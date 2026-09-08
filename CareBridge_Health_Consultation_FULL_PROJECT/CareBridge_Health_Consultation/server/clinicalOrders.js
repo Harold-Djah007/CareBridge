@@ -1,3 +1,5 @@
+import { evaluateMedicationSafety } from "./clinicalSafety.js";
+
 const ORDER_TYPES = new Set(["lab", "imaging", "medication", "procedure"]);
 const ORDER_STATUSES = new Set(["draft", "active", "in_progress", "completed", "cancelled"]);
 const TRANSITIONS = {
@@ -15,6 +17,7 @@ function ensureOrders(db) {
   if (!Array.isArray(db.clinicalOrders)) db.clinicalOrders = [];
   if (!Array.isArray(db.diagnosticReports)) db.diagnosticReports = [];
   if (!Array.isArray(db.labs)) db.labs = [];
+  if (!Array.isArray(db.safetyOverrides)) db.safetyOverrides = [];
   return db.clinicalOrders;
 }
 
@@ -38,6 +41,7 @@ function enrich(db, order, safeUser) {
     patient: safeUser(patientFor(db, order.patientId) || {}),
     orderedBy: safeUser(clinicianFor(db, order.orderedById) || {}),
     lastUpdatedBy: safeUser(clinicianFor(db, order.lastUpdatedById) || {}),
+    resultAcknowledgedBy: order.resultAcknowledgedById ? safeUser(clinicianFor(db, order.resultAcknowledgedById) || {}) : null,
   };
 }
 
@@ -81,6 +85,7 @@ function fileCompletedResult(db, order, actor) {
       flag: order.resultFlag || "review",
       orderedBy: clinicianFor(db, order.orderedById)?.name || "CareBridge clinician",
       resultedBy: actor?.name || "Clinical team",
+      acknowledgedAt: null,
     };
     db.labs.push(record);
     order.resultRecordId = record.id;
@@ -103,6 +108,7 @@ function fileCompletedResult(db, order, actor) {
       bodySite: order.bodySite || "",
       orderedBy: clinicianFor(db, order.orderedById)?.name || "CareBridge clinician",
       resultedBy: actor?.name || "Clinical team",
+      acknowledgedAt: null,
     };
     db.diagnosticReports.push(report);
     order.resultRecordId = report.id;
@@ -120,6 +126,7 @@ export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, em
     else if (req.query.patientId) rows = rows.filter((order) => order.patientId === req.query.patientId);
     if (req.query.type) rows = rows.filter((order) => order.type === req.query.type);
     if (req.query.status) rows = rows.filter((order) => order.status === req.query.status);
+    if (req.query.unacknowledged === "1") rows = rows.filter((order) => order.status === "completed" && order.result && !order.resultAcknowledgedAt);
     rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     res.json(rows.map((order) => enrich(db, order, safeUser)));
   });
@@ -149,6 +156,16 @@ export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, em
     if (codeError) return res.status(400).json({ message: codeError });
 
     ensureOrders(db);
+    const safety = type === "medication" ? evaluateMedicationSafety(db, patientId, title) : { safe: true, warnings: [], checkedAt: null };
+    const overrideReason = cleanText(req.body.safetyOverrideReason);
+    if (!safety.safe && !overrideReason) {
+      return res.status(409).json({
+        message: "A high-severity medication safety warning must be reviewed before this order can be placed.",
+        code: "CLINICAL_SAFETY_BLOCK",
+        safety,
+      });
+    }
+
     const now = new Date().toISOString();
     const order = {
       id: nid("ord"),
@@ -174,9 +191,17 @@ export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, em
       resultFlag: "",
       resultRecordId: null,
       resultResourceType: null,
+      resultAcknowledgedAt: null,
+      resultAcknowledgedById: null,
+      safetyAssessment: safety,
+      safetyOverrideReason: overrideReason || "",
     };
     db.clinicalOrders.push(order);
     writeAudit(db, { actorId: req.authUser.id, action: "order.create", entity: "clinical-order", entityId: order.id, detail: `${type}: ${title} for ${patientId}` });
+    if (!safety.safe && overrideReason) {
+      db.safetyOverrides.push({ id: nid("sov"), orderId: order.id, patientId, warnings: safety.warnings, reason: overrideReason, actorId: req.authUser.id, createdAt: now });
+      writeAudit(db, { actorId: req.authUser.id, action: "safety.override", entity: "clinical-order", entityId: order.id, detail: overrideReason });
+    }
     if (order.status === "active") {
       notify(db, patientId, `${type === "lab" ? "Lab" : type === "imaging" ? "Imaging" : type === "medication" ? "Medication" : "Procedure"} order placed`, `${title} was added to your care plan.`);
       await emailPatient(db, patientId, {
