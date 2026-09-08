@@ -217,6 +217,62 @@
   gap: 6px;
 }
 
+/* Modal priority: keep admission/booking sheets above sticky CareBridge chrome.
+   The route frame intentionally receives the highest local stacking context while a
+   modal is mounted, because fixed descendants cannot otherwise outrank a sticky
+   patient dock if an ancestor has established a stacking context. */
+body:has(.px-modal-backdrop) {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.cbv6-app:has(.px-modal-backdrop) .cbv6-shell,
+.cbv6-app:has(.px-modal-backdrop) .cbv6-main,
+.cbv6-app:has(.px-modal-backdrop) .cbv6-content,
+.cbv6-app:has(.px-modal-backdrop) .cbv6-route-frame {
+  position: relative;
+  z-index: 10000 !important;
+}
+
+.cbv6-app:has(.px-modal-backdrop) .cbv6-route-frame {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+.cbv6-app:has(.px-modal-backdrop) .cbv6-topbar,
+.cbv6-app:has(.px-modal-backdrop) .cbv6-patient-dock,
+.cbv6-app:has(.px-modal-backdrop) .cbv6-mobile-nav,
+.cbv6-app:has(.px-modal-backdrop) .cbv6-context-strip {
+  z-index: 1 !important;
+  pointer-events: none !important;
+}
+
+.cbv6-app:has(.px-modal-backdrop) .cbv6-patient-dock-inner {
+  pointer-events: none !important;
+}
+
+.cbv6-app .px-modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  z-index: 20000 !important;
+  isolation: isolate;
+  overflow: hidden !important;
+  background: rgba(4, 16, 23, .54) !important;
+  backdrop-filter: blur(10px) saturate(90%) !important;
+}
+
+.cbv6-app .px-modal-backdrop > .px-booking-sheet,
+.cbv6-app .px-modal-backdrop > form {
+  position: relative;
+  z-index: 1;
+  max-height: calc(100dvh - 44px) !important;
+}
+
 .cbv6-app.cbv6-theme-midnight .status.discharged,
 .cbv6-app.cbv6-theme-midnight .status.completed {
   color: #8fe2c8 !important;
@@ -243,5 +299,16 @@
   }
   .cbv6-app .px-live-alert-state {
     grid-column: 2;
+  }
+
+  .cbv6-app .px-modal-backdrop {
+    padding: 12px !important;
+    align-items: flex-end !important;
+  }
+  .cbv6-app .px-modal-backdrop > .px-booking-sheet,
+  .cbv6-app .px-modal-backdrop > form {
+    width: 100% !important;
+    max-height: calc(100dvh - 24px) !important;
+    border-radius: 18px 18px 12px 12px !important;
   }
 }
