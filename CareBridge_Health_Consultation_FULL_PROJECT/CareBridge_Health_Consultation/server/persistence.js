@@ -8,9 +8,31 @@ function ensureParent(file) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
 }
 
-function fsyncFile(file) {
-  const fd = fs.openSync(file, "r");
-  try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+function flushFd(fd) {
+  try {
+    fs.fsyncSync(fd);
+    return true;
+  } catch (error) {
+    // Some Windows filesystems/drivers reject fsync even for a valid regular
+    // file descriptor. The write itself has already completed at this point;
+    // keep atomic rename semantics while treating only known unsupported
+    // Windows flush errors as a best-effort durability downgrade.
+    const unsupportedOnWindows = process.platform === "win32" && ["EPERM", "EINVAL", "ENOTSUP", "ENOSYS"].includes(error?.code);
+    if (unsupportedOnWindows) return false;
+    throw error;
+  }
+}
+
+function writeFileDurably(file, contents) {
+  const fd = fs.openSync(file, "w", 0o600);
+  let flushed = false;
+  try {
+    fs.writeFileSync(fd, contents, { encoding: "utf8" });
+    flushed = flushFd(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  return flushed;
 }
 
 function fsyncDir(dir) {
@@ -18,7 +40,8 @@ function fsyncDir(dir) {
     const fd = fs.openSync(dir, "r");
     try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
   } catch {
-    // Directory fsync is not supported on every platform/filesystem.
+    // Directory fsync is not supported on every platform/filesystem (notably
+    // Windows). Atomic rename still protects against partially written files.
   }
 }
 
@@ -29,6 +52,7 @@ export function createDurableJsonStore(file, { backups = 3 } = {}) {
   let writes = 0;
   let recoveries = 0;
   let lastWriteAt = null;
+  let lastFileFlush = null;
 
   ensureParent(dataFile);
 
@@ -57,9 +81,9 @@ export function createDurableJsonStore(file, { backups = 3 } = {}) {
       try {
         const { parsed, raw } = parseFile(candidate);
         const temp = `${dataFile}.recover-${process.pid}-${Date.now()}`;
-        fs.writeFileSync(temp, raw, { encoding: "utf8", mode: 0o600 });
-        fsyncFile(temp);
+        lastFileFlush = writeFileDurably(temp, raw);
         fs.renameSync(temp, dataFile);
+        fsyncDir(path.dirname(dataFile));
         fs.writeFileSync(checksumFile, `${sha256(raw)}\n`, { encoding: "utf8", mode: 0o600 });
         recoveries += 1;
         return parsed;
@@ -90,12 +114,11 @@ export function createDurableJsonStore(file, { backups = 3 } = {}) {
 
     ensureParent(dataFile);
     rotateBackups();
-    fs.writeFileSync(temp, raw, { encoding: "utf8", mode: 0o600 });
-    fsyncFile(temp);
+    lastFileFlush = writeFileDurably(temp, raw);
     fs.renameSync(temp, dataFile);
     fsyncDir(dir);
     fs.writeFileSync(checksumFile, `${digest}\n`, { encoding: "utf8", mode: 0o600 });
-    fs.appendFileSync(journalFile, `${JSON.stringify({ at: new Date().toISOString(), sha256: digest, bytes: Buffer.byteLength(raw), pid: process.pid })}\n`, { encoding: "utf8", mode: 0o600 });
+    fs.appendFileSync(journalFile, `${JSON.stringify({ at: new Date().toISOString(), sha256: digest, bytes: Buffer.byteLength(raw), pid: process.pid, fileFlushed: lastFileFlush })}\n`, { encoding: "utf8", mode: 0o600 });
     writes += 1;
     lastWriteAt = new Date().toISOString();
     return db;
@@ -119,7 +142,7 @@ export function createDurableJsonStore(file, { backups = 3 } = {}) {
     }
     return {
       provider: "atomic-json",
-      durableWrite: "temp+fsync+rename",
+      durableWrite: "temp+write-fd-flush+atomic-rename",
       readable,
       checksumValid,
       backups: Array.from({ length: backups }, (_, index) => fs.existsSync(backupPath(index + 1))).filter(Boolean).length,
@@ -128,6 +151,7 @@ export function createDurableJsonStore(file, { backups = 3 } = {}) {
       writes,
       recoveries,
       lastWriteAt,
+      fileFlushSupported: lastFileFlush,
       error,
     };
   }
