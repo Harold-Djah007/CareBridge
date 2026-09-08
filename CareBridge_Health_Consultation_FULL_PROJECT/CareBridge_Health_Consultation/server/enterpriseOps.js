@@ -69,7 +69,7 @@ function environmentChecks() {
   const production = process.env.NODE_ENV === "production";
   const checks = [
     process.env.CLIENT_URL || process.env.CLIENT_URLS ? ok("env.origin", "Origin allow-list", "Client origin configuration is present.") : warn("env.origin", "Origin allow-list", "CLIENT_URL/CLIENT_URLS is not configured."),
-    process.env.FЛW_SECRET_KEY || process.env.FLW_SECRET_KEY ? ok("env.payments", "Payment provider secret", "Flutterwave server secret is configured.") : warn("env.payments", "Payment provider secret", "Flutterwave secret is not configured; hosted payments cannot be production-ready."),
+    process.env.FLW_SECRET_KEY ? ok("env.payments", "Payment provider secret", "Flutterwave server secret is configured.") : warn("env.payments", "Payment provider secret", "Flutterwave secret is not configured; hosted payments cannot be production-ready."),
     process.env.SMTP_HOST ? ok("env.smtp", "SMTP delivery", "SMTP host is configured for real email delivery.") : warn("env.smtp", "SMTP delivery", "SMTP_HOST is not configured; production email delivery is not ready."),
     process.env.SESSION_DAYS ? ok("env.sessions", "Session lifetime", "Explicit session lifetime is configured.") : warn("env.sessions", "Session lifetime", "Using default session lifetime."),
   ];
