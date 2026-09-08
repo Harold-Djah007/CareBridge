@@ -40,6 +40,7 @@ const NAV = {
     { group: "Clinical", items: [
       { to: "/care", icon: Users, label: "Caseload", primary: true },
       { to: "/records", icon: FolderOpen, label: "Patient charts", primary: true },
+      { to: "/orders", icon: ClipboardList, label: "Clinical orders", primary: true },
       { to: "/prescriptions", icon: Pill, label: "Prescriptions" },
       { to: "/wards", icon: BedDouble, label: "Admissions", badge: "wards" },
     ]},
@@ -52,6 +53,7 @@ const NAV = {
   nurse: [
     { group: "Dispensary", items: [
       { to: "/home", icon: ClipboardList, label: "Dispensing board", end: true, badge: "queue", primary: true },
+      { to: "/orders", icon: Stethoscope, label: "Clinical orders", primary: true },
       { to: "/pharmacy-stock", icon: Pill, label: "Inventory", primary: true },
       { to: "/messages", icon: MessageCircle, label: "Clinical messages", badge: "messages", primary: true },
     ]},
@@ -69,6 +71,7 @@ const NAV = {
     ]},
     { group: "Control", items: [
       { to: "/admin/patient-experience", icon: Eye, label: "Patient experience", primary: true },
+      { to: "/orders", icon: ClipboardList, label: "Clinical orders", primary: true },
       { to: "/admin/cases", icon: FolderKanban, label: "Case workflow" },
       { to: "/admin/reports", icon: ScrollText, label: "Analytics & audit", primary: true },
       { to: "/pay", icon: Receipt, label: "Finance & receipts" },
@@ -91,6 +94,7 @@ const PAGE_META = [
   ["/admin/users", "People", "Patients, clinicians and access"],
   ["/admin/cases", "Case workflow", "Operational cases and follow-up"],
   ["/admin", "Operations home", "Live hospital overview"],
+  ["/orders", "Clinical orders", "CPOE, diagnostic work and result lifecycle"],
   ["/appointments", "Appointments", "Schedule and manage care"],
   ["/messages", "Messages", "Secure care communication"],
   ["/video", "Teleconsultation", "Private video consultation"],
