@@ -42,8 +42,30 @@
 .cbv6-route-frame,
 .cbv6-content,
 .cbv6-main,
-.cbv6-shell {
+.cbv6-shell,
+.cbx-settings-page,
+.cbx-settings-shell,
+.cbx-settings-main,
+.cbx-settings-document,
+.cbx-settings-section,
+.cbx-settings-profile-line,
+.cbx-settings-form-grid,
+.cbx-settings-inline-setting {
   min-width: 0;
+  max-width: 100%;
+}
+
+/* The legacy duty glow is an absolutely positioned sibling of the pill. Without
+   a positioned toggle wrapper its -8px inset resolves against a much larger
+   settings ancestor and creates document-level horizontal overflow. */
+.duty-toggle {
+  position: relative;
+  min-width: min(260px, 100%);
+  max-width: 100%;
+}
+.duty-toggle .duty-pill {
+  min-width: min(248px, 100%);
+  max-width: 100%;
 }
 
 .cbv6-content img,
