@@ -1,3 +1,5 @@
+import { mountPatientExperience } from "./patientExperience.js";
+
 const nid = (p) => `${p}${Date.now()}${Math.floor(Math.random() * 900)}`;
 
 const CATEGORIES = ["billing", "clinical", "technical", "account", "admissions", "other"];
@@ -20,6 +22,8 @@ async function pingAdmins(db, { notify, emailPatient }, { title, body, email }) 
 }
 
 export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPatient }) {
+  mountPatientExperience(app, { readDb, writeDb });
+
   app.get("/api/tickets", (req, res) => {
     const db = readDb();
     const { userId, role } = req.query;
