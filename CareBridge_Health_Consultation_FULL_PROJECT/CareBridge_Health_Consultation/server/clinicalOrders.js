@@ -13,6 +13,8 @@ const cleanText = (value, fallback = "") => String(value ?? fallback).trim();
 
 function ensureOrders(db) {
   if (!Array.isArray(db.clinicalOrders)) db.clinicalOrders = [];
+  if (!Array.isArray(db.diagnosticReports)) db.diagnosticReports = [];
+  if (!Array.isArray(db.labs)) db.labs = [];
   return db.clinicalOrders;
 }
 
@@ -59,6 +61,55 @@ function writeAudit(db, entry) {
     entityId: entry.entityId || "",
     detail: entry.detail || "",
   });
+}
+
+function fileCompletedResult(db, order, actor) {
+  if (order.status !== "completed" || !order.result || order.resultRecordId) return null;
+  const date = new Date().toISOString().slice(0, 10);
+
+  if (order.type === "lab") {
+    const record = {
+      id: nid("lab"),
+      patientId: order.patientId,
+      orderId: order.id,
+      name: order.title,
+      code: order.code || "",
+      codeSystem: order.codeSystem || "",
+      date,
+      status: "final",
+      result: order.result,
+      flag: order.resultFlag || "review",
+      orderedBy: clinicianFor(db, order.orderedById)?.name || "CareBridge clinician",
+      resultedBy: actor?.name || "Clinical team",
+    };
+    db.labs.push(record);
+    order.resultRecordId = record.id;
+    order.resultResourceType = "Observation";
+    return record;
+  }
+
+  if (order.type === "imaging") {
+    const report = {
+      id: nid("dr"),
+      patientId: order.patientId,
+      orderId: order.id,
+      title: order.title,
+      code: order.code || "",
+      codeSystem: order.codeSystem || "",
+      date,
+      status: "final",
+      result: order.result,
+      flag: order.resultFlag || "review",
+      bodySite: order.bodySite || "",
+      orderedBy: clinicianFor(db, order.orderedById)?.name || "CareBridge clinician",
+      resultedBy: actor?.name || "Clinical team",
+    };
+    db.diagnosticReports.push(report);
+    order.resultRecordId = report.id;
+    order.resultResourceType = "DiagnosticReport";
+    return report;
+  }
+  return null;
 }
 
 export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, emailPatient }) {
@@ -121,6 +172,8 @@ export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, em
       resultCode: "",
       resultCodeSystem: "",
       resultFlag: "",
+      resultRecordId: null,
+      resultResourceType: null,
     };
     db.clinicalOrders.push(order);
     writeAudit(db, { actorId: req.authUser.id, action: "order.create", entity: "clinical-order", entityId: order.id, detail: `${type}: ${title} for ${patientId}` });
@@ -174,7 +227,10 @@ export function mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, em
     order.updatedAt = new Date().toISOString();
     if (nextStatus === "completed") order.completedAt = order.completedAt || order.updatedAt;
 
+    const resultRecord = fileCompletedResult(db, order, req.authUser);
     writeAudit(db, { actorId: req.authUser.id, action: statusChanged ? `order.${nextStatus}` : "order.update", entity: "clinical-order", entityId: order.id, detail: `${order.type}: ${order.title}` });
+    if (resultRecord) writeAudit(db, { actorId: req.authUser.id, action: "result.file", entity: order.resultResourceType === "DiagnosticReport" ? "diagnostic-report" : "lab-result", entityId: resultRecord.id, detail: `${order.title} result filed from ${order.id}` });
+
     if (statusChanged && ["completed", "cancelled"].includes(nextStatus)) {
       notify(db, order.patientId, nextStatus === "completed" ? "Clinical result available" : "Clinical order cancelled", nextStatus === "completed" ? `${order.title} is complete${order.result ? `: ${order.result}` : "."}` : `${order.title} was cancelled.`);
       await emailPatient(db, order.patientId, {
