@@ -26,6 +26,7 @@ import "./carebridge-premium-viewport.css";
 import "./carebridge-live-state.css";
 import "./carebridge-notification-portal.css";
 import "./carebridge-patient-experience.css";
+import "./carebridge-clinical-orders.css";
 import { homeFor } from "./utils";
 import { AuthProvider, ToastProvider, useAuth } from "./state";
 import { PatientExperienceProvider, usePatientExperience } from "./patientExperience";
@@ -50,6 +51,7 @@ const VideoConsultation = lazy(() => import("./pages/VideoConsultation"));
 const CareTeam = lazy(() => import("./pages/CareTeam"));
 const Alerts = lazy(() => import("./pages/Alerts"));
 const ClinicalRecord = lazy(() => import("./pages/ClinicalRecord"));
+const ClinicalOrders = lazy(() => import("./pages/ClinicalOrders"));
 const Help = lazy(() => import("./pages/Help"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const AdminOverview = lazy(() => import("./pages/admin/Overview"));
@@ -139,6 +141,7 @@ function AppRoutes() {
               <Route path="/guide" element={<Help />} />
               <Route path="/records" element={<PatientFeatureRoute feature="records"><RoleRoute roles={["patient", "doctor", "admin"]}><ClinicalRecord /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/records/:patientId" element={<RoleRoute roles={["doctor", "admin"]}><ClinicalRecord /></RoleRoute>} />
+              <Route path="/orders" element={<RoleRoute roles={["doctor", "nurse", "admin"]}><ClinicalOrders /></RoleRoute>} />
               <Route path="/pay" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient", "admin"]}><Pay /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/payment/callback" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient"]}><PaymentCallback /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/payments/:id" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient", "admin"]}><PaymentStatus /></RoleRoute></PatientFeatureRoute>} />
