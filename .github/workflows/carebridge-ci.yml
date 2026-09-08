@@ -38,6 +38,9 @@ jobs:
           for file in server/*.js; do
             node --check "$file"
           done
+          for file in server/*.mjs; do
+            node --check "$file"
+          done
 
       - name: Build web client
         run: npm run build --prefix client
@@ -47,4 +50,11 @@ jobs:
         run: |
           set -euo pipefail
           cp server/data/db.json /tmp/carebridge-ci-db.json
-          DATA_FILE=/tmp/carebridge-ci-db.json PORT=5055 node server/ci-role-regression.mjs
+          DATA_FILE=/tmp/carebridge-ci-db.json PORT=5055 LOG_LEVEL=silent node server/ci-role-regression.mjs
+
+      - name: Security and persistence regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-security-ci-db.json
+          DATA_FILE=/tmp/carebridge-security-ci-db.json PORT=5056 LOG_LEVEL=silent node server/ci-security-regression.mjs
