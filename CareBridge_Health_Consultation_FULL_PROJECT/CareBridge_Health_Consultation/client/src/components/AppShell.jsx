@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity, BedDouble, Bell, Building2, CalendarDays, ChevronRight, ClipboardList, Command,
-  FolderKanban, FolderOpen, HeartPulse, Inbox, LayoutDashboard, LifeBuoy, LogOut,
+  Eye, FolderKanban, FolderOpen, HeartPulse, Inbox, LayoutDashboard, LifeBuoy, LogOut,
   Mail, MessageCircle, Pill, Receipt, Search, ScrollText, Settings2,
   ShoppingBag, Sparkles, Stethoscope, Users, Video, Wifi, X,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { CartMastButton, useCart } from "../ShopCart";
 import { useAuth, useToast } from "../state";
+import { usePatientExperience } from "../patientExperience";
 import { api, socketOptions, socketUrl } from "../api";
 import { HOSPITAL } from "../utils";
 import { LiveClock } from "./LiveMeter";
@@ -19,15 +20,15 @@ import { photoFor, sceneFor } from "../imagery";
 const NAV = {
   patient: [
     { to: "/home", icon: LayoutDashboard, label: "Home", end: true, primary: true },
-    { to: "/appointments", icon: CalendarDays, label: "Appointments", primary: true },
-    { to: "/records", icon: FolderOpen, label: "Health record", primary: true },
-    { to: "/messages", icon: MessageCircle, label: "Messages", badge: "messages", primary: true },
-    { to: "/prescriptions", icon: ClipboardList, label: "Prescriptions" },
-    { to: "/wards", icon: BedDouble, label: "Admissions", badge: "wards" },
-    { to: "/pay", icon: ShoppingBag, label: "Shop & pay", primary: true },
-    { to: "/care", icon: Stethoscope, label: "Care team" },
-    { to: "/alerts", icon: Inbox, label: "Notifications", badge: "notifications" },
-    { to: "/support", icon: LifeBuoy, label: "Support", badge: "tickets" },
+    { to: "/appointments", icon: CalendarDays, label: "Appointments", feature: "appointments", primary: true },
+    { to: "/records", icon: FolderOpen, label: "Health record", feature: "records", primary: true },
+    { to: "/messages", icon: MessageCircle, label: "Messages", feature: "messages", badge: "messages", primary: true },
+    { to: "/prescriptions", icon: ClipboardList, label: "Prescriptions", feature: "prescriptions" },
+    { to: "/wards", icon: BedDouble, label: "Admissions", feature: "admissions", badge: "wards" },
+    { to: "/pay", icon: ShoppingBag, label: "Shop & pay", feature: "shop", primary: true },
+    { to: "/care", icon: Stethoscope, label: "Care team", feature: "careTeam" },
+    { to: "/alerts", icon: Inbox, label: "Notifications", feature: "notifications", badge: "notifications" },
+    { to: "/support", icon: LifeBuoy, label: "Support", feature: "support", badge: "tickets" },
   ],
   doctor: [
     { group: "Today", items: [
@@ -67,6 +68,7 @@ const NAV = {
       { to: "/admin/users", icon: Users, label: "People", primary: true },
     ]},
     { group: "Control", items: [
+      { to: "/admin/patient-experience", icon: Eye, label: "Patient experience", primary: true },
       { to: "/admin/cases", icon: FolderKanban, label: "Case workflow" },
       { to: "/admin/reports", icon: ScrollText, label: "Analytics & audit", primary: true },
       { to: "/pay", icon: Receipt, label: "Finance & receipts" },
@@ -82,6 +84,7 @@ const NAV = {
 };
 
 const PAGE_META = [
+  ["/admin/patient-experience", "Patient experience", "Choose what patients see in CareBridge"],
   ["/admin/reports", "Analytics & audit", "Operational intelligence and governance"],
   ["/admin/appointments", "Clinic operations", "Hospital diary and encounter flow"],
   ["/admin/hospital", "Capacity & beds", "Occupancy, admissions and bed allocation"],
@@ -132,6 +135,7 @@ function flatNav(role) {
 export default function AppShell() {
   const { user, logout } = useAuth();
   const { push } = useToast();
+  const { config: patientExperience, moduleVisible } = usePatientExperience();
   const cart = useCart();
   const navigate = useNavigate();
   const location = useLocation();
@@ -149,8 +153,11 @@ export default function AppShell() {
   const meta = pageMeta(location.pathname, user.role);
   const scene = sceneFor(location.pathname, user.role);
   const scenePhoto = photoFor(scene);
-  const allNav = flatNav(user.role);
+  const rawNav = flatNav(user.role);
+  const allNav = isPatient ? rawNav.filter((item) => !item.feature || moduleVisible(item.feature)) : rawNav;
   const mobileNav = allNav.filter((item) => item.primary).slice(0, 5);
+  const patientShopVisible = !isPatient || moduleVisible("shop");
+  const patientNotificationsVisible = !isPatient || moduleVisible("notifications");
 
   const loadNotes = () => api(`/notifications/${user.id}`).then((rows) => { setNotes(rows); return rows; }).catch(() => []);
   const loadBadges = () => api(`/badges?userId=${user.id}&role=${user.role}`).then((next) => { setBadges({ ...EMPTY_BADGES, ...next }); return next; }).catch(() => EMPTY_BADGES);
@@ -202,6 +209,13 @@ export default function AppShell() {
     setPaletteQuery("");
     loadBadges();
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (isPatient && !moduleVisible("notifications")) {
+      setNoticeOpen(false);
+      setSelectedNotice(null);
+    }
+  }, [isPatient, patientExperience]);
 
   const unread = Number(badges.notifications || 0);
   const roleName = user.role === "doctor" ? "Clinician" : user.role === "nurse" ? "Pharmacy" : user.role === "admin" ? "Operations" : "Patient";
@@ -280,10 +294,10 @@ export default function AppShell() {
             <Wifi size={14} /><span>{connected ? "Live" : "Syncing"}</span>
           </span>
           <LiveClock />
-          {isPatient && <CartMastButton />}
-          <button className="cbv6-icon-btn" type="button" onClick={() => setNoticeOpen((value) => !value)} aria-label="Notifications">
+          {isPatient && patientShopVisible && <CartMastButton />}
+          {patientNotificationsVisible && <button className="cbv6-icon-btn" type="button" onClick={() => setNoticeOpen((value) => !value)} aria-label="Notifications">
             <Bell size={18} />{unread > 0 && <em>{unread > 99 ? "99+" : unread}</em>}
-          </button>
+          </button>}
           <button className="cbv6-profile" type="button" onClick={() => navigate("/settings")}>
             <Avatar person={user} className="small" />
             <span><strong>{user.name}</strong><small>{userMeta}</small></span>
@@ -335,7 +349,7 @@ export default function AppShell() {
             <button type="button" onClick={() => navigate("/settings?tab=experience")}><Settings2 size={15} /> Personalize</button>
           </div>
 
-          {noticeOpen && (
+          {noticeOpen && patientNotificationsVisible && (
             <aside className="cbv6-notice-panel" role="dialog" aria-label="Notifications">
               <header><div><small>Live feed</small><strong>Notifications</strong></div><button type="button" onClick={() => setNoticeOpen(false)}><X size={16} /></button></header>
               <div>
@@ -352,7 +366,7 @@ export default function AppShell() {
 
           <div className="cbv6-content">
             <div key={location.pathname} className="cbv6-route-frame">
-              <Outlet context={{ badges, refreshBadges: loadBadges, refreshNotifications: loadNotes }} />
+              <Outlet context={{ badges, refreshBadges: loadBadges, refreshNotifications: loadNotes, patientExperience }} />
             </div>
           </div>
         </main>
