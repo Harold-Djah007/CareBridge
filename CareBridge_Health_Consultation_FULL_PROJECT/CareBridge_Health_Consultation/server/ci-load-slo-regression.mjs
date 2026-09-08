@@ -21,15 +21,23 @@ const stop = () => { if (!server.killed) server.kill("SIGTERM"); };
 process.on("exit", stop);
 
 async function waitForReady() {
+  let lastStatus = 0;
+  let lastBody = "";
+  let lastError = "";
   for (let attempt = 0; attempt < 40; attempt += 1) {
     if (server.exitCode != null) throw new Error(`Server exited early\n${log}`);
     try {
       const response = await fetch(`${base}/api/ready`);
+      lastStatus = response.status;
+      lastBody = await response.text();
+      lastError = "";
       if (response.ok) return;
-    } catch {}
+    } catch (error) {
+      lastError = error.message;
+    }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Server not ready\n${log}`);
+  throw new Error(`Server not ready (status=${lastStatus}, body=${lastBody || "<empty>"}, fetchError=${lastError || "<none>"})\n${log}`);
 }
 
 async function request(path, token = "") {
@@ -77,7 +85,7 @@ try {
   const p95 = percentile(timings, 0.95);
   const p99 = percentile(timings, 0.99);
   const max = Math.max(...timings);
-  if (failures.length) throw new Error(`${failures.length}/${total} authenticated load requests failed`);
+  if (failures.length) throw new Error(`${failures.length}/${total} authenticated load requests failed; statuses=${JSON.stringify(failures.reduce((acc, row) => ({ ...acc, [row.status]: (acc[row.status] || 0) + 1 }), {}))}`);
   if (missingCorrelation.length) throw new Error(`${missingCorrelation.length}/${total} load responses lacked request/trace correlation`);
   if (p95 > Number(process.env.CI_P95_BUDGET_MS || 1000)) throw new Error(`P95 ${p95.toFixed(1)}ms exceeded SLO budget`);
   console.log(`✓ authenticated concurrency: ${total} requests @ ${concurrency} workers, 0 errors`);
