@@ -59,12 +59,21 @@ async function request(base, path, token = "", init = {}) {
   return { response, body, text };
 }
 
-async function login(base) {
-  const result = await request(base, "/api/login", "", {
+async function requestWithDiagnostics(instance, base, path, token = "", init = {}) {
+  try {
+    return await request(base, path, token, init);
+  } catch (error) {
+    const state = instance?.child?.exitCode == null ? "running" : `exited(${instance.child.exitCode})`;
+    throw new Error(`PostgreSQL runtime request ${init.method || "GET"} ${path} terminated while server was ${state}: ${error.message}\n--- CareBridge child log ---\n${instance?.getLog?.() || "<no child log>"}`);
+  }
+}
+
+async function login(instance, base) {
+  const result = await requestWithDiagnostics(instance, base, "/api/login", "", {
     method: "POST",
     body: JSON.stringify({ email: patient.email, password: patient.password, expectedRole: "patient" }),
   });
-  if (!result.response.ok || !result.body?.token) throw new Error(`PostgreSQL runtime login failed: ${result.response.status} ${result.text}`);
+  if (!result.response.ok || !result.body?.token) throw new Error(`PostgreSQL runtime login failed: ${result.response.status} ${result.text}\n${instance.getLog()}`);
   return result.body;
 }
 
@@ -89,17 +98,17 @@ try {
   }
   console.log("✓ PostgreSQL promoted to primary CareBridge runtime");
 
-  const auth1 = await login(one.base);
+  const auth1 = await login(first, one.base);
   const marker = `CI-PG-${Date.now()}`;
-  const patch = await request(one.base, `/api/users/${auth1.user.id}`, auth1.token, {
+  const patch = await requestWithDiagnostics(first, one.base, `/api/users/${auth1.user.id}`, auth1.token, {
     method: "PATCH",
     body: JSON.stringify({ city: marker }),
   });
-  if (!patch.response.ok || patch.body?.city !== marker) throw new Error(`PostgreSQL runtime mutation failed: ${patch.response.status} ${patch.text}`);
+  if (!patch.response.ok || patch.body?.city !== marker) throw new Error(`PostgreSQL runtime mutation failed: ${patch.response.status} ${patch.text}\n${first.getLog()}`);
 
   const rowAfterWrite = await pool.query("SELECT version, payload FROM carebridge_state WHERE id = 'primary'");
   if (!rowAfterWrite.rowCount || rowAfterWrite.rows[0].payload?.users?.find((user) => user.id === auth1.user.id)?.city !== marker) {
-    throw new Error("API mutation was not durably committed to PostgreSQL");
+    throw new Error(`API mutation was not durably committed to PostgreSQL\n${first.getLog()}`);
   }
   console.log(`✓ API mutation durably committed at PostgreSQL version ${rowAfterWrite.rows[0].version}`);
 
@@ -108,12 +117,12 @@ try {
 
   second = start(5059);
   const two = await waitForReady(second, 5059);
-  const auth2 = await login(two.base);
-  if (auth2.user?.city !== marker) throw new Error(`PostgreSQL restart lost API state: ${auth2.user?.city}`);
+  const auth2 = await login(second, two.base);
+  if (auth2.user?.city !== marker) throw new Error(`PostgreSQL restart lost API state: ${auth2.user?.city}\n${second.getLog()}`);
   console.log("✓ CareBridge restart reloads state from PostgreSQL system of record");
 
-  const sessions = await request(two.base, "/api/security/sessions", auth2.token);
-  if (!sessions.response.ok || !Array.isArray(sessions.body?.sessions)) throw new Error("PostgreSQL-backed session state unavailable after restart");
+  const sessions = await requestWithDiagnostics(second, two.base, "/api/security/sessions", auth2.token);
+  if (!sessions.response.ok || !Array.isArray(sessions.body?.sessions)) throw new Error(`PostgreSQL-backed session state unavailable after restart\n${second.getLog()}`);
   console.log("✓ authenticated session state persists through PostgreSQL runtime restart");
 
   console.log("CareBridge PostgreSQL primary-runtime regression passed.");
