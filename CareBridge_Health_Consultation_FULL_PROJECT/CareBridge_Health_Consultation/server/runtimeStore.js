@@ -5,7 +5,7 @@ const clone = (value) => structuredClone(value);
 const VERSION = Symbol("carebridgeStateVersion");
 
 function markVersion(payload, version) {
-  if (payload && typeof payload === "object") Object.defineProperty(payload, VERSION, { value: Number(version), enumerable: false, configurable: true });
+  if (payload && typeof payload === "object") Object.defineProperty(payload, VERSION, { value: Number(version), enumerable: false, configurable: true, writable: true });
   return payload;
 }
 
@@ -58,6 +58,7 @@ export async function createRuntimeStore(dataFile) {
   function write(db) {
     const expectedVersion = Number(db?.[VERSION] ?? currentVersion);
     const snapshot = clone(db);
+    markVersion(db, expectedVersion + 1);
     pending = pending.then(async () => {
       try {
         const saved = await repo.saveState(snapshot, { expectedVersion });
