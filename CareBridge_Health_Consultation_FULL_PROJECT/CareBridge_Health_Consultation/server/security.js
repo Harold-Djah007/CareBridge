@@ -2,6 +2,7 @@ import crypto from "crypto";
 
 const nowMs = () => Date.now();
 const requestId = () => crypto.randomUUID();
+const hex = (bytes) => crypto.randomBytes(bytes).toString("hex");
 
 function ipOf(req) {
   return String(req.ip || req.socket?.remoteAddress || "unknown").replace(/^::ffff:/, "");
@@ -25,6 +26,21 @@ const LIMITS = {
   web: { windowMs: 60_000, max: 900 },
 };
 
+function traceContext(req) {
+  const incoming = String(req.headers.traceparent || "").trim();
+  const match = incoming.match(/^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/i);
+  const traceId = match?.[1]?.toLowerCase() || hex(16);
+  const parentSpanId = match?.[2]?.toLowerCase() || null;
+  const flags = match?.[3]?.toLowerCase() || "01";
+  const spanId = hex(8);
+  return { traceId, spanId, parentSpanId, flags, traceparent: `00-${traceId}-${spanId}-${flags}` };
+}
+
+function routeKey(req) {
+  const raw = String(req.route?.path || req.path || req.originalUrl || "").split("?")[0];
+  return `${req.method} ${raw.replace(/\b(?:[a-f0-9]{8}-[a-f0-9-]{27,}|(?:apt|wb|rx|ord|claim|sess|smart|hl7|dcm)[A-Za-z0-9_-]+)\b/gi, ":id")}`.slice(0, 180);
+}
+
 export function installSecurity(app, { readiness } = {}) {
   const buckets = new Map();
   const stats = {
@@ -34,14 +50,18 @@ export function installSecurity(app, { readiness } = {}) {
     responses5xx: 0,
     rateLimited: 0,
     lastRequestAt: null,
+    routeLatency: {},
   };
   app.locals.securityMetrics = stats;
 
   app.use((req, res, next) => {
     const id = String(req.headers["x-request-id"] || requestId()).slice(0, 128);
+    const trace = traceContext(req);
     const started = process.hrtime.bigint();
     req.id = id;
+    req.trace = trace;
     res.setHeader("X-Request-Id", id);
+    res.setHeader("traceparent", trace.traceparent);
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -75,12 +95,28 @@ export function installSecurity(app, { readiness } = {}) {
     res.on("finish", () => {
       if (res.statusCode >= 500) stats.responses5xx += 1;
       else if (res.statusCode >= 400) stats.responses4xx += 1;
-      if (process.env.LOG_LEVEL === "silent") return;
       const durationMs = Number(process.hrtime.bigint() - started) / 1e6;
+      const key = routeKey(req);
+      const row = stats.routeLatency[key] || { count: 0, totalMs: 0, maxMs: 0, under250Ms: 0, errors: 0, lastAt: null };
+      row.count += 1;
+      row.totalMs += durationMs;
+      row.maxMs = Math.max(row.maxMs, durationMs);
+      if (durationMs <= 250) row.under250Ms += 1;
+      if (res.statusCode >= 500) row.errors += 1;
+      row.lastAt = new Date().toISOString();
+      stats.routeLatency[key] = row;
+      if (Object.keys(stats.routeLatency).length > 300) {
+        const oldest = Object.entries(stats.routeLatency).sort((a, b) => String(a[1].lastAt).localeCompare(String(b[1].lastAt))).slice(0, 50);
+        oldest.forEach(([oldKey]) => delete stats.routeLatency[oldKey]);
+      }
+      if (process.env.LOG_LEVEL === "silent") return;
       const record = {
         level: res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info",
         event: "http_request",
         requestId: id,
+        traceId: trace.traceId,
+        spanId: trace.spanId,
+        parentSpanId: trace.parentSpanId,
         method: req.method,
         path: String(req.originalUrl || "").split("?")[0],
         status: res.statusCode,
@@ -124,13 +160,14 @@ export function installSecurity(app, { readiness } = {}) {
     let details = {};
     try { details = typeof readiness === "function" ? readiness() : {}; } catch (error) { details = { error: error.message }; }
     const persistence = details.persistence || {};
-    const ready = persistence.readable !== false && !details.error;
+    const ready = persistence.readable !== false && persistence.error !== true && !details.error;
     res.status(ready ? 200 : 503).json({
       ok: ready,
       name: "CareBridge API",
       requestId: req.id,
+      traceId: req.trace?.traceId,
       uptimeSeconds: Math.round(process.uptime()),
-      security: { rateLimiting: true, csp: true, requestIds: true, structuredHttpLogs: true },
+      security: { rateLimiting: true, csp: true, requestIds: true, structuredHttpLogs: true, traceContext: true, latencySloTelemetry: true },
       ...details,
     });
   });
