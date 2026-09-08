@@ -1,6 +1,7 @@
 import { mountPatientExperience } from "./patientExperience.js";
 import { mountFhir } from "./fhir.js";
 import { mountClinicalOrders } from "./clinicalOrders.js";
+import { mountEnterpriseOps } from "./enterpriseOps.js";
 
 const nid = (p) => `${p}${Date.now()}${Math.floor(Math.random() * 900)}`;
 
@@ -27,6 +28,7 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
   mountPatientExperience(app, { readDb, writeDb });
   mountFhir(app, { readDb });
   mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, emailPatient });
+  mountEnterpriseOps(app, { readDb });
 
   app.get("/api/tickets", (req, res) => {
     const db = readDb();
