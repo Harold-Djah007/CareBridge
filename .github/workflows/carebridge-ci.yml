@@ -54,6 +54,13 @@ jobs:
       - name: Install client dependencies
         run: npm install --prefix client --no-audit --no-fund
 
+      - name: Install Chromium browser quality runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd client
+          npx playwright install --with-deps chromium
+
       - name: Syntax-check server modules
         shell: bash
         run: |
@@ -67,6 +74,9 @@ jobs:
 
       - name: Build web client
         run: npm run build --prefix client
+
+      - name: Client performance budget
+        run: npm run quality:budget --prefix client
 
       - name: Runtime regression across all authenticated roles
         shell: bash
@@ -127,3 +137,10 @@ jobs:
           set -euo pipefail
           cp server/data/db.json /tmp/carebridge-load-ci-db.json
           DATA_FILE=/tmp/carebridge-load-ci-db.json PORT=5062 LOG_LEVEL=silent CI_P95_BUDGET_MS=1000 node server/ci-load-slo-regression.mjs
+
+      - name: Browser UX quality regression across desktop and mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-browser-ci-db.json
+          CAREBRIDGE_E2E_DATA_FILE=/tmp/carebridge-browser-ci-db.json npm run quality:e2e --prefix client
