@@ -9,7 +9,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MIGRATIONS_DIR = path.join(__dirname, "db", "migrations");
 
-const stableJson = (value) => JSON.stringify(value);
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
+  }
+  return value;
+}
+
+const stableJson = (value) => JSON.stringify(canonical(value));
 const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
 
 export function createPostgresRepository(connectionString = process.env.DATABASE_URL) {
@@ -108,7 +116,7 @@ export function createPostgresRepository(connectionString = process.env.DATABASE
         await client.query(
           `INSERT INTO carebridge_outbox(id, topic, aggregate_type, aggregate_id, payload)
            VALUES ($1, $2, $3, $4, $5::jsonb)`,
-          [event.id || crypto.randomUUID(), event.topic, event.aggregateType || "system", event.aggregateId || id, JSON.stringify(event.payload || {})]
+          [event.id || crypto.randomUUID(), event.topic, event.aggregateType || "system", event.aggregateId || id, stableJson(event.payload || {})]
         );
       }
       await client.query("COMMIT");
@@ -130,12 +138,12 @@ export function createPostgresRepository(connectionString = process.env.DATABASE
       const previousHash = previous.rows[0]?.event_hash || "";
       const id = crypto.randomUUID();
       const createdAt = new Date().toISOString();
-      const body = JSON.stringify({ id, actorId, action, entityType, entityId, detail, previousHash, createdAt });
+      const body = stableJson({ id, actorId, action, entityType, entityId, detail, previousHash, createdAt });
       const eventHash = digest(body);
       await client.query(
         `INSERT INTO carebridge_audit_events(id, actor_id, action, entity_type, entity_id, detail, previous_hash, event_hash, created_at)
          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)`,
-        [id, actorId || null, action, entityType, entityId || null, JSON.stringify(detail || {}), previousHash || null, eventHash, createdAt]
+        [id, actorId || null, action, entityType, entityId || null, stableJson(detail || {}), previousHash || null, eventHash, createdAt]
       );
       await client.query("COMMIT");
       return { id, eventHash, previousHash, createdAt };
