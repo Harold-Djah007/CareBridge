@@ -133,33 +133,82 @@ async function wardCapacityCheck(patientToken, adminToken) {
 }
 
 async function patientExperienceCheck(patientToken, adminToken) {
-  const before = await request("/api/patient-experience", patientToken);
-  if (!before?.modules || !before?.home) throw new Error("Patient experience policy returned an invalid shape");
+  const globalBefore = await request("/api/patient-experience", adminToken);
+  const individualBefore = await request(`/api/admin/patient-experience/${patientSeed.id}`, adminToken);
+  if (!globalBefore?.modules || !globalBefore?.home || !individualBefore?.effective) {
+    throw new Error("Patient experience policy returned an invalid shape");
+  }
 
-  const changed = await request("/api/admin/patient-experience", adminToken, {
+  await request(`/api/admin/patient-experience/${patientSeed.id}`, adminToken, { method: "DELETE" });
+
+  const globalChanged = await request("/api/admin/patient-experience", adminToken, {
     method: "PATCH",
     body: JSON.stringify({
       modules: { support: false },
       home: { quickActions: false },
     }),
   });
-  if (changed.modules?.support !== false || changed.home?.quickActions !== false) {
-    throw new Error("Admin patient experience update was not persisted");
+  if (globalChanged.modules?.support !== false || globalChanged.home?.quickActions !== false) {
+    throw new Error("All-patient experience update was not persisted");
   }
 
-  const patientView = await request("/api/patient-experience", patientToken);
-  if (patientView.modules?.support !== false || patientView.home?.quickActions !== false) {
-    throw new Error("Patient did not receive the published visibility policy");
+  const inheritedView = await request("/api/patient-experience", patientToken);
+  if (inheritedView.modules?.support !== false || inheritedView.home?.quickActions !== false || inheritedView.hasOverride) {
+    throw new Error("Patient did not inherit the all-patient visibility policy");
+  }
+
+  const individual = await request(`/api/admin/patient-experience/${patientSeed.id}`, adminToken, {
+    method: "PATCH",
+    body: JSON.stringify({
+      modules: { support: true },
+      home: { quickActions: true },
+    }),
+  });
+  if (!individual.hasOverride || individual.override?.modules?.support !== true || individual.override?.home?.quickActions !== true) {
+    throw new Error("Individual patient override was not persisted");
+  }
+  if (individual.effective?.modules?.support !== true || individual.effective?.home?.quickActions !== true) {
+    throw new Error("Individual patient override was not applied to the effective view");
+  }
+
+  const personalizedView = await request("/api/patient-experience", patientToken);
+  if (personalizedView.modules?.support !== true || personalizedView.home?.quickActions !== true || !personalizedView.hasOverride) {
+    throw new Error("Patient did not receive their individual visibility override");
+  }
+
+  const inheritedAgain = await request(`/api/admin/patient-experience/${patientSeed.id}`, adminToken, {
+    method: "PATCH",
+    body: JSON.stringify({ modules: { support: null } }),
+  });
+  if (inheritedAgain.override?.modules?.support !== undefined || inheritedAgain.effective?.modules?.support !== false) {
+    throw new Error("Per-setting Default mode did not fall back to the all-patient policy");
+  }
+  if (inheritedAgain.effective?.home?.quickActions !== true) {
+    throw new Error("Changing one individual override unexpectedly changed another override");
+  }
+
+  await request(`/api/admin/patient-experience/${patientSeed.id}`, adminToken, { method: "DELETE" });
+  const resetView = await request("/api/patient-experience", patientToken);
+  if (resetView.modules?.support !== false || resetView.home?.quickActions !== false || resetView.hasOverride) {
+    throw new Error("Resetting the individual patient view did not restore all-patient defaults");
   }
 
   await request("/api/admin/patient-experience", adminToken, {
     method: "PATCH",
     body: JSON.stringify({
-      modules: { support: before.modules.support !== false },
-      home: { quickActions: before.home.quickActions !== false },
+      modules: globalBefore.modules,
+      home: globalBefore.home,
     }),
   });
-  console.log("✓ admin-controlled patient experience policy");
+
+  if (individualBefore.hasOverride) {
+    await request(`/api/admin/patient-experience/${patientSeed.id}`, adminToken, {
+      method: "PATCH",
+      body: JSON.stringify({ modules: individualBefore.override.modules, home: individualBefore.override.home }),
+    });
+  }
+
+  console.log("✓ dual-scope patient experience policy (all patients + individual override + inheritance)");
 }
 
 try {
