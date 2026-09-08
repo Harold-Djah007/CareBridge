@@ -1,3 +1,15 @@
+import { audit } from "./clinical.js";
+import { passwordMatches, revokeAllUserSessions } from "./auth.js";
+import {
+  beginEnrollment,
+  confirmEnrollment,
+  disableMfa,
+  mfaEncryptionConfigured,
+  mfaStatus,
+  regenerateRecoveryCodes,
+  verifyUserMfa,
+} from "./mfa.js";
+
 export const DEFAULT_PATIENT_EXPERIENCE = {
   version: 2,
   modules: {
@@ -118,6 +130,66 @@ function patientAccount(db, patientId) {
 }
 
 export function mountPatientExperience(app, { readDb, writeDb }) {
+  app.get("/api/security/mfa", (req, res) => {
+    const db = readDb();
+    res.json({ ...mfaStatus(db, req.authUser.id), encryptionConfigured: mfaEncryptionConfigured() });
+  });
+
+  app.post("/api/security/mfa/enroll", (req, res) => {
+    const db = readDb();
+    const user = (db.users || []).find((item) => item.id === req.authUser.id);
+    if (!user) return res.status(404).json({ message: "Account not found." });
+    if (!req.body.currentPassword || !passwordMatches(req.body.currentPassword, user.password)) {
+      return res.status(403).json({ message: "Enter your current password before setting up multi-factor authentication." });
+    }
+    const enrollment = beginEnrollment(db, user);
+    audit(db, { actorId: user.id, action: "mfa.enroll-start", entity: "user", entityId: user.id, detail: "TOTP enrollment started" });
+    writeDb(db);
+    res.json(enrollment);
+  });
+
+  app.post("/api/security/mfa/confirm", (req, res) => {
+    const db = readDb();
+    const user = (db.users || []).find((item) => item.id === req.authUser.id);
+    if (!user) return res.status(404).json({ message: "Account not found." });
+    const result = confirmEnrollment(db, user, req.body.code);
+    if (!result.ok) return res.status(400).json({ message: result.message });
+    const revoked = revokeAllUserSessions(db, user.id, req.authSession?.id || "");
+    audit(db, { actorId: user.id, action: "mfa.enable", entity: "user", entityId: user.id, detail: `TOTP enabled; ${revoked} other session(s) revoked` });
+    writeDb(db);
+    res.json({ enabled: true, method: "totp", enabledAt: result.enabledAt, recoveryCodes: result.recoveryCodes });
+  });
+
+  app.post("/api/security/mfa/recovery-codes", (req, res) => {
+    const db = readDb();
+    const user = (db.users || []).find((item) => item.id === req.authUser.id);
+    if (!user) return res.status(404).json({ message: "Account not found." });
+    if (!req.body.currentPassword || !passwordMatches(req.body.currentPassword, user.password)) {
+      return res.status(403).json({ message: "Enter your current password first." });
+    }
+    const result = regenerateRecoveryCodes(db, user.id, req.body.code);
+    if (!result.ok) return res.status(400).json({ message: result.message });
+    audit(db, { actorId: user.id, action: "mfa.recovery-regenerate", entity: "user", entityId: user.id, detail: "MFA recovery codes regenerated" });
+    writeDb(db);
+    res.json({ recoveryCodes: result.recoveryCodes });
+  });
+
+  app.post("/api/security/mfa/disable", (req, res) => {
+    const db = readDb();
+    const user = (db.users || []).find((item) => item.id === req.authUser.id);
+    if (!user) return res.status(404).json({ message: "Account not found." });
+    if (!req.body.currentPassword || !passwordMatches(req.body.currentPassword, user.password)) {
+      return res.status(403).json({ message: "Enter your current password before disabling multi-factor authentication." });
+    }
+    const verification = verifyUserMfa(db, user.id, req.body.code, { consumeRecovery: false });
+    if (!verification.ok) return res.status(400).json({ message: "Enter a valid authenticator or recovery code." });
+    disableMfa(db, user.id);
+    const revoked = revokeAllUserSessions(db, user.id, req.authSession?.id || "");
+    audit(db, { actorId: user.id, action: "mfa.disable", entity: "user", entityId: user.id, detail: `MFA disabled; ${revoked} other session(s) revoked` });
+    writeDb(db);
+    res.json({ enabled: false });
+  });
+
   app.get("/api/patient-experience", (req, res) => {
     const db = readDb();
     if (req.authUser?.role === "patient") return res.json(effectivePatientExperience(db, req.authUser.id));
