@@ -1,0 +1,19 @@
+{$CAREBRIDGE_DOMAIN} {
+  encode zstd gzip
+
+  reverse_proxy app:5000 {
+    health_uri /api/health
+    health_interval 15s
+    health_timeout 5s
+  }
+
+  header {
+    -Server
+    X-Robots-Tag "noindex, nofollow" defer
+  }
+
+  log {
+    output stdout
+    format json
+  }
+}
