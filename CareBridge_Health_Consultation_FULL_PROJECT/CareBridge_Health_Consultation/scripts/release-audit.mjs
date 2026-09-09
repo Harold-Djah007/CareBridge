@@ -18,6 +18,7 @@ function requireFile(name) {
 }
 
 for (const name of [
+  ".dockerignore",
   "Dockerfile",
   "docker-compose.production.yml",
   "deploy/Caddyfile",
@@ -46,7 +47,7 @@ for (const file of appFiles) {
   const full = local(file);
   if (!fs.existsSync(full) || fs.statSync(full).size > 2_000_000) continue;
   const base = path.basename(file);
-  if (!textExtensions.has(path.extname(file).toLowerCase()) && !["Dockerfile", "Caddyfile", ".gitignore"].includes(base)) continue;
+  if (!textExtensions.has(path.extname(file).toLowerCase()) && !["Dockerfile", "Caddyfile", ".gitignore", ".dockerignore"].includes(base)) continue;
   const source = fs.readFileSync(full, "utf8");
   if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(source)) errors.push(`Private key material found in tracked file: ${file}`);
   if (/\bgh[pousr]_[A-Za-z0-9]{30,}\b/.test(source)) errors.push(`GitHub token-like value found in tracked file: ${file}`);
@@ -72,6 +73,11 @@ for (const entry of ["server/.env", "deploy/.env.production", "backups/", "*.pem
   if (!gitignore.includes(entry)) errors.push(`.gitignore is missing release-safety rule: ${entry}`);
 }
 
+const dockerignore = content(".dockerignore");
+for (const entry of ["server/.env", "deploy/.env.production", "backups", "*.pem", "*.key", "**/node_modules"]) {
+  if (!dockerignore.includes(entry)) errors.push(`.dockerignore is missing build-context safety rule: ${entry}`);
+}
+
 const compose = content("docker-compose.production.yml");
 for (const needle of ["postgres:17-alpine", "redis:7-alpine", "PERSISTENCE_PROVIDER: postgres", "REDIS_SESSION_ENFORCE: \"true\"", "no-new-privileges:true"]) {
   if (!compose.includes(needle)) errors.push(`Production compose contract is missing: ${needle}`);
@@ -84,7 +90,7 @@ for (const needle of ["FROM node:22-alpine", "USER node", "HEALTHCHECK", "npm ru
 
 const workflowPath = path.join(repoRoot, ".github", "workflows", "carebridge-ci.yml");
 const workflow = fs.existsSync(workflowPath) ? fs.readFileSync(workflowPath, "utf8") : "";
-for (const needle of ["Client performance budget", "PostgreSQL primary runtime restart regression", "Encrypted PostgreSQL disaster-recovery drill", "Browser UX quality regression across desktop and mobile", "Production-mode release certification", "Repository release hygiene audit"]) {
+for (const needle of ["Client performance budget", "PostgreSQL primary runtime restart regression", "Encrypted PostgreSQL disaster-recovery drill", "Browser UX quality regression across desktop and mobile", "Production-mode release certification", "Repository release hygiene audit", "Build hardened production container"]) {
   if (!workflow.includes(needle)) errors.push(`CI release gate is missing: ${needle}`);
 }
 
@@ -96,5 +102,5 @@ if (errors.length) {
 
 console.log(`✓ ${appFiles.length} tracked CareBridge files checked for release hygiene`);
 console.log("✓ production deployment, recovery, environment and CI contracts present");
-console.log("✓ no tracked environment/private-key credential files detected");
+console.log("✓ Git and Docker contexts exclude production secrets, keys and backups");
 console.log("CareBridge repository release hygiene audit passed.");
