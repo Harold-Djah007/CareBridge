@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowRight, BellRing, CreditCard, Landmark, Minus, Plus, ReceiptText, Search, ShieldCheck, ShoppingCart, Smartphone } from "lucide-react";
+import { Minus, Plus, Search, ShieldCheck, ShoppingCart } from "lucide-react";
 import { io } from "socket.io-client";
 import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
@@ -219,10 +219,10 @@ function PatientShop() {
       />
 
       <div className="commerce-trustbar" aria-label="Checkout options">
-        <span><ShieldCheck size={16} /> Server-verified payments</span>
-        <span><Smartphone size={16} /> MTN · Telecel · AT Money</span>
-        <span><CreditCard size={16} /> Visa / Mastercard</span>
-        <span><Landmark size={16} /> GHS bank transfer</span>
+        <span><ShieldCheck size={16} aria-hidden="true" /> Server-verified payments</span>
+        <span>MTN · Telecel · AT Money</span>
+        <span>Visa / Mastercard</span>
+        <span>GHS bank transfer</span>
       </div>
 
       <div className="shop-toolbar">
@@ -263,12 +263,12 @@ function PatientShop() {
 
       {due.length > 0 && tab !== "bills" && (
         <button type="button" className="bill-nudge" onClick={() => setTab("bills")}>
-          <span className="bill-nudge-icon"><BellRing size={18} aria-hidden="true" /></span>
+          <span className="bill-nudge-icon" aria-hidden="true">₵</span>
           <span className="bill-nudge-copy">
             <strong>{due.length} unpaid {due.length === 1 ? "bill" : "bills"}</strong>
             <small>{ghs(dueTotal)} outstanding · add to the same cart whenever you are ready</small>
           </span>
-          <span className="bill-nudge-action">Review <ArrowRight size={15} aria-hidden="true" /></span>
+          <span className="bill-nudge-action">Review <span aria-hidden="true">→</span></span>
         </button>
       )}
 
@@ -312,7 +312,7 @@ function PatientShop() {
                     const added = cart.some((c) => c.kind === "invoice" && c.id === i.id);
                     return (
                       <article className={`unpaid-bill-notice ${added ? "on" : ""}`} key={i.id}>
-                        <span className="unpaid-bill-icon"><ReceiptText size={18} aria-hidden="true" /></span>
+                        <span className="unpaid-bill-icon" aria-hidden="true">₵</span>
                         <span className="unpaid-bill-copy">
                           <small>Payment due</small>
                           <b>{i.item}</b>
