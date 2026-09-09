@@ -54,12 +54,12 @@ jobs:
       - name: Install client dependencies
         run: npm install --prefix client --no-audit --no-fund
 
-      - name: Install Chromium browser quality runtime
+      - name: Install Chromium Firefox and WebKit quality runtimes
         shell: bash
         run: |
           set -euo pipefail
           cd client
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium firefox webkit
 
       - name: Syntax-check server modules
         shell: bash
@@ -71,12 +71,25 @@ jobs:
           for file in server/*.mjs; do
             node --check "$file"
           done
+          node --check scripts/postdeploy-smoke.mjs
+          node --check scripts/release-audit.mjs
+          sh -n deploy/backup-postgres.sh
+          sh -n deploy/restore-postgres.sh
+
+      - name: Repository release hygiene audit
+        run: npm run audit:release
+
+      - name: Validate production Compose contract
+        run: docker compose --env-file deploy/.env.production.example -f docker-compose.production.yml config --quiet
 
       - name: Build web client
         run: npm run build --prefix client
 
       - name: Client performance budget
         run: npm run quality:budget --prefix client
+
+      - name: Build hardened production container
+        run: docker build --pull -t carebridge-ci:${{ github.sha }} .
 
       - name: Runtime regression across all authenticated roles
         shell: bash
@@ -130,6 +143,16 @@ jobs:
           set -euo pipefail
           cp server/data/db.json /tmp/carebridge-dr-ci-db.json
           DATA_FILE=/tmp/carebridge-dr-ci-db.json node server/ci-disaster-recovery.mjs
+
+      - name: Production-mode release certification
+        shell: bash
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carebridge_ci
+          REDIS_URL: redis://127.0.0.1:6379
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-production-ci-db.json
+          DATA_FILE=/tmp/carebridge-production-ci-db.json node server/ci-production-release.mjs
 
       - name: Authenticated concurrency and SLO regression
         shell: bash
