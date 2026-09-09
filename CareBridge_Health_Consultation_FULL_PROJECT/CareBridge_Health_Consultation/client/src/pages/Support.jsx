@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { LifeBuoy, Send } from "lucide-react";
+import { useOutletContext } from "react-router-dom";
+import { LifeBuoy, Search, Send, ShieldCheck, Sparkles, XCircle } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { prettyDate } from "../utils";
-import PageHero from "../components/PageHero";
 
 const CATEGORIES = [
   { id: "billing", label: "Billing & receipts" },
@@ -17,174 +17,114 @@ const CATEGORIES = [
 export default function Support() {
   const { user } = useAuth();
   const { push } = useToast();
+  const { refreshBadges } = useOutletContext() || {};
   const isAdmin = user.role === "admin";
   const [tickets, setTickets] = useState([]);
   const [active, setActive] = useState(null);
   const [filter, setFilter] = useState("open");
+  const [query, setQuery] = useState("");
+  const [compose, setCompose] = useState(false);
   const [form, setForm] = useState({ category: "billing", subject: "", body: "" });
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const markLocalRead = (id, opened) => {
+    setActive(opened);
+    setTickets((current) => current.map((ticket) => ticket.id === id ? { ...ticket, ...opened, unread: false } : ticket));
+  };
+
+  const openTicket = async (id) => {
+    const opened = await api(`/tickets/${id}?userId=${user.id}&role=${user.role}`);
+    markLocalRead(id, opened);
+    await refreshBadges?.();
+    return opened;
+  };
+
   const load = async (keepId) => {
     const rows = await api(`/tickets?userId=${user.id}&role=${user.role}`);
-    const list = filter === "open"
-      ? rows.filter((t) => t.status !== "resolved")
-      : filter === "all"
-        ? rows
-        : rows.filter((t) => t.status === filter);
+    const list = filter === "open" ? rows.filter((ticket) => ticket.status !== "resolved") : filter === "all" ? rows : rows.filter((ticket) => ticket.status === filter);
     setTickets(list);
     const id = keepId || active?.id;
-    setActive(list.find((t) => t.id === id) || list[0] || null);
+    const selected = list.find((ticket) => ticket.id === id) || list[0] || null;
+    if (!selected) {
+      setActive(null);
+      await refreshBadges?.();
+      return;
+    }
+    try {
+      await openTicket(selected.id);
+    } catch {
+      setActive(selected);
+    }
   };
 
   useEffect(() => { load(); }, [user.id, user.role, filter]);
 
-  const openTicket = async (id) => {
-    const t = await api(`/tickets/${id}?userId=${user.id}&role=${user.role}`);
-    setActive(t);
-  };
-
-  const submit = async (e) => {
-    e.preventDefault();
+  const submit = async (event) => {
+    event.preventDefault();
     setBusy(true);
     try {
-      const t = await api("/tickets", {
-        method: "POST",
-        body: JSON.stringify({ userId: user.id, ...form }),
-      });
-      push("Sent to hospital operations. You will see their reply on this thread.");
+      const ticket = await api("/tickets", { method: "POST", body: JSON.stringify({ userId: user.id, ...form }) });
       setForm({ category: "billing", subject: "", body: "" });
+      setCompose(false);
       setFilter("open");
+      push("Request sent to hospital operations.");
       const rows = await api(`/tickets?userId=${user.id}&role=${user.role}`);
-      setTickets(rows.filter((x) => x.status !== "resolved"));
-      setActive(t);
-    } catch (err) {
-      push(err.message, "error");
-    } finally {
-      setBusy(false);
-    }
+      setTickets(rows.filter((item) => item.status !== "resolved"));
+      setActive(ticket);
+      await refreshBadges?.();
+    } catch (err) { push(err.message, "error"); } finally { setBusy(false); }
   };
 
-  const sendReply = async (e) => {
-    e.preventDefault();
+  const sendReply = async (event) => {
+    event.preventDefault();
     if (!active || !reply.trim()) return;
     setBusy(true);
     try {
-      const t = await api(`/tickets/${active.id}/replies`, {
-        method: "POST",
-        body: JSON.stringify({ actorId: user.id, body: reply }),
-      });
+      const ticket = await api(`/tickets/${active.id}/replies`, { method: "POST", body: JSON.stringify({ actorId: user.id, body: reply }) });
       setReply("");
-      setActive(t);
-      push(isAdmin ? "Reply delivered to the requester." : "Reply sent to operations.");
-      load(t.id);
-    } catch (err) {
-      push(err.message, "error");
-    } finally {
-      setBusy(false);
-    }
+      setActive(ticket);
+      push(isAdmin ? "Reply delivered to requester." : "Update sent to operations.");
+      await load(ticket.id);
+    } catch (err) { push(err.message, "error"); } finally { setBusy(false); }
   };
 
   const setStatus = async (status) => {
     if (!active) return;
-    try {
-      const t = await api(`/tickets/${active.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ actorId: user.id, status }),
-      });
-      setActive(t);
-      push(status === "resolved" ? "Ticket closed." : "Ticket reopened.");
-      load(t.id);
-    } catch (err) {
-      push(err.message, "error");
-    }
+    const ticket = await api(`/tickets/${active.id}`, { method: "PATCH", body: JSON.stringify({ actorId: user.id, status }) });
+    setActive(ticket);
+    push(status === "resolved" ? "Ticket resolved." : "Ticket reopened.");
+    await load(ticket.id);
   };
 
+  const visible = tickets.filter((ticket) => `${ticket.subject} ${ticket.category} ${ticket.user?.name || ""}`.toLowerCase().includes(query.trim().toLowerCase()));
+
   return (
-    <div>
-      <PageHero
-        scene="support"
-        eyebrow={isAdmin ? "Operations" : "Help desk"}
-        title="Support"
-        lead={isAdmin
-          ? "Tickets from patients and clinicians land here and as a notice on every administrator account. Replies email the requester."
-          : "Write to Ridge Campus operations. Every ticket notifies administrators in CareBridge and by email — this is not a static FAQ."}
-      />
+    <div className="px-page px-support-desk">
+      <section className="px-support-hero">
+        <div><span className="px-kicker"><Sparkles size={14} /> {isAdmin ? "Hospital operations" : "CareBridge support"}</span><h1>{isAdmin ? "Service desk" : "Support that stays in context."}</h1><p>{isAdmin ? "Triage patient and staff requests, reply with traceability and close the loop from one operational queue." : "Billing, visits, admissions, video and account help all live in one threaded service experience."}</p></div>
+        <div className="px-support-summary"><span>Open requests</span><strong>{tickets.filter((ticket) => ticket.status !== "resolved").length}</strong><small>{isAdmin ? "operations queue" : "on your account"}</small>{!isAdmin && <button className="px-primary" type="button" onClick={() => setCompose(true)}><LifeBuoy size={16} /> New request</button>}</div>
+      </section>
 
-      <div className="filters">
-        {["open", "in_progress", "resolved", "all"].map((s) => (
-          <button key={s} className={filter === s ? "active" : ""} onClick={() => setFilter(s)}>
-            {s === "in_progress" ? "In progress" : s[0].toUpperCase() + s.slice(1)}
-          </button>
-        ))}
-      </div>
+      <section className="px-support-shell">
+        <aside className="px-ticket-rail">
+          <header><div><span className="px-kicker">Tickets</span><h2>{visible.length}</h2></div><div className="px-segmented">{["open","in_progress","resolved","all"].map((item) => <button type="button" key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item === "in_progress" ? "working" : item}</button>)}</div></header>
+          <label className="px-ticket-search"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tickets" aria-label="Search support tickets" /></label>
+          <div className="px-ticket-list">{visible.map((ticket) => <button type="button" key={ticket.id} className={`${active?.id === ticket.id ? "active" : ""} ${ticket.unread ? "is-unread" : ""}`.trim()} onClick={() => openTicket(ticket.id)}><span><strong>{ticket.subject}</strong><small>{isAdmin ? `${ticket.user?.name || "Unknown"} · ` : ""}{ticket.category}</small></span>{ticket.unread && <i className="px-ticket-new" aria-label="New support update">New</i>}<em className={`status ${ticket.status === "resolved" ? "completed" : ticket.status === "open" ? "pending" : "confirmed"}`}>{ticket.status.replace("_", " ")}</em><time>{prettyDate(ticket.updatedAt || ticket.createdAt)}</time></button>)}{visible.length === 0 && <div className="px-empty compact"><LifeBuoy size={24} /><h3>No tickets here</h3></div>}</div>
+        </aside>
 
-      <div className="support-layout">
-        <section className="card">
-          {!isAdmin && (
-            <form className="pay-form" onSubmit={submit} style={{ marginBottom: 18 }}>
-              <h3><LifeBuoy size={16} /> New request</h3>
-              <label>Category
-                <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                  {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                </select>
-              </label>
-              <label>Subject<input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} required placeholder="e.g. MoMo receipt not showing" /></label>
-              <label>How can we help?<textarea rows="4" value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} required /></label>
-              <button className="primary-btn" disabled={busy}>{busy ? "Sending…" : "Send to operations"}</button>
-            </form>
-          )}
-          <h3>{isAdmin ? "Queue" : "Your tickets"}</h3>
-          {tickets.length === 0 && <p className="muted">{filter === "open" ? "No open tickets." : "Nothing in this view."}</p>}
-          {tickets.map((t) => (
-            <button type="button" key={t.id} className={`pay-pick ${active?.id === t.id ? "on" : ""}`} onClick={() => openTicket(t.id)}>
-              <span>
-                <b>{t.subject}</b>
-                <small>{isAdmin ? `${t.user?.name || "Unknown"} · ` : ""}{t.category} · {prettyDate(t.updatedAt || t.createdAt)}</small>
-              </span>
-              <strong className={`status ${t.status === "resolved" ? "completed" : t.status === "open" ? "pending" : "confirmed"}`}>{t.status.replace("_", " ")}</strong>
-            </button>
-          ))}
-        </section>
+        <main className="px-ticket-thread">
+          {!active ? <div className="px-empty large"><LifeBuoy size={30} /><h3>{isAdmin ? "Choose a request" : "No ticket selected"}</h3><p>{isAdmin ? "Open a ticket from the queue to respond." : "Start a request when you need help."}</p></div> : <>
+            <header className="px-ticket-head"><div><span className="px-kicker">{active.category}</span><h2>{active.subject}</h2><p>{active.user?.name} · {active.user?.email}</p></div>{active.status !== "resolved" ? <button type="button" onClick={() => setStatus("resolved")}>Mark resolved</button> : <button type="button" onClick={() => setStatus("open")}>Reopen</button>}</header>
+            <div className="px-ticket-messages"><article className="px-ticket-message requester"><header><strong>{active.user?.name}</strong><time>{prettyDate(active.createdAt)}</time></header><p>{active.body}</p></article>{(active.replies || []).map((item) => <article className={`px-ticket-message ${item.role === "admin" ? "operations" : "requester"}`} key={item.id}><header><strong>{item.authorName}{item.role === "admin" ? " · Operations" : ""}</strong><time>{prettyDate(item.createdAt)}</time></header><p>{item.body}</p></article>)}</div>
+            {active.status !== "resolved" && <form className="px-ticket-composer" onSubmit={sendReply}><textarea rows="3" value={reply} onChange={(e) => setReply(e.target.value)} placeholder={isAdmin ? "Reply to requester…" : "Add more detail…"} aria-label={isAdmin ? "Reply to support requester" : "Add an update to support ticket"} required /><button className="px-primary" disabled={busy}><Send size={16} /> {isAdmin ? "Send reply" : "Send update"}</button></form>}
+          </>}
+        </main>
+      </section>
 
-        <section className="card">
-          {!active && <p className="muted">{isAdmin ? "Select a ticket to reply. Replies notify the sender." : "Open a ticket or send a new request."}</p>}
-          {active && (
-            <div className="ticket-thread">
-              <div className="card-head">
-                <div>
-                  <span className="eyebrow">{active.category}</span>
-                  <h3>{active.subject}</h3>
-                  <p className="muted">{active.user?.name} · {active.user?.email}</p>
-                </div>
-                {active.status !== "resolved" ? (
-                  <button className="secondary-btn" type="button" onClick={() => setStatus("resolved")}>Mark resolved</button>
-                ) : (
-                  <button className="ghost-btn" type="button" onClick={() => setStatus("open")}>Reopen</button>
-                )}
-              </div>
-              <article className="ticket-msg">
-                <b>{active.user?.name}</b>
-                <small>{prettyDate(active.createdAt)}</small>
-                <p>{active.body}</p>
-              </article>
-              {(active.replies || []).map((r) => (
-                <article className={`ticket-msg ${r.role === "admin" ? "ops" : ""}`} key={r.id}>
-                  <b>{r.authorName} {r.role === "admin" ? "· Operations" : ""}</b>
-                  <small>{prettyDate(r.createdAt)}</small>
-                  <p>{r.body}</p>
-                </article>
-              ))}
-              {active.status !== "resolved" && (
-                <form className="ticket-reply" onSubmit={sendReply}>
-                  <textarea rows="3" value={reply} onChange={(e) => setReply(e.target.value)} placeholder={isAdmin ? "Reply to the requester…" : "Add more detail for operations…"} required />
-                  <button className="primary-btn" disabled={busy}><Send size={16} /> {isAdmin ? "Reply to requester" : "Send update"}</button>
-                </form>
-              )}
-            </div>
-          )}
-        </section>
-      </div>
+      <div className="px-support-trust"><ShieldCheck size={16} /><span>Support conversations stay attached to authenticated CareBridge identities and ticket history.</span></div>
+
+      {compose && <div className="px-modal-backdrop" onMouseDown={() => setCompose(false)}><form className="px-booking-sheet px-support-sheet" onSubmit={submit} onMouseDown={(e) => e.stopPropagation()}><header><span className="px-sheet-icon"><LifeBuoy size={20} /></span><div><span className="px-kicker">New request</span><h2>How can we help?</h2><p>Tell hospital operations what happened and keep the request attached to your account.</p></div><button type="button" onClick={() => setCompose(false)}><XCircle size={20} /></button></header><div className="px-sheet-body"><label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{CATEGORIES.map((category) => <option key={category.id} value={category.id}>{category.label}</option>)}</select></label><label>Subject<input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} required placeholder="e.g. MoMo receipt not showing" /></label><label>What happened?<textarea rows="6" value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} required /></label></div><footer><button className="px-secondary" type="button" onClick={() => setCompose(false)}>Cancel</button><button className="px-primary" disabled={busy}>Send to operations</button></footer></form></div>}
     </div>
   );
 }

@@ -12,6 +12,29 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: carebridge_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d carebridge_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: CareBridge_Health_Consultation_FULL_PROJECT/CareBridge_Health_Consultation
@@ -31,6 +54,20 @@ jobs:
       - name: Install client dependencies
         run: npm install --prefix client --no-audit --no-fund
 
+      - name: Production dependency vulnerability gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm audit --prefix server --omit=dev --audit-level=high
+          npm audit --prefix client --omit=dev --audit-level=high
+
+      - name: Install Chromium Firefox and WebKit quality runtimes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd client
+          npx playwright install --with-deps chromium firefox webkit
+
       - name: Syntax-check server modules
         shell: bash
         run: |
@@ -38,6 +75,176 @@ jobs:
           for file in server/*.js; do
             node --check "$file"
           done
+          for file in server/*.mjs; do
+            node --check "$file"
+          done
+          node --check scripts/postdeploy-smoke.mjs
+          node --check scripts/release-audit.mjs
+          sh -n deploy/backup-postgres.sh
+          sh -n deploy/restore-postgres.sh
+
+      - name: Repository release hygiene audit
+        run: npm run audit:release
+
+      - name: Validate production Compose contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp deploy/.env.production.example deploy/.env.production
+          trap 'rm -f deploy/.env.production' EXIT
+          docker compose --env-file deploy/.env.production -f docker-compose.production.yml config --quiet
 
       - name: Build web client
         run: npm run build --prefix client
+
+      - name: Client performance budget
+        run: npm run quality:budget --prefix client
+
+      - name: Build hardened production container
+        run: docker build --pull -t carebridge-ci:${{ github.sha }} .
+
+      - name: Runtime regression across all authenticated roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-ci-db.json
+          DATA_FILE=/tmp/carebridge-ci-db.json PORT=5055 LOG_LEVEL=silent node server/ci-role-regression.mjs
+
+      - name: Security and persistence regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-security-ci-db.json
+          DATA_FILE=/tmp/carebridge-security-ci-db.json PORT=5056 LOG_LEVEL=silent node server/ci-security-regression.mjs
+
+      - name: PostgreSQL enterprise persistence regression
+        shell: bash
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carebridge_ci
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-postgres-ci-db.json
+          DATA_FILE=/tmp/carebridge-postgres-ci-db.json node server/ci-postgres-regression.mjs
+
+      - name: Enterprise 9.5 interoperability clinical finance and Redis regression
+        shell: bash
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+          MFA_ENCRYPTION_KEY: ci-carebridge-mfa-encryption-key-2026
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-enterprise95-ci-db.json
+          DATA_FILE=/tmp/carebridge-enterprise95-ci-db.json PORT=5057 LOG_LEVEL=silent node server/ci-enterprise95-regression.mjs
+
+      - name: PostgreSQL primary runtime restart regression
+        shell: bash
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carebridge_ci
+          MFA_ENCRYPTION_KEY: ci-carebridge-mfa-encryption-key-2026
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-runtime-postgres-ci-db.json
+          DATA_FILE=/tmp/carebridge-runtime-postgres-ci-db.json LOG_LEVEL=silent node server/ci-runtime-postgres.mjs
+
+      - name: Encrypted PostgreSQL disaster-recovery drill
+        shell: bash
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carebridge_ci
+          BACKUP_ENCRYPTION_KEY: ci-carebridge-backup-key-2026
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-dr-ci-db.json
+          DATA_FILE=/tmp/carebridge-dr-ci-db.json node server/ci-disaster-recovery.mjs
+
+      - name: Production-mode release certification
+        shell: bash
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carebridge_ci
+          REDIS_URL: redis://127.0.0.1:6379
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-production-ci-db.json
+          DATA_FILE=/tmp/carebridge-production-ci-db.json node server/ci-production-release.mjs
+
+      - name: Built production container runtime smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME=carebridge-production-runtime-${{ github.run_id }}
+          cleanup() { docker rm -f "$NAME" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          docker run -d --name "$NAME" --network host \
+            -e NODE_ENV=production \
+            -e PORT=5064 \
+            -e LOG_LEVEL=silent \
+            -e PERSISTENCE_PROVIDER=postgres \
+            -e DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/carebridge_ci \
+            -e REDIS_URL=redis://127.0.0.1:6379 \
+            -e REDIS_SESSION_ENFORCE=true \
+            -e REDIS_PREFIX=carebridge-container-ci \
+            -e CLIENT_URL=https://carebridge-ci.example \
+            -e APP_URL=https://carebridge-ci.example \
+            -e SESSION_DAYS=7 \
+            -e SESSION_MAX_PER_USER=8 \
+            -e PASSWORD_MIN_LENGTH=10 \
+            -e MFA_ENCRYPTION_KEY=carebridge-container-ci-mfa-encryption-key-2026 \
+            -e BACKUP_ENCRYPTION_KEY=carebridge-container-ci-backup-encryption-key-2026 \
+            -e BACKUP_REQUIRED=true \
+            -e CAREBRIDGE_BEHIND_TLS_PROXY=true \
+            -e FLW_SECRET_KEY=FLWSECK-LIVE-CONTAINER-CI-0123456789 \
+            -e FLW_SECRET_HASH=carebridge-container-ci-webhook-secret-2026 \
+            -e CAREBRIDGE_ALLOW_TEST_PAYMENT_KEYS=false \
+            -e SMTP_HOST=smtp.carebridge-ci.invalid \
+            -e SMTP_PORT=587 \
+            -e SMTP_SECURE=false \
+            -e SMTP_REQUIRE_TLS=true \
+            -e SMTP_REJECT_UNAUTHORIZED=true \
+            -e SMTP_USER=ci@carebridge.example \
+            -e SMTP_PASS=carebridge-container-ci-smtp-password-2026 \
+            -e 'SMTP_FROM=CareBridge CI <ci@carebridge.example>' \
+            carebridge-ci:${{ github.sha }}
+          for attempt in $(seq 1 80); do
+            if ! docker inspect "$NAME" >/dev/null 2>&1; then
+              echo 'Production container disappeared.' >&2
+              exit 1
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' "$NAME")" != "true" ]; then
+              docker logs "$NAME" >&2 || true
+              exit 1
+            fi
+            if node -e "fetch('http://127.0.0.1:5064/api/ready').then(async r=>{const b=await r.json();process.exit(r.ok&&b.environment==='production'&&b.persistence?.provider==='postgres'&&b.coordination?.provider==='redis'&&b.security?.distributedRateLimiting===true?0:1)}).catch(()=>process.exit(1))"; then
+              break
+            fi
+            if [ "$attempt" -eq 80 ]; then
+              docker logs "$NAME" >&2 || true
+              exit 1
+            fi
+            sleep 0.25
+          done
+          node -e "fetch('http://127.0.0.1:5064/').then(async r=>{const t=await r.text();if(!r.ok||!t.includes('CareBridge'))process.exit(1);console.log('Built production container serves the compiled CareBridge SPA.')}).catch(e=>{console.error(e);process.exit(1)})"
+          echo 'CareBridge built production container runtime smoke passed.'
+
+      - name: Authenticated concurrency and SLO regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-load-ci-db.json
+          DATA_FILE=/tmp/carebridge-load-ci-db.json PORT=5062 LOG_LEVEL=silent CI_P95_BUDGET_MS=1000 node server/ci-load-slo-regression.mjs
+
+      - name: Browser UX quality regression across desktop and mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp server/data/db.json /tmp/carebridge-browser-ci-db.json
+          CAREBRIDGE_E2E_DATA_FILE=/tmp/carebridge-browser-ci-db.json npm run quality:e2e --prefix client
+
+      - name: Preserve browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: carebridge-browser-quality-${{ github.run_id }}
+          path: |
+            CareBridge_Health_Consultation_FULL_PROJECT/CareBridge_Health_Consultation/client/test-results
+            CareBridge_Health_Consultation_FULL_PROJECT/CareBridge_Health_Consultation/client/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7

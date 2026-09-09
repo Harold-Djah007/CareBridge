@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, FileClock, FolderKanban, ShieldCheck, Sparkles } from "lucide-react";
 import { api } from "../../api";
 import { useAuth, useToast } from "../../state";
 import { prettyDate } from "../../utils";
-import PageHero from "../../components/PageHero";
 
 export default function AdminCaseDetail() {
   const { id } = useParams();
@@ -16,135 +16,63 @@ export default function AdminCaseDetail() {
   const [busy, setBusy] = useState(false);
 
   const load = () => {
-    api(`/cases/${id}`).then((c) => {
-      setRow(c);
-      setForm({ detail: "", stage: c.stage, close: c.status === "closed" });
-    }).catch((e) => setError(e.message));
-  };
-
-  useEffect(() => { load(); }, [id]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      const next = await api(`/cases/${id}/forms`, {
-        method: "POST",
-        body: JSON.stringify({
-          actorId: user.id,
-          form: form.close ? "close" : "followup",
-          detail: form.detail,
-          stage: form.close ? (row.workflow[row.workflow.length - 1] || form.stage) : form.stage,
-        }),
-      });
+    api(`/cases/${id}`).then((next) => {
       setRow(next);
       setForm({ detail: "", stage: next.stage, close: next.status === "closed" });
-      push(form.close ? "Case closed." : "Follow-up form saved on the case.");
-    } catch (err) {
-      push(err.message, "error");
-    } finally {
-      setBusy(false);
-    }
+    }).catch((err) => setError(err.message));
+  };
+  useEffect(() => { load(); }, [id]);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const next = await api(`/cases/${id}/forms`, { method: "POST", body: JSON.stringify({ actorId: user.id, form: form.close ? "close" : "followup", detail: form.detail, stage: form.close ? (row.workflow[row.workflow.length - 1] || form.stage) : form.stage }) });
+      setRow(next);
+      setForm({ detail: "", stage: next.stage, close: next.status === "closed" });
+      push(form.close ? "Case closed." : "Follow-up saved.");
+    } catch (err) { push(err.message, "error"); } finally { setBusy(false); }
   };
 
-  if (error) return <p className="error-box">{error}</p>;
-  if (!row) return <p className="muted">Loading case…</p>;
+  if (error) return <div className="px-empty"><FolderKanban size={28} /><h3>{error}</h3></div>;
+  if (!row) return <div className="px-empty"><FileClock size={28} /><h3>Loading case…</h3></div>;
 
   const props = Object.entries(row.properties || {});
   const stageIndex = (row.workflow || []).indexOf(row.stage);
 
-  return (
-    <div>
-      <PageHero
-        scene="cases"
-        eyebrow={`Case detail · ${row.typeLabel}`}
-        title={row.caseName}
-        lead={`Case ID ${row.externalId} · Owner ${row.ownerName || "—"} · ${row.status}`}
-        actions={(
-          <div className="row-actions">
-            <Link className="ghost-btn" to="/admin/cases">Back to case list</Link>
-            {row.link && <Link className="secondary-btn" to={row.link}>Open hospital record</Link>}
-          </div>
-        )}
-      />
+  const jumpStage = async (step) => {
+    const next = await api(`/cases/${id}`, { method: "PATCH", body: JSON.stringify({ actorId: user.id, stage: step }) });
+    setRow(next);
+    setForm((current) => ({ ...current, stage: next.stage }));
+    push(`Stage set to ${step.replaceAll("_", " ")}`);
+  };
 
-      <section className="card" style={{ marginBottom: 16 }}>
-        <span className="eyebrow">Workflow</span>
-        <div className="case-flow">
-          {(row.workflow || []).map((step, i) => (
-            <button
-              type="button"
-              key={step}
-              className={`case-step ${i <= stageIndex ? "done" : ""} ${step === row.stage ? "current" : ""}`}
-              onClick={async () => {
-                const next = await api(`/cases/${id}`, { method: "PATCH", body: JSON.stringify({ actorId: user.id, stage: step }) });
-                setRow(next);
-                setForm((f) => ({ ...f, stage: next.stage }));
-                push(`Stage set to ${step.replace("_", " ")}`);
-              }}
-            >
-              <em>{i + 1}</em>
-              {step.replace("_", " ")}
-            </button>
-          ))}
-        </div>
+  return (
+    <div className="px-page px-case-detail">
+      <section className="px-case-detail-hero">
+        <button className="px-back" type="button" onClick={() => navigate("/admin/cases")}><ArrowLeft size={16} /> Case registry</button>
+        <div className="px-case-detail-copy"><span className="px-kicker"><Sparkles size={14} /> {row.typeLabel}</span><h1>{row.caseName}</h1><p>Case {row.externalId} · owned by {row.ownerName || "Unassigned"}</p></div>
+        <div className="px-case-detail-state"><span>Status</span><strong className={`status ${row.status === "open" ? "pending" : "completed"}`}>{row.status}</strong><small>Current stage · {row.stage.replaceAll("_", " ")}</small>{row.link && <Link to={row.link}>Open hospital record</Link>}</div>
       </section>
 
-      <div className="dashboard-grid">
-        <section className="card">
-          <h3>Case properties</h3>
-          <table className="table">
-            <tbody>
-              {props.length === 0 && <tr><td className="muted">No properties saved on this case.</td></tr>}
-              {props.map(([k, v]) => (
-                <tr key={k}><th style={{ width: 160, textTransform: "capitalize" }}>{k.replaceAll("_", " ")}</th><td>{String(v || "—")}</td></tr>
-              ))}
-            </tbody>
-          </table>
-          {row.parent && (
-            <p style={{ marginTop: 12 }}>
-              Parent case: <Link to={`/admin/cases/${row.parent.id}`}><b>{row.parent.caseName}</b></Link>
-            </p>
-          )}
-          {row.children?.length > 0 && (
-            <div style={{ marginTop: 14 }}>
-              <h3>Child cases</h3>
-              {row.children.map((c) => (
-                <button type="button" key={c.id} className="pay-pick" onClick={() => navigate(`/admin/cases/${c.id}`)}>
-                  <span><b>{c.caseName}</b><small>{c.caseType} · {c.stage}</small></span>
-                  <strong className={`status ${c.status === "open" ? "pending" : "completed"}`}>{c.status}</strong>
-                </button>
-              ))}
-            </div>
-          )}
+      <section className="px-case-flow-board">
+        <header><div><span className="px-kicker">Lifecycle</span><h2>Workflow progression</h2></div><span className="px-case-progress">{Math.max(0, stageIndex + 1)} / {(row.workflow || []).length} stages</span></header>
+        <div className="px-case-flow">{(row.workflow || []).map((step, index) => <button type="button" key={step} className={`${index <= stageIndex ? "done" : ""} ${step === row.stage ? "current" : ""}`} onClick={() => jumpStage(step)}><span>{index < stageIndex ? <CheckCircle2 size={15} /> : index + 1}</span><strong>{step.replaceAll("_", " ")}</strong><i /></button>)}</div>
+      </section>
+
+      <div className="px-case-detail-grid">
+        <section className="px-case-facts">
+          <header><span className="px-kicker">Case properties</span><h2>Operational context</h2></header>
+          <div className="px-property-grid">{props.map(([key, value]) => <div key={key}><span>{key.replaceAll("_", " ")}</span><strong>{String(value || "—")}</strong></div>)}{props.length === 0 && <div className="px-empty compact"><FolderKanban size={24} /><h3>No properties saved</h3></div>}</div>
+          {row.parent && <div className="px-case-relation"><span>Parent case</span><Link to={`/admin/cases/${row.parent.id}`}>{row.parent.caseName}</Link></div>}
+          {row.children?.length > 0 && <div className="px-case-children"><span className="px-kicker">Child cases</span>{row.children.map((child) => <button key={child.id} type="button" onClick={() => navigate(`/admin/cases/${child.id}`)}><span><strong>{child.caseName}</strong><small>{child.caseType} · {child.stage}</small></span><b className={`status ${child.status === "open" ? "pending" : "completed"}`}>{child.status}</b></button>)}</div>}
+          <div className="px-case-assurance"><ShieldCheck size={16} /><span>Case changes are attributed to authenticated CareBridge operators.</span></div>
         </section>
 
-        <section className="card">
-          <h3>Forms on this case</h3>
-          <p className="muted">Registration opened the case. Follow-up forms update properties and stage. Close ends the workflow.</p>
-          {(row.events || []).slice().reverse().map((ev) => (
-            <article className="ticket-msg" key={ev.id}>
-              <b>{ev.form} · {ev.actorName}</b>
-              <small>{prettyDate(ev.at)}</small>
-              <p>{ev.detail}</p>
-            </article>
-          ))}
-          {row.status !== "closed" && (
-            <form className="pay-form" onSubmit={submit} style={{ marginTop: 16 }}>
-              <h3>Follow-up form</h3>
-              <label>Move to stage
-                <select value={form.stage} onChange={(e) => setForm({ ...form, stage: e.target.value })}>
-                  {(row.workflow || []).map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
-                </select>
-              </label>
-              <label>Notes<textarea rows="3" value={form.detail} onChange={(e) => setForm({ ...form, detail: e.target.value })} required placeholder="What changed on this case?" /></label>
-              <label className="check-row">
-                <input type="checkbox" checked={form.close} onChange={(e) => setForm({ ...form, close: e.target.checked })} />
-                Close this case
-              </label>
-              <button className="primary-btn" disabled={busy}>{busy ? "Saving…" : "Save form"}</button>
-            </form>
-          )}
+        <section className="px-case-activity">
+          <header><span className="px-kicker">Form history</span><h2>Lifecycle activity</h2><p>Registration, follow-up and close events remain attached to this case.</p></header>
+          <div className="px-case-events">{(row.events || []).slice().reverse().map((event) => <article key={event.id}><span className="px-case-event-dot" /><div><strong>{event.form}</strong><small>{event.actorName} · {prettyDate(event.at)}</small><p>{event.detail}</p></div></article>)}{!row.events?.length && <div className="px-empty compact"><FileClock size={24} /><h3>No form history yet</h3></div>}</div>
+          {row.status !== "closed" && <form className="px-case-followup" onSubmit={submit}><span className="px-kicker">New follow-up</span><label>Move to stage<select value={form.stage} onChange={(event) => setForm({ ...form, stage: event.target.value })}>{(row.workflow || []).map((step) => <option key={step} value={step}>{step.replaceAll("_", " ")}</option>)}</select></label><label>What changed?<textarea rows="4" value={form.detail} onChange={(event) => setForm({ ...form, detail: event.target.value })} required /></label><label className="px-case-close"><input type="checkbox" checked={form.close} onChange={(event) => setForm({ ...form, close: event.target.checked })} /><span>Close this case after saving</span></label><button className="px-primary" disabled={busy}>{busy ? "Saving…" : "Save follow-up"}</button></form>}
         </section>
       </div>
     </div>

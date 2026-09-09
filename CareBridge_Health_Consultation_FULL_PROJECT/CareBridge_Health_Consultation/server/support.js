@@ -1,13 +1,52 @@
+import { mountPatientExperience } from "./patientExperience.js";
+import { mountFhir } from "./fhir.js";
+import { mountClinicalOrders } from "./clinicalOrders.js";
+import { mountEnterpriseOps } from "./enterpriseOps.js";
+import { mountSmart, smartScopeAllows } from "./smart.js";
+import { mountInterop } from "./interop.js";
+import { mountClinicalSafety } from "./clinicalSafety.js";
+import { mountRevenueCycle } from "./revenueCycle.js";
+
 const nid = (p) => `${p}${Date.now()}${Math.floor(Math.random() * 900)}`;
 
 const CATEGORIES = ["billing", "clinical", "technical", "account", "admissions", "other"];
 
-function enrich(db, ticket, safeUser) {
+function readStamp(db, userId, ticketId) {
+  return String(db.ticketReads?.[userId]?.[ticketId] || "");
+}
+
+function incomingActivityAt(ticket, role) {
+  let latest = role === "admin" ? String(ticket.createdAt || "") : "";
+  for (const reply of ticket.replies || []) {
+    const incoming = role === "admin" ? reply.role !== "admin" : reply.role === "admin";
+    if (incoming && String(reply.createdAt || "") > latest) latest = String(reply.createdAt || "");
+  }
+  return latest;
+}
+
+function ticketUnread(db, ticket, viewer) {
+  if (!viewer?.id || !viewer?.role) return false;
+  const incoming = incomingActivityAt(ticket, viewer.role);
+  if (!incoming) return false;
+  const seen = readStamp(db, viewer.id, ticket.id);
+  return !seen || incoming > seen;
+}
+
+function markTicketRead(db, ticketId, userId) {
+  if (!ticketId || !userId) return false;
+  db.ticketReads = db.ticketReads || {};
+  db.ticketReads[userId] = db.ticketReads[userId] || {};
+  db.ticketReads[userId][ticketId] = new Date().toISOString();
+  return true;
+}
+
+function enrich(db, ticket, safeUser, viewer) {
   const owner = db.users.find((u) => u.id === ticket.userId) || {};
   return {
     ...ticket,
     user: safeUser(owner),
     replyCount: (ticket.replies || []).length,
+    unread: ticketUnread(db, ticket, viewer),
   };
 }
 
@@ -20,25 +59,60 @@ async function pingAdmins(db, { notify, emailPatient }, { title, body, email }) 
 }
 
 export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPatient }) {
+  mountPatientExperience(app, { readDb, writeDb });
+  mountSmart(app, { readDb, writeDb });
+
+  // Express trims a mount path from req.path inside nested middleware. Validate
+  // SMART scopes here from the mounted relative FHIR path, then mark only that
+  // already-authorized integration request as authenticated for the FHIR layer.
+  app.use("/api/fhir/R4", (req, res, next) => {
+    if (!req.smartAuth || req.authUser) return next();
+    const relative = String(req.path || "").replace(/^\/+/, "");
+    if (!relative || relative === "metadata" || relative.startsWith(".well-known/")) return next();
+    const resourceType = relative.split("/")[0];
+    if (!smartScopeAllows(req.smartAuth, resourceType, "read")) {
+      return res.status(403).type("application/fhir+json").json({
+        resourceType: "OperationOutcome",
+        issue: [{ severity: "error", code: "forbidden", diagnostics: `SMART token does not include system/${resourceType}.read.` }],
+      });
+    }
+    req.authUser = {
+      id: `smart:${req.smartAuth.clientId}`,
+      role: "smart",
+      name: req.smartAuth.name || "SMART integration",
+    };
+    return next();
+  });
+
+  mountFhir(app, { readDb });
+  mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, emailPatient });
+  mountClinicalSafety(app, { readDb, writeDb, safeUser, notify });
+  mountInterop(app, { readDb, writeDb });
+  mountRevenueCycle(app, { readDb, writeDb, notify });
+  mountEnterpriseOps(app, { readDb });
+
   app.get("/api/tickets", (req, res) => {
     const db = readDb();
     const { userId, role } = req.query;
+    const viewer = req.authUser || { id: userId, role };
     let rows = db.tickets || [];
-    if (role !== "admin") rows = rows.filter((t) => t.userId === userId);
+    if (viewer.role !== "admin") rows = rows.filter((t) => t.userId === viewer.id);
     const status = req.query.status;
     if (status && status !== "all") rows = rows.filter((t) => t.status === status);
-    res.json(rows.slice().reverse().map((t) => enrich(db, t, safeUser)));
+    res.json(rows.slice().reverse().map((t) => enrich(db, t, safeUser, viewer)));
   });
 
   app.get("/api/tickets/:id", (req, res) => {
     const db = readDb();
     const ticket = (db.tickets || []).find((t) => t.id === req.params.id);
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
-    const { userId, role } = req.query;
-    if (role !== "admin" && ticket.userId !== userId) {
+    const viewer = req.authUser || { id: req.query.userId, role: req.query.role };
+    if (viewer.role !== "admin" && ticket.userId !== viewer.id) {
       return res.status(403).json({ message: "You cannot open this ticket." });
     }
-    res.json(enrich(db, ticket, safeUser));
+    markTicketRead(db, ticket.id, viewer.id);
+    writeDb(db);
+    res.json(enrich(db, ticket, safeUser, viewer));
   });
 
   app.post("/api/tickets", async (req, res) => {
@@ -65,6 +139,7 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
     };
     db.tickets = db.tickets || [];
     db.tickets.push(ticket);
+    markTicketRead(db, ticket.id, user.id);
     notify(db, userId, "Support request sent", `Operations has your ticket: ${subject}`);
     await pingAdmins(db, { notify, emailPatient }, {
       title: "New support desk ticket",
@@ -85,7 +160,7 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
       },
     });
     writeDb(db);
-    res.status(201).json(enrich(db, ticket, safeUser));
+    res.status(201).json(enrich(db, ticket, safeUser, user));
   });
 
   app.post("/api/tickets/:id/replies", async (req, res) => {
@@ -110,6 +185,7 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
     ticket.replies = ticket.replies || [];
     ticket.replies.push(reply);
     ticket.updatedAt = reply.createdAt;
+    markTicketRead(db, ticket.id, actor.id);
     if (actor.role === "admin" && ticket.status === "open") ticket.status = "in_progress";
 
     if (actor.role === "admin") {
@@ -144,7 +220,7 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
       });
     }
     writeDb(db);
-    res.status(201).json(enrich(db, ticket, safeUser));
+    res.status(201).json(enrich(db, ticket, safeUser, actor));
   });
 
   app.patch("/api/tickets/:id", async (req, res) => {
@@ -162,6 +238,7 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
     }
     if (status) ticket.status = status;
     ticket.updatedAt = new Date().toISOString();
+    markTicketRead(db, ticket.id, actor.id);
     const owner = db.users.find((u) => u.id === ticket.userId) || {};
     if (status === "resolved") {
       notify(db, ticket.userId, "Ticket resolved", `“${ticket.subject}” is closed.`);
@@ -181,6 +258,6 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
       }
     }
     writeDb(db);
-    res.json(enrich(db, ticket, safeUser));
+    res.json(enrich(db, ticket, safeUser, actor));
   });
 }

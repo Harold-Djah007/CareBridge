@@ -107,7 +107,7 @@ export default function RxPad({ patient, source = "chart", compact = false, onIs
             </label>
             {i === lines.length - 1 && (
               <div className="rx-suggest">
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter stock…" />
+                <input aria-label="Filter stock" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter stock…" />
                 <div className="rx-suggest-list">
                   {catalog.slice(0, 8).map((p) => (
                     <button type="button" key={p.id} className={!p.inStock ? "oos" : ""} onClick={() => pickStock(i, p)}>
@@ -128,7 +128,7 @@ export default function RxPad({ patient, source = "chart", compact = false, onIs
               </label>
               {product && <em className={`stock-badge ${product.inStock ? "in" : "out"}`}>{product.inStock ? `${product.qty} on shelf` : "Out of stock"}</em>}
               {lines.length > 1 && (
-                <button type="button" className="icon-btn" title="Remove line" onClick={() => setLines((rows) => rows.filter((_, idx) => idx !== i))}>
+                <button type="button" className="icon-btn" title="Remove line" aria-label="Remove medicine line" onClick={() => setLines((rows) => rows.filter((_, idx) => idx !== i))}>
                   <Trash2 size={16} />
                 </button>
               )}

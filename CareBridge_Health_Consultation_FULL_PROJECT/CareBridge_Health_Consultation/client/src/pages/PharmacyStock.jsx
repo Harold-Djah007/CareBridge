@@ -1,21 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Archive, Boxes, PackageCheck, PackageX, Plus, RotateCcw, ShieldCheck } from "lucide-react";
+import { Archive, Boxes, PackageCheck, PackageX, Plus, RotateCcw, Search, ShieldCheck, Sparkles, XCircle } from "lucide-react";
 import { io } from "socket.io-client";
 import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { ghs } from "../utils";
-import { IMAGERY } from "../imagery";
-import PageHero, { EmptyPlate } from "../components/PageHero";
 
 const blank = { name: "", sku: "", pack: "30 tablets", form: "Tablet", category: "Vitamins", price: 20, qty: 12, nhis: true, available: true };
 
-function ShelfToggle({ on, disabled, onChange }) {
-  return <div className={`shelf-toggle ${on ? "on" : "off"}`} role="group" aria-label="Shelf status"><button type="button" className={on ? "active" : ""} disabled={disabled} onClick={() => onChange(true)}>In stock</button><button type="button" className={!on ? "active" : ""} disabled={disabled} onClick={() => onChange(false)}>Out</button></div>;
-}
-
-function RestockCell({ disabled, onRestock }) {
-  const [value, setValue] = useState(10);
-  return <div className="restock-cell"><input className="stock-input" type="number" min="1" value={value} disabled={disabled} onChange={(event) => setValue(event.target.value)} aria-label="Restock quantity" /><button type="button" className="ghost-btn" disabled={disabled} onClick={() => onRestock(Number(value) || 0)}>Restock</button></div>;
+function AvailabilityToggle({ on, disabled, onChange }) {
+  return <div className={`px-stock-toggle ${on ? "on" : "off"}`}><button type="button" className={on ? "active" : ""} disabled={disabled} onClick={() => onChange(true)}>In</button><button type="button" className={!on ? "active" : ""} disabled={disabled} onClick={() => onChange(false)}>Out</button></div>;
 }
 
 export default function PharmacyStock() {
@@ -27,6 +20,7 @@ export default function PharmacyStock() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
 
   const load = () => api("/pharmacy/stock?manage=1").then(setStock);
   useEffect(() => {
@@ -38,13 +32,26 @@ export default function PharmacyStock() {
   }, []);
 
   const cats = useMemo(() => [...new Set([...(categories || []), ...stock.map((row) => row.category).filter(Boolean)])], [categories, stock]);
-  const visible = stock.filter((row) => filter === "archived" ? row.archived : row.archived ? false : filter === "in" ? row.inStock : filter === "out" ? !row.inStock : true);
+  const active = stock.filter((row) => !row.archived);
+  const inCount = active.filter((row) => row.inStock).length;
+  const outCount = active.filter((row) => !row.inStock).length;
+  const lowCount = active.filter((row) => Number(row.qty || 0) > 0 && Number(row.qty || 0) <= 5).length;
+  const archivedCount = stock.filter((row) => row.archived).length;
+  const visible = stock.filter((row) => {
+    if (filter === "archived" && !row.archived) return false;
+    if (filter !== "archived" && row.archived) return false;
+    if (filter === "in" && !row.inStock) return false;
+    if (filter === "out" && row.inStock) return false;
+    const q = query.trim().toLowerCase();
+    return !q || `${row.name} ${row.sku || ""} ${row.category || ""} ${row.form || ""}`.toLowerCase().includes(q);
+  });
 
   const saveRow = async (row, patch, ok) => {
     setBusy(row.id);
     try {
       await api(`/pharmacy/stock/${row.id}`, { method: "PATCH", body: JSON.stringify({ actorId: user.id, ...patch }) });
       push(ok || `${row.name} updated`);
+      load();
     } catch (err) { push(err.message, "error"); } finally { setBusy(""); }
   };
 
@@ -53,9 +60,10 @@ export default function PharmacyStock() {
     setBusy("new");
     try {
       await api("/pharmacy/stock", { method: "POST", body: JSON.stringify({ actorId: user.id, ...form, qty: form.available === false ? 0 : form.qty, available: form.available !== false }) });
-      push(`${form.name} added to the cupboard`);
+      push(`${form.name} added to inventory`);
       setForm(blank);
       setOpen(false);
+      load();
     } catch (err) { push(err.message, "error"); } finally { setBusy(""); }
   };
 
@@ -65,69 +73,65 @@ export default function PharmacyStock() {
     const raw = window.prompt(`How many packs of ${row.name} should go back on the shelf?`, "10");
     if (raw === null) return;
     const qty = Math.max(0, Number(raw));
-    if (!qty) return push("Enter a quantity above 0 so patients can buy again.", "error");
-    saveRow(row, { available: true, qty }, `${row.name} restocked and marked in stock.`);
+    if (!qty) return push("Enter a quantity above 0.", "error");
+    saveRow(row, { available: true, qty }, `${row.name} restocked.`);
   };
 
   const archive = async (row) => {
-    if (!window.confirm(`Remove ${row.name} from the shelf? Patients will no longer see it in Shop & pay.`)) return;
+    if (!window.confirm(`Archive ${row.name}? Patients will no longer see it.`)) return;
     setBusy(row.id);
     try {
       await api(`/pharmacy/stock/${row.id}?actorId=${user.id}`, { method: "DELETE" });
-      push(`${row.name} archived. Patients no longer see it.`);
+      push(`${row.name} archived.`);
+      load();
     } catch {
       try {
         await api(`/pharmacy/stock/${row.id}`, { method: "PATCH", body: JSON.stringify({ actorId: user.id, archived: true, available: false }) });
-        push(`${row.name} archived. Patients no longer see it.`);
+        push(`${row.name} archived.`);
+        load();
       } catch (err) { push(err.message, "error"); }
     } finally { setBusy(""); }
   };
 
-  const active = stock.filter((row) => !row.archived);
-  const inCount = active.filter((row) => row.inStock).length;
-  const outCount = active.filter((row) => !row.inStock).length;
-  const lowCount = active.filter((row) => Number(row.qty || 0) > 0 && Number(row.qty || 0) <= 5).length;
-  const archivedCount = stock.filter((row) => row.archived).length;
-
   return (
-    <div className="stock-workspace">
-      <PageHero scene="pharmacy" eyebrow="Inventory control" title="Pharmacy stock" lead="A live operational inventory for what patients can see and buy in Shop & pay. Restock, change availability and archive products without leaving the dispensary workspace." actions={<button className="primary-btn" type="button" onClick={() => setOpen(true)}><Plus size={16} /> Add medicine</button>} />
+    <div className="px-page px-stock-console">
+      <section className="px-stock-hero">
+        <div><span className="px-kicker"><Sparkles size={14} /> Dispensary inventory</span><h1>Know what is on the shelf before the queue asks.</h1><p>Live stock, low-level risk, patient visibility and restocking are controlled from one operational console.</p><button className="px-primary" type="button" onClick={() => setOpen(true)}><Plus size={16} /> Add medicine</button></div>
+        <div className="px-stock-radar"><span>Active SKUs</span><strong>{active.length}</strong><small>{lowCount} low stock · {outCount} unavailable</small><i /></div>
+      </section>
 
-      <div className="product-metric-grid stock-metrics">
-        <div className="product-metric-card"><span className="metric-icon tone-green"><PackageCheck size={18} /></span><div className="metric-copy"><small>In stock</small><strong>{inCount}</strong><span>Visible to patients</span></div></div>
-        <div className="product-metric-card"><span className="metric-icon tone-red"><PackageX size={18} /></span><div className="metric-copy"><small>Out of stock</small><strong>{outCount}</strong><span>Unavailable in shop</span></div></div>
-        <div className="product-metric-card"><span className="metric-icon tone-amber"><Boxes size={18} /></span><div className="metric-copy"><small>Low stock</small><strong>{lowCount}</strong><span>5 packs or fewer</span></div></div>
-        <div className="product-metric-card"><span className="metric-icon tone-violet"><Archive size={18} /></span><div className="metric-copy"><small>Archived</small><strong>{archivedCount}</strong><span>Removed from patient shop</span></div></div>
-      </div>
+      <section className="px-signal-grid">
+        <article><span><PackageCheck size={17} /></span><div><small>In stock</small><strong>{inCount}</strong></div></article>
+        <article><span><PackageX size={17} /></span><div><small>Out</small><strong>{outCount}</strong></div></article>
+        <article><span><Boxes size={17} /></span><div><small>Low stock</small><strong>{lowCount}</strong></div></article>
+        <article><span><Archive size={17} /></span><div><small>Archived</small><strong>{archivedCount}</strong></div></article>
+      </section>
 
-      <section className="product-imagery-strip stock-visual" style={{ backgroundImage: `url(${IMAGERY.pharmacy})` }}><div><span className="eyebrow">Live dispensary inventory</span><h3>{active.length} active medicine SKUs</h3><p>Changes made here flow into the patient storefront and dispensing workflows so stock status stays operationally consistent.</p></div></section>
-
-      <div className="stock-toolbar"><div className="filters">{[["all",`Active · ${active.length}`],["in",`In stock · ${inCount}`],["out",`Out · ${outCount}`],["archived",`Archived · ${archivedCount}`]].map(([id,label]) => <button key={id} className={filter === id ? "active" : ""} onClick={() => setFilter(id)}>{label}</button>)}</div><span className="live-state"><i /> Live inventory</span></div>
-
-      <section className="product-section stock-table-section">
-        <div className="product-section-head"><div><span className="eyebrow">Stock ledger</span><h2>{visible.length} medicine{visible.length === 1 ? "" : "s"}</h2></div><div className="ops-footer-assurance compact"><ShieldCheck size={14} /><span>Only authorised pharmacy staff can change stock</span></div></div>
-        <div className="stock-table-wrap">
-          <table className="table stock-table product-stock-table"><thead><tr><th>Medicine</th><th>Category</th><th>Pack</th><th>Price</th><th>Qty</th><th>Shelf</th><th>NHIS</th><th>Restock</th><th /></tr></thead><tbody>{visible.map((row) => {
+      <section className="px-stock-board">
+        <header className="px-stock-toolbar"><div><span className="px-kicker">Inventory ledger</span><h2>{visible.length} medicine{visible.length === 1 ? "" : "s"}</h2></div><label><Search size={15} /><input aria-label="Search inventory" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search SKU, name or category" /></label><div className="px-segmented">{[["all","Active"],["in","In stock"],["out","Out"],["archived","Archived"]].map(([id,label]) => <button key={id} type="button" className={filter === id ? "active" : ""} onClick={() => setFilter(id)}>{label}</button>)}</div></header>
+        <div className="px-stock-head"><span>Medicine</span><span>Category</span><span>Price</span><span>Qty</span><span>Availability</span><span>NHIS</span><span>Actions</span></div>
+        <div className="px-stock-list">
+          {visible.map((row) => {
             const on = !row.archived && row.inStock;
             const qty = Number(row.qty || 0);
             const low = !row.archived && qty <= 5;
-            return <tr key={`${row.id}-${row.qty}-${row.inStock}-${row.archived}-${row.price}-${row.nhis}`} className={row.archived ? "oos-row" : low ? "stock-row-low" : ""}>
-              <td><div className="stock-product-cell"><input defaultValue={row.name} disabled={busy === row.id} onBlur={(event) => { const name = event.target.value.trim(); if (name && name !== row.name) saveRow(row, { name }); }} aria-label={`Name for ${row.name}`} /><small>{row.sku || "No SKU"}</small><input className="stock-input wide" defaultValue={row.form} disabled={busy === row.id} onBlur={(event) => { const value = event.target.value.trim(); if (value && value !== row.form) saveRow(row, { form: value }); }} aria-label={`Form for ${row.name}`} /></div></td>
-              <td><select value={row.category} disabled={busy === row.id} onChange={(event) => saveRow(row, { category: event.target.value })}>{(cats.includes(row.category) ? cats : [row.category, ...cats]).map((category) => <option key={category}>{category}</option>)}</select></td>
-              <td><input defaultValue={row.pack} disabled={busy === row.id} onBlur={(event) => { const pack = event.target.value.trim(); if (pack && pack !== row.pack) saveRow(row, { pack }); }} /></td>
-              <td><input className="stock-input" type="number" min="0" defaultValue={row.price} disabled={busy === row.id} onBlur={(event) => { const price = Number(event.target.value); if (price !== Number(row.price)) saveRow(row, { price }); }} /></td>
-              <td><input className="stock-input" type="number" min="0" defaultValue={row.qty} disabled={busy === row.id} onBlur={(event) => { const nextQty = Number(event.target.value); if (nextQty !== Number(row.qty)) saveRow(row, { qty: nextQty }); }} />{low && <em className={`stock-warn ${qty === 0 ? "empty" : ""}`}>{qty === 0 ? "Empty" : `Low · ${qty}`}</em>}</td>
-              <td>{row.archived ? <em className="stock-badge out">Archived</em> : <ShelfToggle on={on} disabled={busy === row.id} onChange={(available) => toggleShelf(row, available)} />}</td>
-              <td><input type="checkbox" checked={row.nhis} disabled={busy === row.id} onChange={(event) => saveRow(row, { nhis: event.target.checked })} /></td>
-              <td>{!row.archived && <RestockCell disabled={busy === row.id} onRestock={(amount) => { if (amount >= 1) saveRow(row, { restock: amount }, `Restocked ${row.name} by ${amount}.`); }} />}</td>
-              <td>{row.archived ? <button type="button" className="secondary-btn" disabled={busy === row.id} onClick={() => saveRow(row, { archived: false, available: true }, `${row.name} restored to the shop.`)}><RotateCcw size={14} /> Restore</button> : <button type="button" className="ghost-btn" disabled={busy === row.id} onClick={() => archive(row)}><Archive size={14} /> Archive</button>}</td>
-            </tr>;
-          })}</tbody></table>
+            return <article className={`px-stock-row ${row.archived ? "archived" : low ? "low" : ""}`} key={`${row.id}-${row.qty}-${row.inStock}-${row.archived}`}>
+              <div className="px-stock-product"><span className="px-stock-product-icon"><Boxes size={17} /></span><div><input aria-label={`Medicine name ${row.name}`} defaultValue={row.name} disabled={busy === row.id} onBlur={(e) => { const name = e.target.value.trim(); if (name && name !== row.name) saveRow(row, { name }); }} /><small>{row.sku || "No SKU"} · {row.form || "Medicine"} · {row.pack || "Pack"}</small></div></div>
+              <div><select aria-label={`Category ${row.name}`} value={row.category} disabled={busy === row.id} onChange={(e) => saveRow(row, { category: e.target.value })}>{(cats.includes(row.category) ? cats : [row.category, ...cats]).map((category) => <option key={category}>{category}</option>)}</select></div>
+              <div><input aria-label={`Price ${row.name}`} className="px-stock-number" type="number" min="0" defaultValue={row.price} disabled={busy === row.id} onBlur={(e) => { const price = Number(e.target.value); if (price !== Number(row.price)) saveRow(row, { price }); }} /><small>{ghs(row.price)}</small></div>
+              <div><input aria-label={`Quantity ${row.name}`} className="px-stock-number" type="number" min="0" defaultValue={row.qty} disabled={busy === row.id} onBlur={(e) => { const nextQty = Number(e.target.value); if (nextQty !== Number(row.qty)) saveRow(row, { qty: nextQty }); }} />{low && <em>{qty === 0 ? "Empty" : `Low · ${qty}`}</em>}</div>
+              <div>{row.archived ? <span className="status cancelled">archived</span> : <AvailabilityToggle on={on} disabled={busy === row.id} onChange={(available) => toggleShelf(row, available)} />}</div>
+              <div><label className="px-stock-check"><input type="checkbox" checked={row.nhis} disabled={busy === row.id} onChange={(e) => saveRow(row, { nhis: e.target.checked })} /><span>{row.nhis ? "Eligible" : "No"}</span></label></div>
+              <div className="px-stock-actions">{row.archived ? <button type="button" disabled={busy === row.id} onClick={() => saveRow(row, { archived: false, available: true }, `${row.name} restored.`)}><RotateCcw size={14} /> Restore</button> : <><button type="button" disabled={busy === row.id} onClick={() => { const raw = window.prompt(`Restock ${row.name} by how many packs?`, "10"); const amount = Math.max(0, Number(raw)); if (amount) saveRow(row, { restock: amount }, `Restocked ${row.name} by ${amount}.`); }}><Plus size={14} /> Restock</button><button className="danger" type="button" aria-label={`Archive ${row.name}`} disabled={busy === row.id} onClick={() => archive(row)}><Archive size={14} /></button></>}</div>
+            </article>;
+          })}
+          {visible.length === 0 && <div className="px-empty"><Boxes size={28} /><h3>No inventory matches this view</h3></div>}
         </div>
-        {visible.length === 0 && <EmptyPlate compact scene="pharmacy" title="Nothing in this inventory view" />}
       </section>
 
-      {open && <div className="modal-backdrop" onMouseDown={() => setOpen(false)}><form className="modal-card" onMouseDown={(event) => event.stopPropagation()} onSubmit={addSku}><div className="modal-icon"><Boxes /></div><span className="eyebrow">New inventory item</span><h2>Add medicine</h2><label>Name<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></label><div className="form-grid"><label>SKU<input value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} placeholder="Optional" /></label><label>Form<input value={form.form} onChange={(event) => setForm({ ...form, form: event.target.value })} /></label></div><div className="form-grid"><label>Pack<input value={form.pack} onChange={(event) => setForm({ ...form, pack: event.target.value })} /></label><label>Category<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>{(cats.length ? cats : ["Vitamins"]).map((category) => <option key={category}>{category}</option>)}</select></label></div><div className="form-grid"><label>Price (GHS)<input type="number" min="0" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></label><label>Quantity<input type="number" min="0" value={form.qty} disabled={form.available === false} onChange={(event) => setForm({ ...form, qty: event.target.value })} /></label></div><label className="check-row"><input type="checkbox" checked={form.nhis} onChange={(event) => setForm({ ...form, nhis: event.target.checked })} /> NHIS eligible</label><div className="add-shelf"><span>Shelf</span><ShelfToggle on={form.available !== false} disabled={false} onChange={(on) => setForm({ ...form, available: on, qty: on ? (Number(form.qty) || 10) : 0 })} /></div><div className="booking-quote"><span>Patient shop preview</span><strong>{ghs(form.price)}</strong><small>{form.name || "New SKU"} · {form.available === false ? "Out of stock" : `${form.qty || 0} on shelf`}</small></div><div className="modal-actions"><button type="button" className="secondary-btn" onClick={() => setOpen(false)}>Cancel</button><button className="primary-btn" disabled={busy === "new"}>{busy === "new" ? "Saving…" : "Add to inventory"}</button></div></form></div>}
+      <div className="px-stock-trust"><ShieldCheck size={16} /><span>Inventory changes are restricted to authorised pharmacy and operations roles and flow to the patient storefront.</span></div>
+
+      {open && <div className="px-modal-backdrop" onMouseDown={() => setOpen(false)}><form className="px-booking-sheet" role="dialog" aria-modal="true" aria-labelledby="add-medicine-title" onMouseDown={(e) => e.stopPropagation()} onSubmit={addSku}><header><span className="px-sheet-icon"><Boxes size={20} /></span><div><span className="px-kicker">New inventory item</span><h2 id="add-medicine-title">Add medicine</h2><p>Create the SKU exactly as patients should see it in Shop & Pay.</p></div><button type="button" aria-label="Close add medicine" onClick={() => setOpen(false)}><XCircle size={20} /></button></header><div className="px-sheet-body"><label>Name<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label><div className="px-form-grid"><label>SKU<input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></label><label>Form<input value={form.form} onChange={(e) => setForm({ ...form, form: e.target.value })} /></label></div><div className="px-form-grid"><label>Pack<input value={form.pack} onChange={(e) => setForm({ ...form, pack: e.target.value })} /></label><label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{(cats.length ? cats : ["Vitamins"]).map((category) => <option key={category}>{category}</option>)}</select></label></div><div className="px-form-grid"><label>Price GHS<input type="number" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></label><label>Quantity<input type="number" min="0" value={form.qty} disabled={form.available === false} onChange={(e) => setForm({ ...form, qty: e.target.value })} /></label></div><label className="px-stock-check"><input type="checkbox" checked={form.nhis} onChange={(e) => setForm({ ...form, nhis: e.target.checked })} /><span>NHIS eligible</span></label><div className="px-quote"><span>Patient shop preview</span><strong>{ghs(form.price)}</strong></div></div><footer><button className="px-secondary" type="button" onClick={() => setOpen(false)}>Cancel</button><button className="px-primary" disabled={busy === "new"}>{busy === "new" ? "Saving…" : "Add to inventory"}</button></footer></form></div>}
     </div>
   );
 }
