@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import { LifeBuoy, Search, Send, ShieldCheck, Sparkles, XCircle } from "lucide-react";
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
@@ -16,6 +17,7 @@ const CATEGORIES = [
 export default function Support() {
   const { user } = useAuth();
   const { push } = useToast();
+  const { refreshBadges } = useOutletContext() || {};
   const isAdmin = user.role === "admin";
   const [tickets, setTickets] = useState([]);
   const [active, setActive] = useState(null);
@@ -26,17 +28,37 @@ export default function Support() {
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const markLocalRead = (id, opened) => {
+    setActive(opened);
+    setTickets((current) => current.map((ticket) => ticket.id === id ? { ...ticket, ...opened, unread: false } : ticket));
+  };
+
+  const openTicket = async (id) => {
+    const opened = await api(`/tickets/${id}?userId=${user.id}&role=${user.role}`);
+    markLocalRead(id, opened);
+    await refreshBadges?.();
+    return opened;
+  };
+
   const load = async (keepId) => {
     const rows = await api(`/tickets?userId=${user.id}&role=${user.role}`);
     const list = filter === "open" ? rows.filter((ticket) => ticket.status !== "resolved") : filter === "all" ? rows : rows.filter((ticket) => ticket.status === filter);
     setTickets(list);
     const id = keepId || active?.id;
-    setActive(list.find((ticket) => ticket.id === id) || list[0] || null);
+    const selected = list.find((ticket) => ticket.id === id) || list[0] || null;
+    if (!selected) {
+      setActive(null);
+      await refreshBadges?.();
+      return;
+    }
+    try {
+      await openTicket(selected.id);
+    } catch {
+      setActive(selected);
+    }
   };
 
   useEffect(() => { load(); }, [user.id, user.role, filter]);
-
-  const openTicket = async (id) => setActive(await api(`/tickets/${id}?userId=${user.id}&role=${user.role}`));
 
   const submit = async (event) => {
     event.preventDefault();
@@ -50,6 +72,7 @@ export default function Support() {
       const rows = await api(`/tickets?userId=${user.id}&role=${user.role}`);
       setTickets(rows.filter((item) => item.status !== "resolved"));
       setActive(ticket);
+      await refreshBadges?.();
     } catch (err) { push(err.message, "error"); } finally { setBusy(false); }
   };
 
@@ -62,7 +85,7 @@ export default function Support() {
       setReply("");
       setActive(ticket);
       push(isAdmin ? "Reply delivered to requester." : "Update sent to operations.");
-      load(ticket.id);
+      await load(ticket.id);
     } catch (err) { push(err.message, "error"); } finally { setBusy(false); }
   };
 
@@ -71,7 +94,7 @@ export default function Support() {
     const ticket = await api(`/tickets/${active.id}`, { method: "PATCH", body: JSON.stringify({ actorId: user.id, status }) });
     setActive(ticket);
     push(status === "resolved" ? "Ticket resolved." : "Ticket reopened.");
-    load(ticket.id);
+    await load(ticket.id);
   };
 
   const visible = tickets.filter((ticket) => `${ticket.subject} ${ticket.category} ${ticket.user?.name || ""}`.toLowerCase().includes(query.trim().toLowerCase()));
@@ -87,7 +110,7 @@ export default function Support() {
         <aside className="px-ticket-rail">
           <header><div><span className="px-kicker">Tickets</span><h2>{visible.length}</h2></div><div className="px-segmented">{["open","in_progress","resolved","all"].map((item) => <button type="button" key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item === "in_progress" ? "working" : item}</button>)}</div></header>
           <label className="px-ticket-search"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tickets" /></label>
-          <div className="px-ticket-list">{visible.map((ticket) => <button type="button" key={ticket.id} className={active?.id === ticket.id ? "active" : ""} onClick={() => openTicket(ticket.id)}><span><strong>{ticket.subject}</strong><small>{isAdmin ? `${ticket.user?.name || "Unknown"} · ` : ""}{ticket.category}</small></span><em className={`status ${ticket.status === "resolved" ? "completed" : ticket.status === "open" ? "pending" : "confirmed"}`}>{ticket.status.replace("_", " ")}</em><time>{prettyDate(ticket.updatedAt || ticket.createdAt)}</time></button>)}{visible.length === 0 && <div className="px-empty compact"><LifeBuoy size={24} /><h3>No tickets here</h3></div>}</div>
+          <div className="px-ticket-list">{visible.map((ticket) => <button type="button" key={ticket.id} className={`${active?.id === ticket.id ? "active" : ""} ${ticket.unread ? "is-unread" : ""}`.trim()} onClick={() => openTicket(ticket.id)}><span><strong>{ticket.subject}</strong><small>{isAdmin ? `${ticket.user?.name || "Unknown"} · ` : ""}{ticket.category}</small></span>{ticket.unread && <i className="px-ticket-new" aria-label="New support update">New</i>}<em className={`status ${ticket.status === "resolved" ? "completed" : ticket.status === "open" ? "pending" : "confirmed"}`}>{ticket.status.replace("_", " ")}</em><time>{prettyDate(ticket.updatedAt || ticket.createdAt)}</time></button>)}{visible.length === 0 && <div className="px-empty compact"><LifeBuoy size={24} /><h3>No tickets here</h3></div>}</div>
         </aside>
 
         <main className="px-ticket-thread">
