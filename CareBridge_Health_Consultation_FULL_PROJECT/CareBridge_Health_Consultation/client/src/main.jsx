@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import "./styles.css";
@@ -64,7 +64,6 @@ const AdminCases = lazy(() => import("./pages/admin/Cases"));
 const AdminCaseDetail = lazy(() => import("./pages/admin/CaseDetail"));
 const AdminPatientExperience = lazy(() => import("./pages/admin/PatientExperience"));
 const Pay = lazy(() => import("./pages/Pay"));
-const Pharmacy = lazy(() => import("./pages/Pharmacy"));
 const PharmacyStock = lazy(() => import("./pages/PharmacyStock"));
 const Prescriptions = lazy(() => import("./pages/Prescriptions"));
 const PrescriptionPrint = lazy(() => import("./pages/PrescriptionPrint"));
@@ -148,7 +147,7 @@ function AppRoutes() {
               <Route path="/payments/:id" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient", "admin"]}><PaymentStatus /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/receipts" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient", "admin"]}><Navigate to="/pay" replace /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/admin/billing" element={<RoleRoute roles={["admin"]}><Navigate to="/pay" replace /></RoleRoute>} />
-              <Route path="/pharmacy" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient", "admin"]}><Pharmacy /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/pharmacy" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient", "admin"]}><Navigate to="/pay" replace /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/pharmacy-stock" element={<RoleRoute roles={["nurse", "admin"]}><PharmacyStock /></RoleRoute>} />
               <Route path="/prescriptions" element={<PatientFeatureRoute feature="prescriptions"><RoleRoute roles={["patient", "doctor"]}><Prescriptions /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/prescriptions/:id" element={<PatientFeatureRoute feature="prescriptions"><RoleRoute roles={["patient", "doctor", "admin"]}><PrescriptionPrint /></RoleRoute></PatientFeatureRoute>} />
