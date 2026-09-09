@@ -8,13 +8,13 @@ const ACCOUNTS = {
 };
 
 const ROUTES = {
-  patient: ["/home", "/appointments", "/records", "/messages", "/wards", "/pay", "/settings"],
+  patient: ["/home", "/appointments", "/records", "/messages", "/wards", "/pay", "/support", "/settings"],
   doctor: ["/home", "/appointments", "/records", "/orders", "/messages", "/settings"],
   nurse: ["/home", "/orders", "/pharmacy-stock", "/messages", "/settings"],
-  admin: ["/admin", "/admin/hospital", "/admin/appointments", "/admin/users", "/admin/patient-experience", "/orders", "/admin/reports", "/settings"],
+  admin: ["/admin", "/admin/hospital", "/admin/appointments", "/admin/users", "/admin/patient-experience", "/orders", "/admin/reports", "/support", "/settings"],
 };
 
-async function directLogin(page, request, role, projectName) {
+async function loginSession(request, role, projectName) {
   const account = ACCOUNTS[role];
   const lastOctet = 20 + Object.keys(ACCOUNTS).indexOf(role) + (projectName.includes("mobile") ? 20 : 0);
   const response = await request.post("http://127.0.0.1:5000/api/login", {
@@ -25,7 +25,12 @@ async function directLogin(page, request, role, projectName) {
   const session = await response.json();
   expect(session.token).toBeTruthy();
   expect(session.user?.role).toBe(role);
+  return session;
+}
 
+async function directLogin(page, request, role, projectName) {
+  const account = ACCOUNTS[role];
+  const session = await loginSession(request, role, projectName);
   await page.goto("/login");
   await page.evaluate(({ user, token }) => {
     localStorage.setItem("carebridge-user", JSON.stringify(user));
@@ -33,6 +38,7 @@ async function directLogin(page, request, role, projectName) {
   }, { user: session.user, token: session.token });
   await page.goto(account.home);
   await expect(page.locator("#cbv6-main")).toBeVisible();
+  return session;
 }
 
 async function waitForRoute(page) {
@@ -221,4 +227,58 @@ test("desktop shell keyboard, command palette and notification reader remain acc
   expect(layers.bodyOverflow).toBe("hidden");
   await page.keyboard.press("Escape");
   await expect(reader).toBeHidden();
+});
+
+test("support live badge clears after the incoming admin reply is viewed", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "Support read lifecycle runs once on desktop Chromium.");
+  const patient = await loginSession(request, "patient", testInfo.project.name);
+  const admin = await loginSession(request, "admin", testInfo.project.name);
+  const patientHeaders = { Authorization: `Bearer ${patient.token}` };
+  const adminHeaders = { Authorization: `Bearer ${admin.token}` };
+
+  const existingResponse = await request.get(`http://127.0.0.1:5000/api/tickets?userId=${patient.user.id}&role=patient`, { headers: patientHeaders });
+  expect(existingResponse.ok()).toBeTruthy();
+  for (const ticket of await existingResponse.json()) {
+    const seen = await request.get(`http://127.0.0.1:5000/api/tickets/${ticket.id}?userId=${patient.user.id}&role=patient`, { headers: patientHeaders });
+    expect(seen.ok()).toBeTruthy();
+  }
+
+  const subject = `Badge lifecycle ${Date.now()}`;
+  const createdResponse = await request.post("http://127.0.0.1:5000/api/tickets", {
+    headers: patientHeaders,
+    data: { userId: patient.user.id, category: "account", subject, body: "Please verify the live support badge lifecycle." },
+  });
+  expect(createdResponse.ok()).toBeTruthy();
+  const created = await createdResponse.json();
+
+  const replyResponse = await request.post(`http://127.0.0.1:5000/api/tickets/${created.id}/replies`, {
+    headers: adminHeaders,
+    data: { actorId: admin.user.id, body: "Operations replied. Viewing this thread should clear its live badge." },
+  });
+  expect(replyResponse.ok()).toBeTruthy();
+
+  const unreadResponse = await request.get(`http://127.0.0.1:5000/api/tickets?userId=${patient.user.id}&role=patient`, { headers: patientHeaders });
+  const unreadRows = await unreadResponse.json();
+  expect(unreadRows.find((ticket) => ticket.id === created.id)?.unread).toBe(true);
+
+  await page.goto("/login");
+  await page.evaluate(({ user, token }) => {
+    localStorage.setItem("carebridge-user", JSON.stringify(user));
+    localStorage.setItem("carebridge-token", token);
+  }, { user: patient.user, token: patient.token });
+  await page.goto("/home");
+  await waitForRoute(page);
+
+  const supportLink = page.locator('a[href="/support"]').first();
+  await expect(supportLink.locator("b")).toBeVisible();
+  await supportLink.click();
+  await waitForRoute(page);
+  await expect(page.getByRole("heading", { name: subject, exact: true })).toBeVisible();
+  await expect(supportLink.locator("b")).toHaveCount(0);
+
+  const readResponse = await request.get(`http://127.0.0.1:5000/api/tickets?userId=${patient.user.id}&role=patient`, { headers: patientHeaders });
+  const readRows = await readResponse.json();
+  const viewed = readRows.find((ticket) => ticket.id === created.id);
+  expect(viewed?.unread).toBe(false);
+  expect(viewed?.status).toBe("in_progress");
 });
