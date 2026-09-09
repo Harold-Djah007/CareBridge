@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "quality:budget": "node scripts/quality-budget.mjs",
-    "quality:e2e": "playwright test"
+    "quality:e2e": "vite build && playwright test",
+    "quality:release": "vite build && node scripts/quality-budget.mjs && playwright test"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
