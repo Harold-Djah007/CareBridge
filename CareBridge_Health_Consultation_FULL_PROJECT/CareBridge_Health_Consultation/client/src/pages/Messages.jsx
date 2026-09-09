@@ -139,7 +139,7 @@ export default function Messages() {
       <section className="px-comm-shell">
         <aside className="px-inbox-rail">
           <div className="px-inbox-title"><span>Conversations</span><strong>{contacts.length}</strong></div>
-          <label className="px-inbox-search"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search people" /></label>
+          <label className="px-inbox-search"><Search size={15} /><input aria-label="Search conversations" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search people" /></label>
           <div className="px-contact-list">
             {visible.map((contact) => <button key={contact.id} type="button" className={selected?.id === contact.id ? "active" : ""} onClick={() => setSelected(contact)}>
               <span className="px-contact-avatar"><Avatar person={contact} /><i className={contact.available === false ? "busy" : "online"} /></span>
@@ -171,9 +171,9 @@ export default function Messages() {
             </div>
 
             <form className="px-composer" onSubmit={(event) => { event.preventDefault(); sendText(text); }}>
-              <input type="file" hidden ref={fileRef} onChange={onFile} />
-              <button type="button" title="Attach file" onClick={() => fileRef.current?.click()}><Paperclip size={18} /></button>
-              <textarea rows="1" value={text} onChange={(e) => setText(e.target.value)} placeholder={selected.available === false && user.role === "patient" ? "Leave a secure message…" : "Write a message…"} />
+              <input type="file" hidden ref={fileRef} aria-label="Attach message file" onChange={onFile} />
+              <button type="button" title="Attach file" aria-label="Attach file" onClick={() => fileRef.current?.click()}><Paperclip size={18} /></button>
+              <textarea aria-label="Message" rows="1" value={text} onChange={(e) => setText(e.target.value)} placeholder={selected.available === false && user.role === "patient" ? "Leave a secure message…" : "Write a message…"} />
               <button className="send" type="submit" aria-label="Send"><Send size={18} /></button>
             </form>
           </> : <div className="px-empty large"><MessageCircle size={32} /><h3>Choose a conversation</h3><p>Select a care contact to open the secure thread.</p></div>}
