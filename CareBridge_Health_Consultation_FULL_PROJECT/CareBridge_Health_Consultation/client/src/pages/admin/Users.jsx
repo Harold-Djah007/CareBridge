@@ -88,7 +88,7 @@ export default function AdminUsers() {
       </section>
 
       <section className="identity-commandbar">
-        <label className="identity-search"><Search size={16} /><input placeholder="Search name, email, specialty or city" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+        <label className="identity-search"><Search size={16} /><input aria-label="Search people" placeholder="Search name, email, specialty or city" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
         <div className="identity-filters"><SlidersHorizontal size={15} />{ROLE_FILTERS.map((item) => <button key={item} type="button" className={role === item ? "active" : ""} onClick={() => setRole(item)}>{item === "all" ? "All roles" : roleLabel(item)}</button>)}</div>
         <div className="identity-state-filter">{["active", "inactive", "all"].map((item) => <button type="button" key={item} className={status === item ? "active" : ""} onClick={() => setStatus(item)}>{item}</button>)}</div>
       </section>
@@ -112,8 +112,8 @@ export default function AdminUsers() {
 
       {open && (
         <div className="px-modal-backdrop" onMouseDown={() => setOpen(false)}>
-          <form className="identity-editor-sheet" onMouseDown={(event) => event.stopPropagation()} onSubmit={save}>
-            <header><div><span className="px-kicker">Identity profile</span><h2>{editing ? "Edit person" : "Create person"}</h2><p>{editing ? "Update profile, role and access details." : "Create a protected CareBridge identity and assign its hospital role."}</p></div><button type="button" onClick={() => setOpen(false)}><X size={18} /></button></header>
+          <form className="identity-editor-sheet" role="dialog" aria-modal="true" aria-labelledby="identity-editor-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={save}>
+            <header><div><span className="px-kicker">Identity profile</span><h2 id="identity-editor-title">{editing ? "Edit person" : "Create person"}</h2><p>{editing ? "Update profile, role and access details." : "Create a protected CareBridge identity and assign its hospital role."}</p></div><button type="button" aria-label="Close identity editor" onClick={() => setOpen(false)}><X size={18} /></button></header>
             <div className="identity-editor-body">
               <PhotoPicker value={form.photo} name={form.name} onChange={(photo) => setForm({ ...form, photo })} onError={(message) => push(message, "error")} />
               <label>Full name<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></label>
