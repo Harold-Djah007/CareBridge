@@ -144,3 +144,14 @@ jobs:
           set -euo pipefail
           cp server/data/db.json /tmp/carebridge-browser-ci-db.json
           CAREBRIDGE_E2E_DATA_FILE=/tmp/carebridge-browser-ci-db.json npm run quality:e2e --prefix client
+
+      - name: Preserve browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: carebridge-browser-quality-${{ github.run_id }}
+          path: |
+            CareBridge_Health_Consultation_FULL_PROJECT/CareBridge_Health_Consultation/client/test-results
+            CareBridge_Health_Consultation_FULL_PROJECT/CareBridge_Health_Consultation/client/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
