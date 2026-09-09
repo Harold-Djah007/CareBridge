@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { createClient } from "redis";
 
 const nowMs = () => Date.now();
 const requestId = () => crypto.randomUUID();
@@ -41,6 +42,27 @@ function routeKey(req) {
   return `${req.method} ${raw.replace(/\b(?:[a-f0-9]{8}-[a-f0-9-]{27,}|(?:apt|wb|rx|ord|claim|sess|smart|hl7|dcm)[A-Za-z0-9_-]+)\b/gi, ":id")}`.slice(0, 180);
 }
 
+function installDistributedLimiter(stats) {
+  if (!process.env.REDIS_URL) return null;
+  const client = createClient({ url: process.env.REDIS_URL });
+  const state = { client, ready: false, errors: 0, provider: "redis" };
+  client.on("error", () => {
+    state.ready = false;
+    state.errors += 1;
+  });
+  client.connect()
+    .then(() => {
+      state.ready = true;
+      client.unref?.();
+    })
+    .catch(() => {
+      state.ready = false;
+      state.errors += 1;
+    });
+  stats.rateLimiter = { provider: "redis-with-local-fallback", distributedConfigured: true };
+  return state;
+}
+
 export function installSecurity(app, { readiness } = {}) {
   const buckets = new Map();
   const stats = {
@@ -51,7 +73,9 @@ export function installSecurity(app, { readiness } = {}) {
     rateLimited: 0,
     lastRequestAt: null,
     routeLatency: {},
+    rateLimiter: { provider: process.env.REDIS_URL ? "redis-with-local-fallback" : "local", distributedConfigured: Boolean(process.env.REDIS_URL) },
   };
+  const distributed = installDistributedLimiter(stats);
   app.locals.securityMetrics = stats;
 
   app.use((req, res, next) => {
@@ -129,11 +153,39 @@ export function installSecurity(app, { readiness } = {}) {
     next();
   });
 
-  app.use((req, res, next) => {
+  app.use(async (req, res, next) => {
     const kind = routeClass(req);
     const limit = LIMITS[kind] || LIMITS.web;
-    const key = `${kind}:${ipOf(req)}`;
+    const ip = ipOf(req);
     const now = nowMs();
+    const resetAt = Math.floor(now / limit.windowMs) * limit.windowMs + limit.windowMs;
+
+    if (distributed?.ready) {
+      try {
+        const slot = Math.floor(now / limit.windowMs);
+        const prefix = String(process.env.REDIS_PREFIX || "carebridge").replace(/[^a-zA-Z0-9:_-]/g, "");
+        const key = `${prefix}:rate:${kind}:${ip}:${slot}`;
+        const result = await distributed.client.multi().incr(key).pExpire(key, limit.windowMs + 5000).exec();
+        const count = Number(result?.[0] || 0);
+        const remaining = Math.max(0, limit.max - count);
+        res.setHeader("RateLimit-Limit", String(limit.max));
+        res.setHeader("RateLimit-Remaining", String(remaining));
+        res.setHeader("RateLimit-Reset", String(Math.ceil(resetAt / 1000)));
+        res.setHeader("RateLimit-Policy", "distributed-redis");
+        if (count > limit.max) {
+          stats.rateLimited += 1;
+          const retry = Math.max(1, Math.ceil((resetAt - now) / 1000));
+          res.setHeader("Retry-After", String(retry));
+          return res.status(429).json({ message: "Too many requests. Please wait and try again.", requestId: req.id, retryAfterSeconds: retry });
+        }
+        return next();
+      } catch {
+        distributed.ready = false;
+        distributed.errors += 1;
+      }
+    }
+
+    const key = `${kind}:${ip}`;
     let bucket = buckets.get(key);
     if (!bucket || bucket.resetAt <= now) {
       bucket = { count: 0, resetAt: now + limit.windowMs };
@@ -144,6 +196,7 @@ export function installSecurity(app, { readiness } = {}) {
     res.setHeader("RateLimit-Limit", String(limit.max));
     res.setHeader("RateLimit-Remaining", String(remaining));
     res.setHeader("RateLimit-Reset", String(Math.ceil(bucket.resetAt / 1000)));
+    res.setHeader("RateLimit-Policy", distributed ? "local-fallback" : "local");
     if (bucket.count > limit.max) {
       stats.rateLimited += 1;
       const retry = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
@@ -167,7 +220,16 @@ export function installSecurity(app, { readiness } = {}) {
       requestId: req.id,
       traceId: req.trace?.traceId,
       uptimeSeconds: Math.round(process.uptime()),
-      security: { rateLimiting: true, csp: true, requestIds: true, structuredHttpLogs: true, traceContext: true, latencySloTelemetry: true },
+      security: {
+        rateLimiting: true,
+        distributedRateLimiting: Boolean(distributed),
+        rateLimiterReady: distributed ? distributed.ready : true,
+        csp: true,
+        requestIds: true,
+        structuredHttpLogs: true,
+        traceContext: true,
+        latencySloTelemetry: true,
+      },
       ...details,
     });
   });
