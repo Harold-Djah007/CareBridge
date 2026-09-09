@@ -183,7 +183,7 @@ export default function ClinicalOrders() {
       <div className="cb-order-workspace">
         <section className="cb-order-listpane">
           <div className="cb-order-toolbar">
-            <label><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search order, code or reason" /></label>
+            <label><Search size={15} /><input aria-label="Search clinical orders" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search order, code or reason" /></label>
             <div>{["open", "active", "in_progress", "completed", "all"].map((id) => <button type="button" key={id} className={filter === id ? "active" : ""} onClick={() => setFilter(id)}>{id === "in_progress" ? "In progress" : id[0].toUpperCase() + id.slice(1)}</button>)}</div>
           </div>
 
@@ -234,7 +234,7 @@ export default function ClinicalOrders() {
                 {!["completed", "cancelled"].includes(selected.status) && (
                   <section className="cb-order-result">
                     <div><FlaskConical size={18} /><span><small>RESULT / COMPLETION</small><b>Clinical execution</b></span></div>
-                    <textarea rows="5" value={result.text} onChange={(event) => setResult({ ...result, text: event.target.value })} placeholder={selected.type === "lab" ? "Enter final laboratory result before completion" : selected.type === "imaging" ? "Enter imaging impression before completion" : "Add completion/result note when appropriate"} />
+                    <textarea aria-label="Clinical result" rows="5" value={result.text} onChange={(event) => setResult({ ...result, text: event.target.value })} placeholder={selected.type === "lab" ? "Enter final laboratory result before completion" : selected.type === "imaging" ? "Enter imaging impression before completion" : "Add completion/result note when appropriate"} />
                     <label>Interpretation<select value={result.flag} onChange={(event) => setResult({ ...result, flag: event.target.value })}><option value="normal">Normal</option><option value="abnormal">Abnormal</option><option value="critical">Critical</option><option value="review">Review</option></select></label>
                   </section>
                 )}
@@ -250,8 +250,8 @@ export default function ClinicalOrders() {
 
       {createOpen && (
         <div className="cb-order-modal" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCreateOpen(false); }}>
-          <form className="cb-order-sheet" onSubmit={createOrder}>
-            <header><div><span>New CPOE order</span><h2>{selectedPatient?.name || "Choose patient"}</h2><p>Structured clinical order with coding, priority and execution metadata.</p></div><button type="button" onClick={() => setCreateOpen(false)}>×</button></header>
+          <form className="cb-order-sheet" role="dialog" aria-modal="true" aria-labelledby="new-order-title" onSubmit={createOrder}>
+            <header><div><span>New CPOE order</span><h2 id="new-order-title">{selectedPatient?.name || "Choose patient"}</h2><p>Structured clinical order with coding, priority and execution metadata.</p></div><button type="button" aria-label="Close new order" onClick={() => setCreateOpen(false)}>×</button></header>
             <div className="cb-order-form">
               <label>Order type<select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value, codeSystem: event.target.value === "lab" ? "http://loinc.org" : form.codeSystem })}>{TYPES.map((type) => <option value={type.id} key={type.id}>{type.label}</option>)}</select></label>
               <label>Priority<select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option value="routine">Routine</option><option value="urgent">Urgent</option><option value="stat">STAT</option></select></label>
