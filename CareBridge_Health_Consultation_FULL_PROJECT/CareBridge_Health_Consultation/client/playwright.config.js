@@ -22,8 +22,20 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
     },
     {
+      name: "desktop-firefox",
+      use: { ...devices["Desktop Firefox"], viewport: { width: 1440, height: 900 } },
+    },
+    {
+      name: "desktop-webkit",
+      use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 } },
+    },
+    {
       name: "mobile-chromium",
       use: { ...devices["Pixel 7"] },
+    },
+    {
+      name: "mobile-webkit",
+      use: { ...devices["iPhone 14"] },
     },
   ],
   webServer: [
@@ -42,7 +54,7 @@ export default defineConfig({
       },
     },
     {
-      command: "npm run dev -- --host 127.0.0.1 --port 5173",
+      command: "npm run preview -- --host 127.0.0.1 --port 5173 --strictPort",
       cwd: ".",
       url: "http://127.0.0.1:5173/login",
       timeout: 120_000,
