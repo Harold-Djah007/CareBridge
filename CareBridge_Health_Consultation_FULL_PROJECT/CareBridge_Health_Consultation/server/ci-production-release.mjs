@@ -44,7 +44,17 @@ const productionEnv = {
 
 const configReport = productionConfigurationReport(productionEnv);
 if (!configReport.ok) throw new Error(`Production configuration contract failed:\n${configReport.issues.join("\n")}`);
-console.log("✓ fail-fast production configuration contract");
+const unsafeReport = productionConfigurationReport({
+  ...productionEnv,
+  DATABASE_URL: "",
+  REDIS_URL: "",
+  REDIS_SESSION_ENFORCE: "false",
+  CLIENT_URL: "http://carebridge.invalid",
+  APP_URL: "http://carebridge.invalid",
+  MFA_ENCRYPTION_KEY: "short",
+});
+if (unsafeReport.ok || unsafeReport.issues.length < 5) throw new Error("Unsafe production configuration was not rejected strongly enough.");
+console.log("✓ fail-fast production configuration contract + negative safety cases");
 
 const child = spawn(process.execPath, ["index.js"], {
   cwd: new URL(".", import.meta.url),
@@ -60,7 +70,14 @@ async function waitReady() {
     if (child.exitCode != null) throw new Error(`Production CareBridge runtime exited early.\n${log}`);
     try {
       const response = await fetch(`${base}/api/ready`);
-      if (response.ok) return { response, body: await response.json() };
+      if (response.ok) {
+        const body = await response.json();
+        if (body?.security?.distributedRateLimiting && body?.security?.rateLimiterReady === false) {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          continue;
+        }
+        return { response, body };
+      }
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -96,16 +113,22 @@ try {
   if (ready.body?.coordination?.ok !== true || ready.body?.coordination?.provider !== "redis") {
     throw new Error(`Redis production coordination is not ready: ${JSON.stringify(ready.body?.coordination)}`);
   }
+  if (ready.body?.security?.distributedRateLimiting !== true || ready.body?.security?.rateLimiterReady !== true) {
+    throw new Error(`Distributed Redis rate limiting is not ready: ${JSON.stringify(ready.body?.security)}`);
+  }
   if (ready.body?.mfa?.encryptionConfigured !== true) throw new Error("Production MFA encryption is not configured.");
   if (!ready.response.headers.get("strict-transport-security")) throw new Error("Production HSTS header is missing.");
   if (!ready.response.headers.get("content-security-policy")) throw new Error("Production CSP header is missing.");
-  console.log("✓ production runtime: PostgreSQL + Redis + MFA key + HSTS/CSP");
+  console.log("✓ production runtime: PostgreSQL + Redis coordination/throttling + MFA key + HSTS/CSP");
 
   const login = await request("/api/login", "", {
     method: "POST",
     body: JSON.stringify({ email: admin.email, password: admin.password, expectedRole: "admin" }),
   });
   if (!login.response.ok || !login.body?.token) throw new Error(`Production admin login failed: ${login.response.status} ${login.text}\n${log}`);
+  if (login.response.headers.get("ratelimit-policy") !== "distributed-redis") {
+    throw new Error(`Production login did not use distributed Redis throttling: ${login.response.headers.get("ratelimit-policy")}`);
+  }
 
   const readiness = await request("/api/admin/system/readiness", login.body.token);
   if (!readiness.response.ok || readiness.body?.ready !== true || Number(readiness.body?.failed || 0) !== 0) {
