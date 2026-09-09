@@ -45,21 +45,42 @@ function routeKey(req) {
 function installDistributedLimiter(stats) {
   if (!process.env.REDIS_URL) return null;
   const client = createClient({ url: process.env.REDIS_URL });
-  const state = { client, ready: false, errors: 0, provider: "redis" };
+  const state = { client, ready: false, errors: 0, reconnects: 0, provider: "redis" };
+  const syncStats = () => {
+    stats.rateLimiter.ready = state.ready;
+    stats.rateLimiter.errors = state.errors;
+    stats.rateLimiter.reconnects = state.reconnects;
+  };
+  client.on("ready", () => {
+    if (!state.ready && state.errors > 0) state.reconnects += 1;
+    state.ready = true;
+    syncStats();
+  });
+  client.on("reconnecting", () => {
+    state.ready = false;
+    syncStats();
+  });
+  client.on("end", () => {
+    state.ready = false;
+    syncStats();
+  });
   client.on("error", () => {
     state.ready = false;
     state.errors += 1;
+    syncStats();
   });
   client.connect()
     .then(() => {
-      state.ready = true;
+      state.ready = client.isReady === true;
+      syncStats();
       client.unref?.();
     })
     .catch(() => {
       state.ready = false;
       state.errors += 1;
+      syncStats();
     });
-  stats.rateLimiter = { provider: "redis-with-local-fallback", distributedConfigured: true };
+  stats.rateLimiter = { provider: "redis-with-local-fallback", distributedConfigured: true, ready: false, errors: 0, reconnects: 0 };
   return state;
 }
 
@@ -73,7 +94,7 @@ export function installSecurity(app, { readiness } = {}) {
     rateLimited: 0,
     lastRequestAt: null,
     routeLatency: {},
-    rateLimiter: { provider: process.env.REDIS_URL ? "redis-with-local-fallback" : "local", distributedConfigured: Boolean(process.env.REDIS_URL) },
+    rateLimiter: { provider: process.env.REDIS_URL ? "redis-with-local-fallback" : "local", distributedConfigured: Boolean(process.env.REDIS_URL), ready: !process.env.REDIS_URL, errors: 0, reconnects: 0 },
   };
   const distributed = installDistributedLimiter(stats);
   app.locals.securityMetrics = stats;
@@ -182,6 +203,8 @@ export function installSecurity(app, { readiness } = {}) {
       } catch {
         distributed.ready = false;
         distributed.errors += 1;
+        stats.rateLimiter.ready = false;
+        stats.rateLimiter.errors = distributed.errors;
       }
     }
 
@@ -224,6 +247,8 @@ export function installSecurity(app, { readiness } = {}) {
         rateLimiting: true,
         distributedRateLimiting: Boolean(distributed),
         rateLimiterReady: distributed ? distributed.ready : true,
+        rateLimiterErrors: distributed?.errors || 0,
+        rateLimiterReconnects: distributed?.reconnects || 0,
         csp: true,
         requestIds: true,
         structuredHttpLogs: true,
