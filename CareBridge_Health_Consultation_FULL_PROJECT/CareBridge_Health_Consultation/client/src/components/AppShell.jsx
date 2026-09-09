@@ -164,7 +164,17 @@ export default function AppShell() {
   const patientNotificationsVisible = !isPatient || moduleVisible("notifications");
 
   const loadNotes = () => api(`/notifications/${user.id}`).then((rows) => { setNotes(rows); return rows; }).catch(() => []);
-  const loadBadges = () => api(`/badges?userId=${user.id}&role=${user.role}`).then((next) => { setBadges({ ...EMPTY_BADGES, ...next }); return next; }).catch(() => EMPTY_BADGES);
+  const loadBadges = async () => {
+    const next = await api(`/badges?userId=${user.id}&role=${user.role}`).catch(() => EMPTY_BADGES);
+    let supportUnread = 0;
+    if (user.role !== "nurse") {
+      const tickets = await api(`/tickets?userId=${user.id}&role=${user.role}`).catch(() => []);
+      supportUnread = tickets.filter((ticket) => ticket.unread).length;
+    }
+    const merged = { ...EMPTY_BADGES, ...next, tickets: supportUnread };
+    setBadges(merged);
+    return merged;
+  };
 
   useEffect(() => {
     loadNotes();
