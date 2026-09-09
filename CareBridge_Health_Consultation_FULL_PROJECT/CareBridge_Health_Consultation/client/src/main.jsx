@@ -75,7 +75,7 @@ const PaymentCallback = lazy(() => import("./pages/PaymentCallback"));
 const PaymentStatus = lazy(() => import("./pages/PaymentStatus"));
 
 function RouteLoader() {
-  return <div className="cbv6-route-loading" role="status" aria-live="polite"><span className="cbv6-route-loading-pulse" aria-hidden="true" /><span>Opening…</span></div>;
+  return <div className="cbv6-route-loading" role="status" aria-live="polite"><span className="cbv6-route-loading-pulse" aria-hidden="true" /><span>Loading…</span></div>;
 }
 
 function RouteReset() {
@@ -86,13 +86,13 @@ function RouteReset() {
 
 function RoleRoute({ roles, children }) {
   const { user } = useAuth();
-  return roles.includes(user.role) ? children : <Navigate to={homeFor(user)} replace />;
+  return roles.includes(user.role[0]) ? children : <Navigate to={homeFor(user)} replace />;
 }
 
 function PatientFeatureRoute({ feature, children }) {
   const { user } = useAuth();
   const { moduleVisible, loading } = usePatientExperience();
-  if (user.role !== "patient") return children;
+  if (user.role[0] !== "p") return children;
   if (loading) return <RouteLoader />;
   return moduleVisible(feature) ? children : <Navigate to="/home" replace />;
 }
@@ -119,39 +119,39 @@ function AppRoutes() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/tariff" element={user ? <Navigate to="/billing/tariff" replace /> : <Tariff />} />
             <Route element={user ? <AppShell /> : <Navigate to="/login" />}>
-              <Route path="/home" element={<RoleRoute roles="patient doctor nurse"><Dashboard /></RoleRoute>} />
-              <Route path="/care" element={<PatientFeatureRoute feature="careTeam"><RoleRoute roles="patient doctor"><CareTeam /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/home" element={<RoleRoute roles="pdn"><Dashboard /></RoleRoute>} />
+              <Route path="/care" element={<PatientFeatureRoute feature="careTeam"><RoleRoute roles="pd"><CareTeam /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/appointments" element={<PatientFeatureRoute feature="appointments"><Appointments /></PatientFeatureRoute>} />
               <Route path="/messages" element={<PatientFeatureRoute feature="messages"><Messages /></PatientFeatureRoute>} />
-              <Route path="/video" element={<PatientFeatureRoute feature="video"><RoleRoute roles="patient doctor"><VideoConsultation /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/video" element={<PatientFeatureRoute feature="video"><RoleRoute roles="pd"><VideoConsultation /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/wards" element={<PatientFeatureRoute feature="admissions"><WardBooking /></PatientFeatureRoute>} />
-              <Route path="/alerts" element={<PatientFeatureRoute feature="notifications"><RoleRoute roles="patient admin"><Alerts /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/alerts" element={<PatientFeatureRoute feature="notifications"><RoleRoute roles="pa"><Alerts /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/profile" element={<Navigate to="/settings" replace />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/support" element={<PatientFeatureRoute feature="support"><Support /></PatientFeatureRoute>} />
               <Route path="/guide" element={<Help />} />
-              <Route path="/records" element={<PatientFeatureRoute feature="records"><RoleRoute roles="patient doctor admin"><ClinicalRecord /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/records/:patientId" element={<RoleRoute roles="doctor admin"><ClinicalRecord /></RoleRoute>} />
-              <Route path="/orders" element={<RoleRoute roles="doctor nurse admin"><ClinicalOrders /></RoleRoute>} />
-              <Route path="/pay" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient admin"><Pay /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/payment/callback" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient"><PaymentCallback /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/payments/:id" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient admin"><PaymentStatus /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/receipts" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient admin"><Navigate to="/pay" replace /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/admin/billing" element={<RoleRoute roles="admin"><Navigate to="/pay" replace /></RoleRoute>} />
-              <Route path="/pharmacy" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient admin"><Navigate to="/pay" replace /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/pharmacy-stock" element={<RoleRoute roles="nurse admin"><PharmacyStock /></RoleRoute>} />
-              <Route path="/prescriptions" element={<PatientFeatureRoute feature="prescriptions"><RoleRoute roles="patient doctor"><Prescriptions /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/prescriptions/:id" element={<PatientFeatureRoute feature="prescriptions"><RoleRoute roles="patient doctor admin"><PrescriptionPrint /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/receipts/:id" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient doctor admin"><Receipt /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/records" element={<PatientFeatureRoute feature="records"><RoleRoute roles="pda"><ClinicalRecord /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/records/:patientId" element={<RoleRoute roles="da"><ClinicalRecord /></RoleRoute>} />
+              <Route path="/orders" element={<RoleRoute roles="dna"><ClinicalOrders /></RoleRoute>} />
+              <Route path="/pay" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="pa"><Pay /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/payment/callback" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="p"><PaymentCallback /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/payments/:id" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="pa"><PaymentStatus /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/receipts" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="pa"><Navigate to="/pay" replace /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/admin/billing" element={<RoleRoute roles="a"><Navigate to="/pay" replace /></RoleRoute>} />
+              <Route path="/pharmacy" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="pa"><Navigate to="/pay" replace /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/pharmacy-stock" element={<RoleRoute roles="na"><PharmacyStock /></RoleRoute>} />
+              <Route path="/prescriptions" element={<PatientFeatureRoute feature="prescriptions"><RoleRoute roles="pd"><Prescriptions /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/prescriptions/:id" element={<PatientFeatureRoute feature="prescriptions"><RoleRoute roles="pda"><PrescriptionPrint /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/receipts/:id" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="pda"><Receipt /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/billing/tariff" element={<Tariff />} />
-              <Route path="/admin" element={<RoleRoute roles="admin"><AdminOverview /></RoleRoute>} />
-              <Route path="/admin/users" element={<RoleRoute roles="admin"><AdminUsers /></RoleRoute>} />
-              <Route path="/admin/appointments" element={<RoleRoute roles="admin"><AdminSchedule /></RoleRoute>} />
-              <Route path="/admin/hospital" element={<RoleRoute roles="admin"><AdminHospital /></RoleRoute>} />
-              <Route path="/admin/reports" element={<RoleRoute roles="admin"><AdminReports /></RoleRoute>} />
-              <Route path="/admin/cases" element={<RoleRoute roles="admin"><AdminCases /></RoleRoute>} />
-              <Route path="/admin/cases/:id" element={<RoleRoute roles="admin"><AdminCaseDetail /></RoleRoute>} />
-              <Route path="/admin/patient-experience" element={<RoleRoute roles="admin"><AdminPatientExperience /></RoleRoute>} />
+              <Route path="/admin" element={<RoleRoute roles="a"><AdminOverview /></RoleRoute>} />
+              <Route path="/admin/users" element={<RoleRoute roles="a"><AdminUsers /></RoleRoute>} />
+              <Route path="/admin/appointments" element={<RoleRoute roles="a"><AdminSchedule /></RoleRoute>} />
+              <Route path="/admin/hospital" element={<RoleRoute roles="a"><AdminHospital /></RoleRoute>} />
+              <Route path="/admin/reports" element={<RoleRoute roles="a"><AdminReports /></RoleRoute>} />
+              <Route path="/admin/cases" element={<RoleRoute roles="a"><AdminCases /></RoleRoute>} />
+              <Route path="/admin/cases/:id" element={<RoleRoute roles="a"><AdminCaseDetail /></RoleRoute>} />
+              <Route path="/admin/patient-experience" element={<RoleRoute roles="a"><AdminPatientExperience /></RoleRoute>} />
             </Route>
             <Route path="*" element={<Navigate to={user ? homeFor(user) : "/"} />} />
           </Routes>
