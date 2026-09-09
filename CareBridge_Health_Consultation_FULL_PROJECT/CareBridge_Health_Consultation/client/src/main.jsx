@@ -75,26 +75,18 @@ const PaymentCallback = lazy(() => import("./pages/PaymentCallback"));
 const PaymentStatus = lazy(() => import("./pages/PaymentStatus"));
 
 function RouteLoader() {
-  return (
-    <div className="cbv6-route-loading" role="status" aria-live="polite">
-      <span className="cbv6-route-loading-pulse" aria-hidden="true" />
-      <span>Opening CareBridge…</span>
-    </div>
-  );
+  return <div className="cbv6-route-loading" role="status" aria-live="polite"><span className="cbv6-route-loading-pulse" aria-hidden="true" /><span>Opening…</span></div>;
 }
 
 function RouteReset() {
   const location = useLocation();
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [location.pathname]);
+  useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
   return null;
 }
 
 function RoleRoute({ roles, children }) {
   const { user } = useAuth();
-  if (!roles.includes(user.role)) return <Navigate to={homeFor(user)} replace />;
-  return children;
+  return roles.includes(user.role) ? children : <Navigate to={homeFor(user)} replace />;
 }
 
 function PatientFeatureRoute({ feature, children }) {
@@ -102,8 +94,7 @@ function PatientFeatureRoute({ feature, children }) {
   const { moduleVisible, loading } = usePatientExperience();
   if (user.role !== "patient") return children;
   if (loading) return <RouteLoader />;
-  if (!moduleVisible(feature)) return <Navigate to="/home" replace />;
-  return children;
+  return moduleVisible(feature) ? children : <Navigate to="/home" replace />;
 }
 
 function AppRoutes() {
@@ -128,39 +119,39 @@ function AppRoutes() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/tariff" element={user ? <Navigate to="/billing/tariff" replace /> : <Tariff />} />
             <Route element={user ? <AppShell /> : <Navigate to="/login" />}>
-              <Route path="/home" element={<RoleRoute roles={["patient", "doctor", "nurse"]}><Dashboard /></RoleRoute>} />
-              <Route path="/care" element={<PatientFeatureRoute feature="careTeam"><RoleRoute roles={["patient", "doctor"]}><CareTeam /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/home" element={<RoleRoute roles="patient doctor nurse"><Dashboard /></RoleRoute>} />
+              <Route path="/care" element={<PatientFeatureRoute feature="careTeam"><RoleRoute roles="patient doctor"><CareTeam /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/appointments" element={<PatientFeatureRoute feature="appointments"><Appointments /></PatientFeatureRoute>} />
               <Route path="/messages" element={<PatientFeatureRoute feature="messages"><Messages /></PatientFeatureRoute>} />
-              <Route path="/video" element={<PatientFeatureRoute feature="video"><RoleRoute roles={["patient", "doctor"]}><VideoConsultation /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/video" element={<PatientFeatureRoute feature="video"><RoleRoute roles="patient doctor"><VideoConsultation /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/wards" element={<PatientFeatureRoute feature="admissions"><WardBooking /></PatientFeatureRoute>} />
-              <Route path="/alerts" element={<PatientFeatureRoute feature="notifications"><RoleRoute roles={["patient", "admin"]}><Alerts /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/alerts" element={<PatientFeatureRoute feature="notifications"><RoleRoute roles="patient admin"><Alerts /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/profile" element={<Navigate to="/settings" replace />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/support" element={<PatientFeatureRoute feature="support"><Support /></PatientFeatureRoute>} />
               <Route path="/guide" element={<Help />} />
-              <Route path="/records" element={<PatientFeatureRoute feature="records"><RoleRoute roles={["patient", "doctor", "admin"]}><ClinicalRecord /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/records/:patientId" element={<RoleRoute roles={["doctor", "admin"]}><ClinicalRecord /></RoleRoute>} />
-              <Route path="/orders" element={<RoleRoute roles={["doctor", "nurse", "admin"]}><ClinicalOrders /></RoleRoute>} />
-              <Route path="/pay" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient", "admin"]}><Pay /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/payment/callback" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient"]}><PaymentCallback /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/payments/:id" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient", "admin"]}><PaymentStatus /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/receipts" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient", "admin"]}><Navigate to="/pay" replace /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/admin/billing" element={<RoleRoute roles={["admin"]}><Navigate to="/pay" replace /></RoleRoute>} />
-              <Route path="/pharmacy" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient", "admin"]}><Navigate to="/pay" replace /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/pharmacy-stock" element={<RoleRoute roles={["nurse", "admin"]}><PharmacyStock /></RoleRoute>} />
-              <Route path="/prescriptions" element={<PatientFeatureRoute feature="prescriptions"><RoleRoute roles={["patient", "doctor"]}><Prescriptions /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/prescriptions/:id" element={<PatientFeatureRoute feature="prescriptions"><RoleRoute roles={["patient", "doctor", "admin"]}><PrescriptionPrint /></RoleRoute></PatientFeatureRoute>} />
-              <Route path="/receipts/:id" element={<PatientFeatureRoute feature="shop"><RoleRoute roles={["patient", "doctor", "admin"]}><Receipt /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/records" element={<PatientFeatureRoute feature="records"><RoleRoute roles="patient doctor admin"><ClinicalRecord /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/records/:patientId" element={<RoleRoute roles="doctor admin"><ClinicalRecord /></RoleRoute>} />
+              <Route path="/orders" element={<RoleRoute roles="doctor nurse admin"><ClinicalOrders /></RoleRoute>} />
+              <Route path="/pay" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient admin"><Pay /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/payment/callback" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient"><PaymentCallback /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/payments/:id" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient admin"><PaymentStatus /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/receipts" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient admin"><Navigate to="/pay" replace /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/admin/billing" element={<RoleRoute roles="admin"><Navigate to="/pay" replace /></RoleRoute>} />
+              <Route path="/pharmacy" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient admin"><Navigate to="/pay" replace /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/pharmacy-stock" element={<RoleRoute roles="nurse admin"><PharmacyStock /></RoleRoute>} />
+              <Route path="/prescriptions" element={<PatientFeatureRoute feature="prescriptions"><RoleRoute roles="patient doctor"><Prescriptions /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/prescriptions/:id" element={<PatientFeatureRoute feature="prescriptions"><RoleRoute roles="patient doctor admin"><PrescriptionPrint /></RoleRoute></PatientFeatureRoute>} />
+              <Route path="/receipts/:id" element={<PatientFeatureRoute feature="shop"><RoleRoute roles="patient doctor admin"><Receipt /></RoleRoute></PatientFeatureRoute>} />
               <Route path="/billing/tariff" element={<Tariff />} />
-              <Route path="/admin" element={<RoleRoute roles={["admin"]}><AdminOverview /></RoleRoute>} />
-              <Route path="/admin/users" element={<RoleRoute roles={["admin"]}><AdminUsers /></RoleRoute>} />
-              <Route path="/admin/appointments" element={<RoleRoute roles={["admin"]}><AdminSchedule /></RoleRoute>} />
-              <Route path="/admin/hospital" element={<RoleRoute roles={["admin"]}><AdminHospital /></RoleRoute>} />
-              <Route path="/admin/reports" element={<RoleRoute roles={["admin"]}><AdminReports /></RoleRoute>} />
-              <Route path="/admin/cases" element={<RoleRoute roles={["admin"]}><AdminCases /></RoleRoute>} />
-              <Route path="/admin/cases/:id" element={<RoleRoute roles={["admin"]}><AdminCaseDetail /></RoleRoute>} />
-              <Route path="/admin/patient-experience" element={<RoleRoute roles={["admin"]}><AdminPatientExperience /></RoleRoute>} />
+              <Route path="/admin" element={<RoleRoute roles="admin"><AdminOverview /></RoleRoute>} />
+              <Route path="/admin/users" element={<RoleRoute roles="admin"><AdminUsers /></RoleRoute>} />
+              <Route path="/admin/appointments" element={<RoleRoute roles="admin"><AdminSchedule /></RoleRoute>} />
+              <Route path="/admin/hospital" element={<RoleRoute roles="admin"><AdminHospital /></RoleRoute>} />
+              <Route path="/admin/reports" element={<RoleRoute roles="admin"><AdminReports /></RoleRoute>} />
+              <Route path="/admin/cases" element={<RoleRoute roles="admin"><AdminCases /></RoleRoute>} />
+              <Route path="/admin/cases/:id" element={<RoleRoute roles="admin"><AdminCaseDetail /></RoleRoute>} />
+              <Route path="/admin/patient-experience" element={<RoleRoute roles="admin"><AdminPatientExperience /></RoleRoute>} />
             </Route>
             <Route path="*" element={<Navigate to={user ? homeFor(user) : "/"} />} />
           </Routes>
@@ -171,17 +162,7 @@ function AppRoutes() {
 }
 
 function App() {
-  return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <ToastProvider>
-          <PatientExperienceProvider>
-            <AppRoutes />
-          </PatientExperienceProvider>
-        </ToastProvider>
-      </AuthProvider>
-    </ErrorBoundary>
-  );
+  return <ErrorBoundary><AuthProvider><ToastProvider><PatientExperienceProvider><AppRoutes /></PatientExperienceProvider></ToastProvider></AuthProvider></ErrorBoundary>;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
