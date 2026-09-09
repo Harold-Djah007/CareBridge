@@ -68,6 +68,24 @@
   max-width: 100%;
 }
 
+/* Support badges represent unseen activity, not merely an open workflow. */
+.px-ticket-list > button.is-unread {
+  border-color: color-mix(in srgb, var(--v6-accent, #1d715e) 30%, transparent);
+  background: color-mix(in srgb, var(--v6-accent, #1d715e) 7%, white);
+}
+.px-ticket-new {
+  align-self: start;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #d85b50;
+  color: #fff;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
 .cbv6-content img,
 .cbv6-route-frame img {
   max-width: 100%;
