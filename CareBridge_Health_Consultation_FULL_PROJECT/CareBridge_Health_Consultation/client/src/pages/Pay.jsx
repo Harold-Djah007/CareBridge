@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ShoppingCart, Plus, Minus, Search, ShieldCheck, Smartphone, CreditCard, Landmark } from "lucide-react";
+import { ArrowRight, BellRing, CreditCard, Landmark, Minus, Plus, ReceiptText, Search, ShieldCheck, ShoppingCart, Smartphone } from "lucide-react";
 import { io } from "socket.io-client";
 import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
@@ -190,6 +190,7 @@ function PatientShop() {
   const inCart = (kind, id) => cart.find((c) => c.kind === kind && c.id === id);
   const due = invoices.filter((i) => i.status === "due");
   const paid = invoices.filter((i) => i.status === "paid");
+  const dueTotal = due.reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0);
   const pendingPayments = payments.filter((p) => p.status === "pending").slice(0, 5);
   const dueVisible = q ? due.filter((i) => matchesCatalogQuery("invoice", i, q)) : due;
   const visibleLabs = q ? labs.filter((p) => matchesCatalogQuery("lab", p, q)) : labs;
@@ -260,18 +261,29 @@ function PatientShop() {
         </button>
       </div>
 
+      {due.length > 0 && tab !== "bills" && (
+        <button type="button" className="bill-nudge" onClick={() => setTab("bills")}>
+          <span className="bill-nudge-icon"><BellRing size={18} aria-hidden="true" /></span>
+          <span className="bill-nudge-copy">
+            <strong>{due.length} unpaid {due.length === 1 ? "bill" : "bills"}</strong>
+            <small>{ghs(dueTotal)} outstanding · add to the same cart whenever you are ready</small>
+          </span>
+          <span className="bill-nudge-action">Review <ArrowRight size={15} aria-hidden="true" /></span>
+        </button>
+      )}
+
       {pendingPayments.length > 0 && (
-        <section className="card pending-payments-strip">
-          <div className="card-head">
-            <div><span className="eyebrow">In progress</span><h3>Pending payments</h3></div>
-            <small className="muted">Receipts appear after verification</small>
-          </div>
-          <div className="pending-payment-list">
+        <section className="pending-payment-notice" aria-label="Pending payments">
+          <header>
+            <span className="pending-payment-notice-icon"><ShieldCheck size={17} aria-hidden="true" /></span>
+            <div><strong>Verification in progress</strong><small>Receipt appears automatically when payment clears.</small></div>
+          </header>
+          <div className="pending-payment-notice-grid">
             {pendingPayments.map((payment) => (
-              <Link className="pay-pick" key={payment.id} to={`/payments/${payment.id}`}>
+              <Link className="pending-payment-mini" key={payment.id} to={`/payments/${payment.id}`}>
                 <span><b>{payment.method === "momo" ? "Mobile Money" : payment.method === "bank" ? "Bank transfer" : payment.method === "card" ? "Card" : payment.method?.toUpperCase()}</b><small>{payment.reference}</small></span>
                 <strong>{ghs(payment.amount)}</strong>
-                <span className="status pending">pending</span>
+                <em>Pending</em>
               </Link>
             ))}
           </div>
@@ -282,38 +294,43 @@ function PatientShop() {
         <div>
           {tab === "bills" && (
             <>
-              <section className="card">
-                <div className="card-head">
+              <section className="card unpaid-bills-card">
+                <div className="card-head unpaid-bills-head">
                   <div>
-                    <span className="eyebrow">On file</span>
-                    <h3>Unpaid bills</h3>
+                    <span className="eyebrow">Payment attention</span>
+                    <h3>{due.length ? `${due.length} unpaid ${due.length === 1 ? "bill" : "bills"}` : "No unpaid bills"}</h3>
+                    <small className="muted">Consults, admissions and earlier hospital orders.</small>
                   </div>
+                  {due.length > 0 && <strong className="unpaid-bills-total">{ghs(dueTotal)}<small>outstanding</small></strong>}
                 </div>
-                <p className="muted">Consults, admissions, and earlier orders. Add them to the same cart as medicines and labs.</p>
-                {due.length === 0 && !q && <p className="muted">Nothing outstanding. Shop medicines, labs, or services if you need a new bill.</p>}
+                {due.length === 0 && !q && <div className="bill-clear-state"><ShieldCheck size={20} /><span><b>You are all clear.</b><small>There is nothing outstanding on your account.</small></span></div>}
                 {q && dueVisible.length === 0 && (
                   <p className="shop-empty-copy">No unpaid bills match “{query.trim()}”.</p>
                 )}
-                {dueVisible.map((i) => {
-                  const added = cart.some((c) => c.kind === "invoice" && c.id === i.id);
-                  return (
-                    <div className={`pay-pick ${added ? "on" : ""}`} key={i.id}>
-                      <span>
-                        <b>{i.item}</b>
-                        <small>{i.date}</small>
-                      </span>
-                      <strong>{ghs(i.amount)}</strong>
-                      <button
-                        type="button"
-                        className={added ? "ghost-btn in-cart-bill" : "add-cart-btn"}
-                        disabled={added}
-                        onClick={() => shop?.addInvoice(i)}
-                      >
-                        {added ? "In cart" : "Add to cart"}
-                      </button>
-                    </div>
-                  );
-                })}
+                <div className="unpaid-bill-grid">
+                  {dueVisible.map((i) => {
+                    const added = cart.some((c) => c.kind === "invoice" && c.id === i.id);
+                    return (
+                      <article className={`unpaid-bill-notice ${added ? "on" : ""}`} key={i.id}>
+                        <span className="unpaid-bill-icon"><ReceiptText size={18} aria-hidden="true" /></span>
+                        <span className="unpaid-bill-copy">
+                          <small>Payment due</small>
+                          <b>{i.item}</b>
+                          <time>{i.date || "On file"}</time>
+                        </span>
+                        <strong>{ghs(i.amount)}</strong>
+                        <button
+                          type="button"
+                          className={added ? "ghost-btn in-cart-bill" : "add-cart-btn"}
+                          disabled={added}
+                          onClick={() => shop?.addInvoice(i)}
+                        >
+                          {added ? "In cart" : "Add to cart"}
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
               </section>
               {paid.length > 0 && !q && (
                 <section className="card" style={{ marginTop: 16 }}>
