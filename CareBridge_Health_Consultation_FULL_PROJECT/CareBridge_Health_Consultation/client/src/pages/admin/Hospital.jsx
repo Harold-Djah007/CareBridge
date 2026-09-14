@@ -7,13 +7,8 @@ import { OccupancyBars } from "../../components/LiveMeter";
 import Avatar from "../../components/Avatar";
 
 const SOCIAL_FIELDS = [
-  ["facebook", "Facebook", "https://facebook.com/your-hospital"],
-  ["instagram", "Instagram", "https://instagram.com/your-hospital"],
-  ["x", "X / Twitter", "https://x.com/your-hospital"],
-  ["linkedin", "LinkedIn", "https://linkedin.com/company/your-hospital"],
-  ["youtube", "YouTube", "https://youtube.com/@your-hospital"],
-  ["tiktok", "TikTok", "https://tiktok.com/@your-hospital"],
-  ["whatsapp", "WhatsApp", "https://wa.me/233..."],
+  ["facebook", "Facebook"], ["instagram", "Instagram"], ["x", "X / Twitter"],
+  ["linkedin", "LinkedIn"], ["youtube", "YouTube"], ["tiktok", "TikTok"], ["whatsapp", "WhatsApp"],
 ];
 
 export default function AdminHospital() {
@@ -102,8 +97,8 @@ export default function AdminHospital() {
       <section className="px-public-presence">
         <header className="px-board-head"><div><span className="px-kicker">Public presence</span><h2>Social media links</h2></div><span className="px-board-note">Only links you configure appear on the public website</span></header>
         <form className="px-social-settings" onSubmit={saveSocials}>
-          <div className="px-social-settings-grid">{SOCIAL_FIELDS.map(([key, label, placeholder]) => <label key={key}><span>{label}</span><input type="url" inputMode="url" autoComplete="url" value={socialLinks[key] || ""} placeholder={placeholder} onChange={(event) => setSocialLinks((current) => ({ ...current, [key]: event.target.value }))} /><small>Leave blank to hide {label}.</small></label>)}</div>
-          <footer><span>{Object.values(socialLinks).filter(Boolean).length} public link{Object.values(socialLinks).filter(Boolean).length === 1 ? "" : "s"} active</span><button className="px-primary" disabled={savingSocials}>{savingSocials ? "Saving…" : "Publish social links"}</button></footer>
+          <div className="px-social-settings-grid">{SOCIAL_FIELDS.map(([key, label]) => <label key={key}><span>{label}</span><input type="url" inputMode="url" value={socialLinks[key] || ""} placeholder="https://…" onChange={(event) => setSocialLinks((current) => ({ ...current, [key]: event.target.value }))} /></label>)}</div>
+          <footer><span>Blank links stay hidden.</span><button className="px-primary" disabled={savingSocials}>{savingSocials ? "Saving…" : "Publish social links"}</button></footer>
         </form>
       </section>
 
