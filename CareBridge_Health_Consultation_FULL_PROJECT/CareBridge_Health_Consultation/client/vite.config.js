@@ -8,6 +8,15 @@ const proxy = {
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("/node_modules/lucide-react/")) return "icons";
+        },
+      },
+    },
+  },
   server: {
     host: true,
     port: 5173,
