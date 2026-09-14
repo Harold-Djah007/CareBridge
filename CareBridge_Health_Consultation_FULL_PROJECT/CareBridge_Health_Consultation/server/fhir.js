@@ -198,7 +198,7 @@ export function mountFhir(app, { readDb }) {
   }));
 
   app.use(root, (req, res, next) => {
-    const relative = req.path.replace(/^\/api\/fhir\/R4\/?/, "");
+    const relative = String(req.path || "").replace(/^\/+/, "");
     if (!relative || relative === "metadata" || relative === ".well-known/smart-configuration") return next();
     if (req.authUser) return next();
     const resourceType = relative.split("/")[0];

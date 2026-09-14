@@ -282,3 +282,39 @@ test("support live badge clears after the incoming admin reply is viewed", async
   expect(viewed?.unread).toBe(false);
   expect(viewed?.status).toBe("in_progress");
 });
+
+test("admin-managed social links publish safely to the public footer", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "Public social-link governance runs once on desktop Chromium.");
+  const admin = await loginSession(request, "admin", testInfo.project.name);
+  const headers = { Authorization: `Bearer ${admin.token}` };
+  const links = {
+    facebook: "https://facebook.com/carebridge.health",
+    instagram: "https://instagram.com/carebridge.health",
+    x: "https://x.com/carebridge_health",
+    linkedin: "",
+    youtube: "",
+    tiktok: "",
+    whatsapp: "https://wa.me/233306104400",
+  };
+
+  const saved = await request.patch("http://127.0.0.1:5000/api/admin/public/social-links", { headers, data: links });
+  expect(saved.ok()).toBeTruthy();
+  const publicResponse = await request.get("http://127.0.0.1:5000/api/public/social-links");
+  expect(publicResponse.ok()).toBeTruthy();
+  const published = await publicResponse.json();
+  expect(published.facebook).toBe(links.facebook);
+  expect(published.whatsapp).toBe(links.whatsapp);
+
+  await page.goto("/");
+  const facebook = page.getByRole("link", { name: "Facebook", exact: true });
+  await expect(facebook).toHaveAttribute("href", links.facebook);
+  await expect(facebook).toHaveAttribute("target", "_blank");
+  await expect(page.getByRole("link", { name: "WhatsApp", exact: true })).toHaveAttribute("href", links.whatsapp);
+  await expect(page.getByRole("link", { name: "LinkedIn", exact: true })).toHaveCount(0);
+
+  const unsafe = await request.patch("http://127.0.0.1:5000/api/admin/public/social-links", {
+    headers,
+    data: { facebook: "javascript:alert(1)" },
+  });
+  expect(unsafe.status()).toBe(400);
+});

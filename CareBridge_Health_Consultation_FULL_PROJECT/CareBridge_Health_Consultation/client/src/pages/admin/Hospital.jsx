@@ -1,21 +1,34 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { BedDouble, Building2, CheckCircle2, Edit3, LogOut, ShieldCheck, Sparkles, XCircle } from "lucide-react";
+import { BedDouble, CheckCircle2, Edit3, LogOut, ShieldCheck, Sparkles, XCircle } from "lucide-react";
 import { io } from "socket.io-client";
 import { api, socketOptions, socketUrl } from "../../api";
 import { useAuth, useToast } from "../../state";
 import { OccupancyBars } from "../../components/LiveMeter";
 import Avatar from "../../components/Avatar";
 
+const SOCIAL_FIELDS = [
+  ["facebook", "Facebook", "https://facebook.com/your-hospital"],
+  ["instagram", "Instagram", "https://instagram.com/your-hospital"],
+  ["x", "X / Twitter", "https://x.com/your-hospital"],
+  ["linkedin", "LinkedIn", "https://linkedin.com/company/your-hospital"],
+  ["youtube", "YouTube", "https://youtube.com/@your-hospital"],
+  ["tiktok", "TikTok", "https://tiktok.com/@your-hospital"],
+  ["whatsapp", "WhatsApp", "https://wa.me/233..."],
+];
+
 export default function AdminHospital() {
   const { user } = useAuth();
   const { push } = useToast();
   const [wards, setWards] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [socialLinks, setSocialLinks] = useState({});
+  const [savingSocials, setSavingSocials] = useState(false);
   const [edit, setEdit] = useState(null);
 
   const load = () => Promise.all([
     api("/wards").then(setWards),
     api("/ward-bookings").then(setBookings),
+    api("/public/social-links").then(setSocialLinks),
   ]);
 
   useEffect(() => {
@@ -50,6 +63,20 @@ export default function AdminHospital() {
     }
   };
 
+  const saveSocials = async (event) => {
+    event.preventDefault();
+    setSavingSocials(true);
+    try {
+      const saved = await api("/admin/public/social-links", { method: "PATCH", body: JSON.stringify(socialLinks) });
+      setSocialLinks(saved);
+      push("Public social links updated.");
+    } catch (error) {
+      push(error.message, "error");
+    } finally {
+      setSavingSocials(false);
+    }
+  };
+
   const saveWard = async (event) => {
     event.preventDefault();
     await api(`/wards/${edit.id}`, { method: "PATCH", body: JSON.stringify(edit) });
@@ -67,9 +94,17 @@ export default function AdminHospital() {
 
       <section className="px-signal-grid">
         <article><span><BedDouble size={17} /></span><div><small>Available beds</small><strong>{totalAvailable}</strong></div></article>
-        <article><span><Building2 size={17} /></span><div><small>Held / occupied</small><strong>{occupied}</strong></div></article>
+        <article><span><BedDouble size={17} /></span><div><small>Held / occupied</small><strong>{occupied}</strong></div></article>
         <article><span><ShieldCheck size={17} /></span><div><small>Pending decisions</small><strong>{pending.length}</strong></div></article>
         <article><span><CheckCircle2 size={17} /></span><div><small>Confirmed</small><strong>{confirmed.length}</strong></div></article>
+      </section>
+
+      <section className="px-public-presence">
+        <header className="px-board-head"><div><span className="px-kicker">Public presence</span><h2>Social media links</h2></div><span className="px-board-note">Only links you configure appear on the public website</span></header>
+        <form className="px-social-settings" onSubmit={saveSocials}>
+          <div className="px-social-settings-grid">{SOCIAL_FIELDS.map(([key, label, placeholder]) => <label key={key}><span>{label}</span><input type="url" inputMode="url" autoComplete="url" value={socialLinks[key] || ""} placeholder={placeholder} onChange={(event) => setSocialLinks((current) => ({ ...current, [key]: event.target.value }))} /><small>Leave blank to hide {label}.</small></label>)}</div>
+          <footer><span>{Object.values(socialLinks).filter(Boolean).length} public link{Object.values(socialLinks).filter(Boolean).length === 1 ? "" : "s"} active</span><button className="px-primary" disabled={savingSocials}>{savingSocials ? "Saving…" : "Publish social links"}</button></footer>
+        </form>
       </section>
 
       <section className="px-bed-map">
@@ -78,7 +113,7 @@ export default function AdminHospital() {
           const used = Math.max(0, Number(ward.capacity || 0) - Number(ward.available || 0));
           const ratio = Number(ward.capacity || 0) ? Math.round((used / Number(ward.capacity || 1)) * 100) : 0;
           const tone = ratio >= 90 ? "critical" : ratio >= 75 ? "watch" : "stable";
-          return <article className={`px-bed-ward ${tone}`} key={ward.id}><header><span><Building2 size={16} /></span><div><h3>{ward.name}</h3><p>{ward.description || "Hospital ward"}</p></div><button type="button" aria-label={`Edit ${ward.name} capacity`} onClick={() => setEdit({ ...ward })}><Edit3 size={15} /></button></header><div className="px-bed-numbers"><span><strong>{ward.available}</strong><small>free</small></span><span><strong>{used}</strong><small>held / occupied</small></span><span><strong>{ward.capacity}</strong><small>capacity</small></span></div><div className="px-bed-meter"><i style={{ width: `${Math.min(100, ratio)}%` }} /></div><footer>{ratio}% committed</footer></article>;
+          return <article className={`px-bed-ward ${tone}`} key={ward.id}><header><span><BedDouble size={16} /></span><div><h3>{ward.name}</h3><p>{ward.description || "Hospital ward"}</p></div><button type="button" aria-label={`Edit ${ward.name} capacity`} onClick={() => setEdit({ ...ward })}><Edit3 size={15} /></button></header><div className="px-bed-numbers"><span><strong>{ward.available}</strong><small>free</small></span><span><strong>{used}</strong><small>held / occupied</small></span><span><strong>{ward.capacity}</strong><small>capacity</small></span></div><div className="px-bed-meter"><i style={{ width: `${Math.min(100, ratio)}%` }} /></div><footer>{ratio}% committed</footer></article>;
         })}</div></div>
       </section>
 
@@ -87,7 +122,7 @@ export default function AdminHospital() {
         <div className="px-admission-list">{bookings.slice().sort((a, b) => (a.status === "pending" ? -1 : 1) - (b.status === "pending" ? -1 : 1)).map((booking) => <article className={`px-admission-row ${booking.status}`} key={booking.id}><div className="px-admission-who"><Avatar person={booking.patient} /><div><h3>{booking.patient?.name || "Patient"}</h3><p>{booking.ward} · {booking.roomType}</p></div></div><div className="px-admission-meta"><span>{booking.date}</span><span>{booking.nights} night{Number(booking.nights) === 1 ? "" : "s"}</span></div><div className="px-admission-notes">{booking.notes || "No preparation notes"}</div><div className="px-admission-state"><span className={`status ${booking.status}`}>{booking.status}</span>{booking.capacityHeld && <small>1 bed held</small>}</div><div className="px-admission-actions">{booking.status === "pending" && <><button className="approve" type="button" onClick={() => decide(booking.id, "confirmed")}><CheckCircle2 size={15} /> Accept</button><button className="decline" type="button" onClick={() => decide(booking.id, "declined")}><XCircle size={15} /> Decline & release</button></>}{booking.status === "confirmed" && <button className="release" type="button" onClick={() => decide(booking.id, "discharged")}><LogOut size={15} /> Discharge & restore bed</button>}</div></article>)}{bookings.length === 0 && <div className="px-empty"><BedDouble size={28} /><h3>No admission requests</h3></div>}</div>
       </section>
 
-      {edit && <div className="px-modal-backdrop" onMouseDown={() => setEdit(null)}><form className="px-booking-sheet" role="dialog" aria-modal="true" aria-labelledby="ward-capacity-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={saveWard}><header><span className="px-sheet-icon"><Building2 size={20} /></span><div><span className="px-kicker">Ward configuration</span><h2 id="ward-capacity-title">{edit.name}</h2><p>Keep operational capacity accurate for admissions and the patient booking experience.</p></div><button type="button" aria-label="Close ward capacity editor" onClick={() => setEdit(null)}><XCircle size={20} /></button></header><div className="px-sheet-body"><label>Ward name<input value={edit.name} onChange={(event) => setEdit({ ...edit, name: event.target.value })} /></label><div className="px-form-grid"><label>Available beds<input type="number" min="0" max={edit.capacity || undefined} value={edit.available} onChange={(event) => setEdit({ ...edit, available: event.target.value })} /></label><label>Total capacity<input type="number" min="0" value={edit.capacity} onChange={(event) => setEdit({ ...edit, capacity: event.target.value })} /></label></div><label>Description<textarea rows="4" value={edit.description} onChange={(event) => setEdit({ ...edit, description: event.target.value })} /></label></div><footer><button className="px-secondary" type="button" onClick={() => setEdit(null)}>Cancel</button><button className="px-primary">Save capacity</button></footer></form></div>}
+      {edit && <div className="px-modal-backdrop" onMouseDown={() => setEdit(null)}><form className="px-booking-sheet" role="dialog" aria-modal="true" aria-labelledby="ward-capacity-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={saveWard}><header><span className="px-sheet-icon"><BedDouble size={20} /></span><div><span className="px-kicker">Ward configuration</span><h2 id="ward-capacity-title">{edit.name}</h2><p>Keep operational capacity accurate for admissions and the patient booking experience.</p></div><button type="button" aria-label="Close ward capacity editor" onClick={() => setEdit(null)}><XCircle size={20} /></button></header><div className="px-sheet-body"><label>Ward name<input value={edit.name} onChange={(event) => setEdit({ ...edit, name: event.target.value })} /></label><div className="px-form-grid"><label>Available beds<input type="number" min="0" max={edit.capacity || undefined} value={edit.available} onChange={(event) => setEdit({ ...edit, available: event.target.value })} /></label><label>Total capacity<input type="number" min="0" value={edit.capacity} onChange={(event) => setEdit({ ...edit, capacity: event.target.value })} /></label></div><label>Description<textarea rows="4" value={edit.description} onChange={(event) => setEdit({ ...edit, description: event.target.value })} /></label></div><footer><button className="px-secondary" type="button" onClick={() => setEdit(null)}>Cancel</button><button className="px-primary">Save capacity</button></footer></form></div>}
     </div>
   );
 }

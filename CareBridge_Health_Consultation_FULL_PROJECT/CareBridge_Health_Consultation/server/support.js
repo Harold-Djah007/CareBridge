@@ -2,7 +2,7 @@ import { mountPatientExperience } from "./patientExperience.js";
 import { mountFhir } from "./fhir.js";
 import { mountClinicalOrders } from "./clinicalOrders.js";
 import { mountEnterpriseOps } from "./enterpriseOps.js";
-import { mountSmart, smartScopeAllows } from "./smart.js";
+import { mountSmart } from "./smart.js";
 import { mountInterop } from "./interop.js";
 import { mountClinicalSafety } from "./clinicalSafety.js";
 import { mountRevenueCycle } from "./revenueCycle.js";
@@ -30,6 +30,14 @@ function ticketUnread(db, ticket, viewer) {
   if (!incoming) return false;
   const seen = readStamp(db, viewer.id, ticket.id);
   return !seen || incoming > seen;
+}
+
+export function unreadSupportCount(db, viewer) {
+  if (!viewer?.id || !viewer?.role) return 0;
+  const rows = viewer.role === "admin"
+    ? (db.tickets || [])
+    : (db.tickets || []).filter((ticket) => ticket.userId === viewer.id);
+  return rows.reduce((total, ticket) => total + (ticketUnread(db, ticket, viewer) ? 1 : 0), 0);
 }
 
 function markTicketRead(db, ticketId, userId) {
@@ -61,28 +69,6 @@ async function pingAdmins(db, { notify, emailPatient }, { title, body, email }) 
 export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPatient }) {
   mountPatientExperience(app, { readDb, writeDb });
   mountSmart(app, { readDb, writeDb });
-
-  // Express trims a mount path from req.path inside nested middleware. Validate
-  // SMART scopes here from the mounted relative FHIR path, then mark only that
-  // already-authorized integration request as authenticated for the FHIR layer.
-  app.use("/api/fhir/R4", (req, res, next) => {
-    if (!req.smartAuth || req.authUser) return next();
-    const relative = String(req.path || "").replace(/^\/+/, "");
-    if (!relative || relative === "metadata" || relative.startsWith(".well-known/")) return next();
-    const resourceType = relative.split("/")[0];
-    if (!smartScopeAllows(req.smartAuth, resourceType, "read")) {
-      return res.status(403).type("application/fhir+json").json({
-        resourceType: "OperationOutcome",
-        issue: [{ severity: "error", code: "forbidden", diagnostics: `SMART token does not include system/${resourceType}.read.` }],
-      });
-    }
-    req.authUser = {
-      id: `smart:${req.smartAuth.clientId}`,
-      role: "smart",
-      name: req.smartAuth.name || "SMART integration",
-    };
-    return next();
-  });
 
   mountFhir(app, { readDb });
   mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, emailPatient });

@@ -9,7 +9,7 @@ import { Server } from "socket.io";
 import { deliverEmail, renderEmail, shouldEmail } from "./email.js";
 import { audit, ensureClinical, mountClinical } from "./clinical.js";
 import { addInvoice, consultFee, ensureTariff, mountFinance, wardFee } from "./finance.js";
-import { mountSupport } from "./support.js";
+import { mountSupport, unreadSupportCount } from "./support.js";
 import { mountCases } from "./cases.js";
 import { ensurePharmacy, mountPharmacy } from "./pharmacy.js";
 import { ensureCarts, mountCart, clearUserCart, removeCartKinds } from "./cart.js";
@@ -165,6 +165,63 @@ const requireAuth = (...roles) => (req, res, next) => {
   if (roles.length && !roles.includes(req.authUser.role)) return res.status(403).json({ message: "You do not have permission to perform this action." });
   return next();
 };
+
+
+const SOCIAL_HOSTS = {
+  facebook: ["facebook.com", "fb.com"],
+  instagram: ["instagram.com"],
+  x: ["x.com", "twitter.com"],
+  linkedin: ["linkedin.com"],
+  youtube: ["youtube.com", "youtu.be"],
+  tiktok: ["tiktok.com"],
+  whatsapp: ["wa.me", "whatsapp.com"],
+};
+const SOCIAL_KEYS = Object.keys(SOCIAL_HOSTS);
+
+const publicSocialLinks = (db) => Object.fromEntries(
+  SOCIAL_KEYS.map((key) => [key, String(db.publicSite?.socialLinks?.[key] || "")])
+);
+
+const normalizeSocialUrl = (platform, value) => {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (text.length > 300) throw new Error("Social media URLs must be 300 characters or fewer.");
+  let url;
+  try { url = new URL(text); } catch { throw new Error("Enter a complete https:// social media URL."); }
+  if (url.protocol !== "https:") throw new Error("Social media links must use HTTPS.");
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  const allowed = SOCIAL_HOSTS[platform] || [];
+  if (!allowed.some((site) => host === site || host.endsWith("." + site))) {
+    throw new Error("That URL does not match the selected social platform.");
+  }
+  return url.toString();
+};
+
+app.get("/api/public/social-links", (_, res) => {
+  res.json(publicSocialLinks(readDb()));
+});
+
+app.patch("/api/admin/public/social-links", requireAuth("admin"), (req, res) => {
+  const db = readDb();
+  db.publicSite = db.publicSite || {};
+  db.publicSite.socialLinks = db.publicSite.socialLinks || {};
+  try {
+    for (const key of SOCIAL_KEYS) {
+      if (req.body[key] !== undefined) db.publicSite.socialLinks[key] = normalizeSocialUrl(key, req.body[key]);
+    }
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+  audit(db, {
+    actorId: req.authUser.id,
+    action: "hospital.social-links.update",
+    entity: "hospital",
+    entityId: "public-site",
+    detail: "Updated public CareBridge social links",
+  });
+  writeDb(db);
+  res.json(publicSocialLinks(db));
+});
 
 const applyPhoto = (user, photo) => {
   if (photo === undefined) return null;
@@ -862,16 +919,12 @@ app.get("/api/badges", (req, res) => {
     if (role === "doctor") return true;
     return true;
   });
-  const tickets = (db.tickets || []).filter((t) => {
-    if (role === "admin") return true;
-    return t.userId === userId;
-  });
   const queue = (db.pharmacyOrders || []).filter((o) => o.fulfill === "hospital" && o.status === "queued");
   res.json({
     messages: unreadMessages(db, userId),
     visits: appointments.filter(isUpcomingAppt).length,
     wards: wards.filter((w) => w.status === "pending").length,
-    tickets: tickets.filter((t) => t.status !== "resolved").length,
+    tickets: unreadSupportCount(db, { id: userId, role }),
     queue: queue.length,
     notifications: (db.notifications || []).filter((n) => n.userId === userId && !n.read).length,
   });

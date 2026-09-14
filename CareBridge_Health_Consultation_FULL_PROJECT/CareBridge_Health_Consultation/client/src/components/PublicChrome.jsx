@@ -4,6 +4,7 @@ import { HeartPulse, Phone, MapPin, Clock, Menu, X, ShieldAlert, Mail } from "lu
 import { HOSPITAL, homeFor } from "../utils";
 import { PUBLIC_NAV } from "../publicContent";
 import { useAuth } from "../state";
+import { api } from "../api";
 
 export function UtilBar({ tone = "navy" }) {
   const tel = (n) => `tel:${String(n).replace(/\s/g, "")}`;
@@ -45,7 +46,10 @@ function NavLinks({ onNavigate, className = "" }) {
   );
 }
 
-export function HospitalFooter() {
+const SOCIAL_LABELS = { facebook: "Facebook", instagram: "Instagram", x: "X", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok", whatsapp: "WhatsApp" };
+
+export function HospitalFooter({ socialLinks = {} }) {
+  const activeSocials = Object.entries(SOCIAL_LABELS).filter(([key]) => socialLinks[key]);
   return (
     <footer className="hospital-foot">
       <div className="foot-grid">
@@ -55,6 +59,7 @@ export function HospitalFooter() {
             <div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div>
           </div>
           <p>A private hospital in Ridge, Accra. We sit with you through clinic, pharmacy, and a stay if you need one.</p>
+          {activeSocials.length > 0 && <div className="foot-socials" aria-label="CareBridge social media"><span>Connect with CareBridge</span><div>{activeSocials.map(([key, label]) => <a key={key} href={socialLinks[key]} target="_blank" rel="noopener noreferrer">{label}</a>)}</div></div>}
         </div>
         <div>
           <h4>Quick links</h4>
@@ -107,9 +112,14 @@ export function PageBanner({ eyebrow, title, lead, image = "/imagery/hero-campus
 
 export default function PublicChrome({ variant = "page", children }) {
   const [open, setOpen] = useState(false);
+  const [socialLinks, setSocialLinks] = useState({});
   const location = useLocation();
   const home = variant === "home";
   const close = () => setOpen(false);
+
+  useEffect(() => {
+    api("/public/social-links").then(setSocialLinks).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const id = location.hash.replace("#", "");
@@ -142,7 +152,7 @@ export default function PublicChrome({ variant = "page", children }) {
         <NavLinks className={open ? "open" : ""} onNavigate={close} />
       </header>
       <main id="main-content" tabIndex="-1" key={location.pathname} className="hospital-body">{children}</main>
-      <HospitalFooter />
+      <HospitalFooter socialLinks={socialLinks} />
     </div>
   );
 }
