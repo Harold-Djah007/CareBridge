@@ -9,6 +9,7 @@ const proxy = {
 export default defineConfig({
   plugins: [react()],
   build: {
+    modulePreload: { polyfill: false },
     rollupOptions: {
       output: {
         manualChunks(id) {
