@@ -8,11 +8,11 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "nodemailer": "^10.0.1",
-    "pg": "^8.16.3",
-    "redis": "^5.8.2",
-    "socket.io": "^4.8.1"
+    "cors": "2.8.6",
+    "express": "5.2.1",
+    "nodemailer": "10.0.9",
+    "pg": "8.23.0",
+    "redis": "5.12.1",
+    "socket.io": "4.8.3"
   }
 }
