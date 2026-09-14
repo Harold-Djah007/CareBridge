@@ -4,7 +4,8 @@ import { HeartPulse, Phone, MapPin, Clock, Menu, X, ShieldAlert, Mail } from "lu
 import { HOSPITAL, homeFor } from "../utils";
 import { PUBLIC_NAV } from "../publicContent";
 import { useAuth } from "../state";
-import { api } from "../api";
+
+const PUBLIC_API = import.meta.env.VITE_API_URL || "/api";
 
 export function UtilBar({ tone = "navy" }) {
   const tel = (n) => `tel:${String(n).replace(/\s/g, "")}`;
@@ -118,7 +119,7 @@ export default function PublicChrome({ variant = "page", children }) {
   const close = () => setOpen(false);
 
   useEffect(() => {
-    api("/public/social-links").then(setSocialLinks).catch(() => {});
+    fetch(`${PUBLIC_API}/public/social-links`).then((response) => response.ok ? response.json() : {}).then(setSocialLinks).catch(() => {});
   }, []);
 
   useEffect(() => {
