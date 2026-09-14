@@ -54,6 +54,13 @@ jobs:
       - name: Install client dependencies
         run: npm install --prefix client --no-audit --no-fund
 
+      - name: Dependency fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ls --prefix server --depth=0
+          npm ls --prefix client --depth=0
+
       - name: Production dependency vulnerability gate
         shell: bash
         run: |
