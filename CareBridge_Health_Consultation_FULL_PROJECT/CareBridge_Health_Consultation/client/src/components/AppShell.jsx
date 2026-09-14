@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  BedDouble, Bell, CalendarDays, ClipboardList, Command,
-  FolderOpen, HeartPulse, LayoutDashboard, LifeBuoy, LogOut,
-  MessageCircle, Pill, Search, ScrollText, Settings2,
-  ShoppingBag, Stethoscope, Users, Video, Wifi, X,
+  Activity, BedDouble, Bell, Building2, CalendarDays, ChevronRight, ClipboardList, Command,
+  Eye, FolderKanban, FolderOpen, HeartPulse, Inbox, LayoutDashboard, LifeBuoy, LogOut,
+  Mail, MessageCircle, Pill, Receipt, Search, ScrollText, Settings2,
+  ShoppingBag, Sparkles, Stethoscope, Users, Video, Wifi, X,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { CartMastButton, useCart } from "../ShopCart";
@@ -27,12 +27,12 @@ const NAV = {
     { to: "/wards", icon: BedDouble, label: "Admissions", feature: "admissions", badge: "wards" },
     { to: "/pay", icon: ShoppingBag, label: "Shop & pay", feature: "shop", primary: true },
     { to: "/care", icon: Stethoscope, label: "Care team", feature: "careTeam" },
-    { to: "/alerts", icon: Bell, label: "Notifications", feature: "notifications", badge: "notifications" },
+    { to: "/alerts", icon: Inbox, label: "Notifications", feature: "notifications", badge: "notifications" },
     { to: "/support", icon: LifeBuoy, label: "Support", feature: "support", badge: "tickets" },
   ],
   doctor: [
     { group: "Today", items: [
-      { to: "/home", icon: HeartPulse, label: "Clinical home", end: true, primary: true },
+      { to: "/home", icon: Activity, label: "Clinical home", end: true, primary: true },
       { to: "/appointments", icon: CalendarDays, label: "Schedule", badge: "visits", primary: true },
       { to: "/messages", icon: MessageCircle, label: "Inbox", badge: "messages", primary: true },
       { to: "/video", icon: Video, label: "Teleconsult" },
@@ -65,22 +65,22 @@ const NAV = {
   admin: [
     { group: "Operations", items: [
       { to: "/admin", icon: LayoutDashboard, label: "Operations home", end: true, primary: true },
-      { to: "/admin/hospital", icon: BedDouble, label: "Capacity & beds", badge: "wards", primary: true },
+      { to: "/admin/hospital", icon: Building2, label: "Capacity & beds", badge: "wards", primary: true },
       { to: "/admin/appointments", icon: CalendarDays, label: "Clinic operations", primary: true },
       { to: "/admin/users", icon: Users, label: "People", primary: true },
     ]},
     { group: "Control", items: [
-      { to: "/admin/patient-experience", icon: Settings2, label: "Patient experience", primary: true },
+      { to: "/admin/patient-experience", icon: Eye, label: "Patient experience", primary: true },
       { to: "/orders", icon: ClipboardList, label: "Clinical orders", primary: true },
-      { to: "/admin/cases", icon: FolderOpen, label: "Case workflow" },
+      { to: "/admin/cases", icon: FolderKanban, label: "Case workflow" },
       { to: "/admin/reports", icon: ScrollText, label: "Analytics & audit", primary: true },
-      { to: "/pay", icon: ShoppingBag, label: "Finance & receipts" },
+      { to: "/pay", icon: Receipt, label: "Finance & receipts" },
       { to: "/billing/tariff", icon: ScrollText, label: "Tariff manager" },
     ]},
     { group: "Communications", items: [
       { to: "/support", icon: LifeBuoy, label: "Support desk", badge: "tickets", primary: true },
       { to: "/messages", icon: MessageCircle, label: "Switchboard", badge: "messages" },
-      { to: "/alerts", icon: Bell, label: "Patient notices", badge: "notifications" },
+      { to: "/alerts", icon: Mail, label: "Patient notices", badge: "notifications" },
       { to: "/settings", icon: Settings2, label: "System preferences" },
     ]},
   ],
@@ -365,7 +365,7 @@ export default function AppShell() {
                 {notes.length === 0 && <p className="cbv6-empty-copy">You are all caught up.</p>}
                 {notes.slice(0, 8).map((note) => (
                   <button key={note.id} type="button" className={`cbv6-notice-item ${note.read ? "" : "unread"}`} onClick={() => openLiveNotice(note)}>
-                    <i /><div><strong>{note.title}</strong><p>{note.body}</p></div><span aria-hidden="true">→</span>
+                    <i /><div><strong>{note.title}</strong><p>{note.body}</p></div><ChevronRight size={16} />
                   </button>
                 ))}
               </div>
