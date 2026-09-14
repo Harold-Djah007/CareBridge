@@ -28,14 +28,10 @@ export default function Support() {
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const markLocalRead = (id, opened) => {
-    setActive(opened);
-    setTickets((current) => current.map((ticket) => ticket.id === id ? { ...ticket, ...opened, unread: false } : ticket));
-  };
-
   const openTicket = async (id) => {
     const opened = await api(`/tickets/${id}?userId=${user.id}&role=${user.role}`);
-    markLocalRead(id, opened);
+    setActive(opened);
+    setTickets((current) => current.map((ticket) => ticket.id === id ? { ...ticket, ...opened, unread: false } : ticket));
     await refreshBadges?.();
     return opened;
   };
