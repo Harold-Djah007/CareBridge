@@ -9,6 +9,7 @@ const proxy = {
 export default defineConfig({
   plugins: [react()],
   build: {
+    target: "es2022",
     modulePreload: { polyfill: false },
     rollupOptions: {
       output: {
