@@ -308,6 +308,10 @@ test("admin-managed social links publish safely to the public footer", async ({ 
   expect(published.facebook).toBe(links.facebook);
   expect(published.whatsapp).toBe(links.whatsapp);
 
+  await page.evaluate(() => {
+    localStorage.removeItem("carebridge-user");
+    localStorage.removeItem("carebridge-token");
+  });
   await page.goto("/");
   const facebook = page.getByRole("link", { name: "Facebook", exact: true });
   await expect(facebook).toHaveAttribute("href", links.facebook);
