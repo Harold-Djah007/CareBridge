@@ -94,6 +94,23 @@ try {
   const token2 = login2.token;
   const adminLogin = await login(admin, "admin");
   const adminToken = adminLogin.token;
+  const nurseLogin = await login({ email: "nurse@carebridge.test", password: "nurse123" }, "nurse");
+  const nurseToken = nurseLogin.token;
+  const nurseId = nurseLogin.body?.user?.id;
+  if (!nurseId) throw new Error("Nurse demo account did not expose an authenticated user id");
+
+  const nurseAppointments = await json(`/api/appointments?userId=${nurseId}&role=nurse`, nurseToken);
+  if (nurseAppointments.response.status !== 403) {
+    throw new Error(`Nurse could read appointment workflow outside role boundary: ${nurseAppointments.response.status}`);
+  }
+  const nurseWardCreate = await json("/api/ward-bookings", nurseToken, {
+    method: "POST",
+    body: JSON.stringify({ patientId: patient.id, ward: "General Ward", date: "2030-01-01", nights: 1 }),
+  });
+  if (nurseWardCreate.response.status !== 403) {
+    throw new Error(`Nurse could create ward reservation outside role boundary: ${nurseWardCreate.response.status}`);
+  }
+  console.log("✓ appointment + ward role boundaries");
 
   const sessionsBefore = await json("/api/security/sessions", token2);
   if (!sessionsBefore.response.ok || !Array.isArray(sessionsBefore.body?.sessions) || sessionsBefore.body.sessions.length < 2) {

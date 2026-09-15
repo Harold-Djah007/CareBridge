@@ -114,9 +114,13 @@ export function mountWardAutomation(app, { readDb, writeDb, safeUser, notify, em
     res.json({ ok: true, notification: note, notifications: remaining });
   });
 
-  // These handlers are mounted before the legacy ward mutation routes in index.js.
-  // They intentionally own POST/PATCH booking mutations so capacity is atomic and idempotent.
+  // These handlers are the single mutation authority for ward bookings so
+  // capacity holds/releases and invoice creation stay atomic and idempotent.
   app.post("/api/ward-bookings", async (req, res) => {
+    const actor = req.authUser;
+    if (!actor || !["patient", "doctor", "admin"].includes(actor.role)) {
+      return res.status(403).json({ message: "You do not have permission to create ward reservations." });
+    }
     const { patientId, ward: wardName, date } = req.body || {};
     if (!String(patientId || "").trim() || !String(wardName || "").trim() || !String(date || "").trim()) {
       return res.status(400).json({ message: "Please choose a ward and admission date." });

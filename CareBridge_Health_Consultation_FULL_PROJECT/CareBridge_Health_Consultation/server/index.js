@@ -663,7 +663,7 @@ app.get("/api/contacts", (req, res) => {
   res.json([...caseload, ...staff]);
 });
 
-app.get("/api/appointments", (req, res) => {
+app.get("/api/appointments", requireAuth("patient", "doctor", "admin"), (req, res) => {
   const { userId, role } = req.query;
   const db = readDb();
   let rows = db.appointments;
@@ -672,7 +672,7 @@ app.get("/api/appointments", (req, res) => {
   res.json(rows.map((a) => enrichAppointment(db, a)));
 });
 
-app.post("/api/appointments", async (req, res) => {
+app.post("/api/appointments", requireAuth("patient", "doctor", "admin"), async (req, res) => {
   const missing = requireFields(req.body, ["patientId", "doctorId", "date", "time"]);
   if (missing.length) return res.status(400).json({ message: "Please choose a doctor, date, and time." });
   const db = readDb();
@@ -721,7 +721,7 @@ app.post("/api/appointments", async (req, res) => {
   res.status(201).json(enrichAppointment(db, item));
 });
 
-app.patch("/api/appointments/:id", async (req, res) => {
+app.patch("/api/appointments/:id", requireAuth("patient", "doctor", "admin"), async (req, res) => {
   const db = readDb();
   const item = db.appointments.find((a) => a.id === req.params.id);
   if (!item) return res.status(404).json({ message: "Appointment not found" });
@@ -774,113 +774,12 @@ app.patch("/api/wards/:id", (req, res) => {
   res.json(ward);
 });
 
-app.get("/api/ward-bookings", (req, res) => {
+app.get("/api/ward-bookings", requireAuth("patient", "doctor", "admin"), (req, res) => {
   const db = readDb();
   const { userId, role } = req.query;
   let rows = db.wardBookings;
   if (role === "patient") rows = rows.filter((w) => w.patientId === userId);
   res.json(rows.map((w) => enrichBooking(db, w)));
-});
-
-app.post("/api/ward-bookings", async (req, res) => {
-  const missing = requireFields(req.body, ["patientId", "ward", "date"]);
-  if (missing.length) return res.status(400).json({ message: "Please choose a ward and admission date." });
-  const db = readDb();
-  const item = {
-    id: `wb${Date.now()}`,
-    patientId: req.body.patientId,
-    ward: req.body.ward,
-    roomType: req.body.roomType || "Private Room",
-    date: req.body.date,
-    nights: Number(req.body.nights || 1),
-    status: "pending",
-    notes: req.body.notes || "",
-  };
-  db.wardBookings.push(item);
-  db.users.filter((u) => u.role === "doctor" || u.role === "admin").forEach((u) => {
-    notify(db, u.id, "New ward request", `${item.ward} requested for ${item.date}.`);
-  });
-  notify(db, item.patientId, "Ward request received", `Your ${item.ward} reservation for ${item.date} is pending review.`);
-  await emailPatient(db, item.patientId, {
-    type: "ward",
-    subject: "We received your ward reservation request",
-    heading: "Ward request received",
-    intro: "Your hospital admission request is with the care team. We will email you again when it is accepted or updated.",
-    details: [
-      ["Ward", item.ward],
-      ["Room", item.roomType],
-      ["Arrival", item.date],
-      ["Nights", String(item.nights)],
-      ["Status", "Pending"],
-      ["Estimated fee", `GHS ${wardFee(item, db)} (invoiced when the bed is accepted)`],
-    ],
-  });
-  writeDb(db);
-  res.status(201).json(enrichBooking(db, item));
-});
-
-app.patch("/api/ward-bookings/:id", async (req, res) => {
-  const db = readDb();
-  const item = db.wardBookings.find((w) => w.id === req.params.id);
-  if (!item) return res.status(404).json({ message: "Ward booking not found" });
-  const actor = req.authUser;
-  if (actor?.role === "patient" && item.patientId !== actor.id) return res.status(403).json({ message: "That ward request is not on your patient file." });
-  if (!actor || !["patient", "doctor", "admin"].includes(actor.role)) return res.status(403).json({ message: "You cannot update this ward request." });
-  const prev = item.status;
-  if (actor.role === "patient") {
-    if (req.body.status && req.body.status !== "cancelled") return res.status(403).json({ message: "Patients can only cancel a ward request; hospital staff confirm beds." });
-    if (req.body.status) item.status = req.body.status;
-  } else {
-    ["status", "ward", "roomType", "date", "nights", "notes"].forEach((key) => { if (req.body[key] !== undefined) item[key] = req.body[key]; });
-  }
-  if (req.body.status && req.body.status !== prev) {
-    const accepted = req.body.status === "confirmed";
-    notify(
-      db,
-      item.patientId,
-      accepted ? "Ward reservation accepted" : `Ward booking ${req.body.status}`,
-      accepted
-        ? `Your ${item.ward} bed is confirmed for ${item.date}.`
-        : `Your ${item.ward} reservation is now ${req.body.status}.`
-    );
-    if (accepted) {
-      const ward = (db.wards || []).find((w) => w.name === item.ward);
-      if (ward && ward.available > 0) ward.available -= 1;
-      const fee = wardFee(item, db);
-      addInvoice(db, {
-        patientId: item.patientId,
-        item: `${item.ward} · ${item.roomType} × ${item.nights} night(s)`,
-        amount: fee,
-        category: "ward",
-        bookingId: item.id,
-      });
-    }
-    if (prev === "confirmed" && req.body.status === "declined") {
-      const ward = (db.wards || []).find((w) => w.name === item.ward);
-      if (ward) ward.available += 1;
-    }
-    await emailPatient(db, item.patientId, {
-      type: "ward",
-      subject: accepted ? "Your ward reservation has been accepted" : `Ward reservation ${req.body.status}`,
-      heading: accepted ? "Ward accepted" : `Ward ${req.body.status}`,
-      intro: accepted
-        ? "Good news — your hospital bed is reserved. You can arrive knowing your ward is ready."
-        : `Your ward reservation was updated to ${req.body.status}.`,
-      details: [
-        ["Ward", item.ward],
-        ["Room", item.roomType],
-        ["Arrival", item.date],
-        ["Nights", String(item.nights)],
-        ["Status", req.body.status],
-        ...(accepted ? [["Admission fee", `GHS ${wardFee(item, db)} — pay by NHIS, MoMo, GCB, or cash`]] : []),
-      ],
-      closing: accepted
-        ? "Bring your ID and any recent lab results. Message your doctor if your arrival time changes."
-        : "If you still need a bed, send a new request or chat with your care team.",
-    });
-  }
-  writeDb(db);
-  res.json(enrichBooking(db, item));
 });
 
 app.get("/api/messages/:roomId", (req, res) => {
