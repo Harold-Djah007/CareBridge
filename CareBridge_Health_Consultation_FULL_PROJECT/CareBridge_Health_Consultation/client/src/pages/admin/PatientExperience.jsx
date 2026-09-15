@@ -292,7 +292,7 @@ export default function AdminPatientExperience() {
       {scope === "all" && <section className="px-public-presence">
         <header className="px-board-head"><div><span className="px-kicker">Public presence</span><h2>Social media links</h2><p>Publish the hospital's official channels. Blank platforms stay hidden from the public website.</p></div><span className="px-board-note">Admin controlled</span></header>
         <form className="px-social-settings" onSubmit={saveSocialLinks}>
-          <div className="px-social-settings-grid">{SOCIAL_FIELDS.map(([key, label]) => <label key={key}><span>{label}</span><input type="url" inputMode="url" value={socialLinks[key] || ""} placeholder="https://…" onChange={(event) => setSocialLinks((current) => ({ ...current, [key]: event.target.value }))} /><small>Leave blank to hide {label}.</small></label>)}</div>
+          <div className="px-social-settings-grid">{SOCIAL_FIELDS.map(([key, label]) => <label key={key}><span>{label}</span><input type="url" inputMode="url" aria-label={label} value={socialLinks[key] || ""} placeholder="https://…" onChange={(event) => setSocialLinks((current) => ({ ...current, [key]: event.target.value }))} /><small>Leave blank to hide {label}.</small></label>)}</div>
           <footer><span>{Object.values(socialLinks).filter(Boolean).length} public link{Object.values(socialLinks).filter(Boolean).length === 1 ? "" : "s"} active</span><button className="px-primary" disabled={socialBusy}>{socialBusy ? "Publishing…" : "Publish social links"}</button></footer>
         </form>
       </section>}
