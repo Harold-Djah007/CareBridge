@@ -21,6 +21,11 @@ const MODULES = [
   { id: "video", label: "Video consultation", description: "Patient access to teleconsultation rooms.", icon: Video },
 ];
 
+const SOCIAL_FIELDS = [
+  ["facebook", "Facebook"], ["instagram", "Instagram"], ["x", "X / Twitter"],
+  ["linkedin", "LinkedIn"], ["youtube", "YouTube"], ["tiktok", "TikTok"], ["whatsapp", "WhatsApp"],
+];
+
 const HOME_SECTIONS = [
   { id: "welcome", label: "Welcome & patient identity", description: "Greeting, MRN, blood type and insurance summary." },
   { id: "recommended", label: "Recommended next step", description: "Prominent next action based on care, balance or visits." },
@@ -89,6 +94,8 @@ export default function AdminPatientExperience() {
   const [patientId, setPatientId] = useState("");
   const [patientBundle, setPatientBundle] = useState(null);
   const [overrideDraft, setOverrideDraft] = useState({ modules: {}, home: {} });
+  const [socialLinks, setSocialLinks] = useState({});
+  const [socialBusy, setSocialBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [patientLoading, setPatientLoading] = useState(false);
 
@@ -101,6 +108,7 @@ export default function AdminPatientExperience() {
         setPatients(list);
       })
       .catch((error) => push(error.message, "error"));
+    api("/public/social-links").then(setSocialLinks).catch((error) => push(error.message, "error"));
   }, []);
 
   const choosePatient = async (id) => {
@@ -193,6 +201,20 @@ export default function AdminPatientExperience() {
     }
   };
 
+  const saveSocialLinks = async (event) => {
+    event.preventDefault();
+    setSocialBusy(true);
+    try {
+      const saved = await api("/admin/public/social-links", { method: "PATCH", body: JSON.stringify(socialLinks) });
+      setSocialLinks(saved);
+      push("Public social links published.");
+    } catch (error) {
+      push(error.message, "error");
+    } finally {
+      setSocialBusy(false);
+    }
+  };
+
   const publish = async () => {
     setBusy(true);
     try {
@@ -266,6 +288,14 @@ export default function AdminPatientExperience() {
         <div><LayoutDashboard size={17} /><span><strong>{visibleHome}</strong> Home sections enabled</span></div>
         <div><RefreshCw size={17} /><span>{scope === "all" ? "This becomes the default for every patient." : "Default settings continue to track the hospital-wide policy."}</span></div>
       </section>
+
+      {scope === "all" && <section className="px-public-presence">
+        <header className="px-board-head"><div><span className="px-kicker">Public presence</span><h2>Social media links</h2><p>Publish the hospital's official channels. Blank platforms stay hidden from the public website.</p></div><span className="px-board-note">Admin controlled</span></header>
+        <form className="px-social-settings" onSubmit={saveSocialLinks}>
+          <div className="px-social-settings-grid">{SOCIAL_FIELDS.map(([key, label]) => <label key={key}><span>{label}</span><input type="url" inputMode="url" value={socialLinks[key] || ""} placeholder="https://…" onChange={(event) => setSocialLinks((current) => ({ ...current, [key]: event.target.value }))} /><small>Leave blank to hide {label}.</small></label>)}</div>
+          <footer><span>{Object.values(socialLinks).filter(Boolean).length} public link{Object.values(socialLinks).filter(Boolean).length === 1 ? "" : "s"} active</span><button className="px-primary" disabled={socialBusy}>{socialBusy ? "Publishing…" : "Publish social links"}</button></footer>
+        </form>
+      </section>}
 
       <div className={`cb-px-layout ${scope === "individual" && !patientId ? "is-disabled" : ""}`}>
         <main className="cb-px-config">

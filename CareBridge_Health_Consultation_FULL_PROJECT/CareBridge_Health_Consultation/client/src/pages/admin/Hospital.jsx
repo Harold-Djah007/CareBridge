@@ -6,24 +6,16 @@ import { useAuth, useToast } from "../../state";
 import { OccupancyBars } from "../../components/LiveMeter";
 import Avatar from "../../components/Avatar";
 
-const SOCIAL_FIELDS = [
-  ["facebook", "Facebook"], ["instagram", "Instagram"], ["x", "X / Twitter"],
-  ["linkedin", "LinkedIn"], ["youtube", "YouTube"], ["tiktok", "TikTok"], ["whatsapp", "WhatsApp"],
-];
-
 export default function AdminHospital() {
   const { user } = useAuth();
   const { push } = useToast();
   const [wards, setWards] = useState([]);
   const [bookings, setBookings] = useState([]);
-  const [socialLinks, setSocialLinks] = useState({});
-  const [savingSocials, setSavingSocials] = useState(false);
   const [edit, setEdit] = useState(null);
 
   const load = () => Promise.all([
     api("/wards").then(setWards),
     api("/ward-bookings").then(setBookings),
-    api("/public/social-links").then(setSocialLinks),
   ]);
 
   useEffect(() => {
@@ -58,20 +50,6 @@ export default function AdminHospital() {
     }
   };
 
-  const saveSocials = async (event) => {
-    event.preventDefault();
-    setSavingSocials(true);
-    try {
-      const saved = await api("/admin/public/social-links", { method: "PATCH", body: JSON.stringify(socialLinks) });
-      setSocialLinks(saved);
-      push("Public social links updated.");
-    } catch (error) {
-      push(error.message, "error");
-    } finally {
-      setSavingSocials(false);
-    }
-  };
-
   const saveWard = async (event) => {
     event.preventDefault();
     await api(`/wards/${edit.id}`, { method: "PATCH", body: JSON.stringify(edit) });
@@ -92,14 +70,6 @@ export default function AdminHospital() {
         <article><span><Building2 size={17} /></span><div><small>Held / occupied</small><strong>{occupied}</strong></div></article>
         <article><span><ShieldCheck size={17} /></span><div><small>Pending decisions</small><strong>{pending.length}</strong></div></article>
         <article><span><CheckCircle2 size={17} /></span><div><small>Confirmed</small><strong>{confirmed.length}</strong></div></article>
-      </section>
-
-      <section className="px-public-presence">
-        <header className="px-board-head"><div><span className="px-kicker">Public presence</span><h2>Social media links</h2></div><span className="px-board-note">Only links you configure appear on the public website</span></header>
-        <form className="px-social-settings" onSubmit={saveSocials}>
-          <div className="px-social-settings-grid">{SOCIAL_FIELDS.map(([key, label]) => <label key={key}><span>{label}</span><input type="url" inputMode="url" value={socialLinks[key] || ""} placeholder="https://…" onChange={(event) => setSocialLinks((current) => ({ ...current, [key]: event.target.value }))} /></label>)}</div>
-          <footer><span>Blank links stay hidden.</span><button className="px-primary" disabled={savingSocials}>{savingSocials ? "Saving…" : "Publish social links"}</button></footer>
-        </form>
       </section>
 
       <section className="px-bed-map">

@@ -285,20 +285,23 @@ test("support live badge clears after the incoming admin reply is viewed", async
 
 test("admin-managed social links publish safely to the public footer", async ({ page, request }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium", "Public social-link governance runs once on desktop Chromium.");
-  const admin = await loginSession(request, "admin", testInfo.project.name);
+  const admin = await directLogin(page, request, "admin", testInfo.project.name);
   const headers = { Authorization: `Bearer ${admin.token}` };
   const links = {
     facebook: "https://facebook.com/carebridge.health",
     instagram: "https://instagram.com/carebridge.health",
     x: "https://x.com/carebridge_health",
-    linkedin: "",
-    youtube: "",
-    tiktok: "",
     whatsapp: "https://wa.me/233306104400",
   };
 
-  const saved = await request.patch("http://127.0.0.1:5000/api/admin/public/social-links", { headers, data: links });
-  expect(saved.ok()).toBeTruthy();
+  await page.goto("/admin/patient-experience");
+  await waitForRoute(page);
+  for (const [label, value] of [["Facebook", links.facebook], ["Instagram", links.instagram], ["X / Twitter", links.x], ["WhatsApp", links.whatsapp]]) {
+    await page.getByLabel(label, { exact: true }).fill(value);
+  }
+  await page.getByRole("button", { name: "Publish social links" }).click();
+  await expect(page.getByText("4 public links active")).toBeVisible();
+
   const publicResponse = await request.get("http://127.0.0.1:5000/api/public/social-links");
   expect(publicResponse.ok()).toBeTruthy();
   const published = await publicResponse.json();
