@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   CheckCircle2, Headphones, MessageCircle, Mic, MicOff, MonitorUp, PhoneOff,
-  ShieldCheck, Stethoscope, Video, VideoOff,
+  ShieldCheck, Sparkles, Stethoscope, Video, VideoOff,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { Link, useSearchParams } from "react-router-dom";
@@ -11,7 +11,6 @@ import { roomIdFor } from "../utils";
 import { IMAGERY } from "../imagery";
 import Avatar from "../components/Avatar";
 import RxPad from "../components/RxPad";
-import PageHero, { EmptyPlate } from "../components/PageHero";
 
 export default function VideoConsultation() {
   const { user } = useAuth();
@@ -28,7 +27,7 @@ export default function VideoConsultation() {
   const [mic, setMic] = useState(true);
   const [cam, setCam] = useState(true);
   const [sharing, setSharing] = useState(false);
-  const [status, setStatus] = useState("Ready to join");
+  const [status, setStatus] = useState("Ready");
   const [consent, setConsent] = useState(user.role !== "patient");
 
   useEffect(() => {
@@ -73,14 +72,14 @@ export default function VideoConsultation() {
       socket.on("webrtc-answer", async ({ answer }) => { await pcRef.current?.setRemoteDescription(answer); });
       socket.on("webrtc-ice", async ({ candidate }) => { try { await pcRef.current?.addIceCandidate(candidate); } catch {} });
       setJoined(true);
-      setStatus("Waiting for the other participant");
+      setStatus("Waiting for participant");
       if (user.role === "doctor" || user.role === "admin") {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         socket.emit("webrtc-offer", { roomId, offer });
       }
     } catch {
-      setStatus("Camera or microphone permission was not granted.");
+      setStatus("Device permission required");
       push("Allow camera and microphone to join", "error");
     }
   };
@@ -115,7 +114,6 @@ export default function VideoConsultation() {
         streamRef.current.addTrack(track);
         if (localRef.current) localRef.current.srcObject = streamRef.current;
         setSharing(false);
-        push("Camera restored");
         return;
       }
       const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
@@ -125,7 +123,6 @@ export default function VideoConsultation() {
       if (localRef.current) localRef.current.srcObject = display;
       setSharing(true);
       track.onended = () => share();
-      push("Screen sharing started");
     } catch {
       push("Screen sharing was cancelled", "error");
     }
@@ -141,70 +138,35 @@ export default function VideoConsultation() {
   };
 
   return (
-    <div className="teleconsult-workspace">
-      <PageHero
-        scene="consult"
-        eyebrow="Telemedicine workspace"
-        title="Video consultation"
-        lead={peer ? `Private consultation room with ${peer.name}.` : "Choose a care contact, complete the pre-call check and join securely."}
-        actions={peer && !joined ? <Link className="secondary-btn" to={`/messages?with=${peer.id}`}><MessageCircle size={15} /> Message first</Link> : null}
-      />
+    <div className="px-page px-video-room">
+      <section className="px-video-titlebar">
+        <div><span className="px-kicker"><Sparkles size={14} /> Private telehealth</span><h1>Consultation room</h1><p>{peer ? `Secure session with ${peer.name}` : "Choose a participant, check your environment and enter when ready."}</p></div>
+        <div className="px-video-assurance"><span><ShieldCheck size={15} /> Authenticated room</span><span><Headphones size={15} /> Headphones recommended</span><span className={joined ? "live" : "standby"}><i /> {joined ? status : "Standby"}</span></div>
+      </section>
 
-      <div className="teleconsult-status-strip">
-        <span><ShieldCheck size={14} /> Authenticated room</span>
-        <span><Headphones size={14} /> Headphones recommended</span>
-        <span className={joined ? "connected" : "standby"}><i /> {joined ? status : "Standby"}</span>
-      </div>
-
-      <div className={`teleconsult-shell ${joined ? "in-call" : "pre-call"}`}>
-        <section className="teleconsult-stage">
-          <video ref={remoteRef} autoPlay playsInline className="remote-video" />
-          {!joined && (
-            <div className="consult-lobby">
-              <div className="consult-lobby-image" style={{ backgroundImage: `url(${IMAGERY.consult})` }}><div><span className="eyebrow">Private telehealth</span><h2>{peer ? "Your consultation room is ready" : "Choose a consultation partner"}</h2><p>{peer ? "Complete the quick privacy and device check, then enter the room." : "Only authorised CareBridge contacts can be invited into this room."}</p></div></div>
-              <div className="consult-lobby-panel">
-                {!peer ? (
-                  <>
-                    <div className="consult-lobby-heading"><Stethoscope size={20} /><div><h3>{user.role === "patient" ? "Choose a clinician" : "Choose a patient"}</h3><p>Select the person for this consultation.</p></div></div>
-                    <div className="consult-contact-grid">{contacts.map((contact) => <button type="button" key={contact.id} className="consult-contact-card" onClick={() => setPeer(contact)}><Avatar person={contact} /><span><b>{contact.name}</b><small>{contact.specialty || contact.city || contact.role}</small></span></button>)}</div>
-                    {contacts.length === 0 && <EmptyPlate compact scene="consult" title="No eligible contacts" hint="Open Messages or your care team to establish a contact first." />}
-                  </>
-                ) : (
-                  <>
-                    <div className="consult-peer-card"><Avatar person={peer} className="large" /><div><span className="eyebrow">Consulting with</span><h2>{peer.name}</h2><p>{peer.specialty || peer.role || "Care contact"}</p></div><button className="ghost-btn" type="button" onClick={() => setPeer(null)}>Change</button></div>
-                    <div className="consult-checklist">
-                      <div><CheckCircle2 size={17} /><span><b>Private space</b><small>Use a quiet place where health information cannot be overheard.</small></span></div>
-                      <div><CheckCircle2 size={17} /><span><b>Camera & microphone</b><small>Your browser will ask for permission when you join.</small></span></div>
-                      <div><CheckCircle2 size={17} /><span><b>Stable connection</b><small>Wi-Fi or reliable mobile data is recommended.</small></span></div>
-                    </div>
-                    {user.role === "patient" && <label className="telehealth-consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span><b>I consent to this telehealth consultation</b><small>I understand that clinical information will be discussed in this private CareBridge room.</small></span></label>}
-                    <button className="primary-btn full consult-join" disabled={!peer || (user.role === "patient" && !consent)} onClick={enter}><Video size={18} /> Join consultation</button>
-                  </>
-                )}
-              </div>
+      <section className={`px-video-shell ${joined ? "in-call" : "lobby"}`}>
+        <main className="px-video-stage">
+          <video ref={remoteRef} autoPlay playsInline className="px-remote-video" />
+          {!joined && <div className="px-video-lobby" style={{ backgroundImage: `linear-gradient(135deg, rgba(4,18,25,.88), rgba(4,18,25,.46)), url(${IMAGERY.consult})` }}>
+            <div className="px-lobby-copy"><span className="px-kicker">CareBridge Video</span><h2>{peer ? "Everything is ready for the call." : "A quieter way to meet your care team."}</h2><p>{peer ? "Review the final checks and enter the private room when you are comfortable." : "Only authenticated CareBridge contacts can be selected for this consultation."}</p></div>
+            <div className="px-lobby-card">
+              {!peer ? <><header><Stethoscope size={19} /><div><strong>{user.role === "patient" ? "Choose clinician" : "Choose patient"}</strong><small>Select the person for this consultation</small></div></header><div className="px-lobby-contacts">{contacts.map((contact) => <button type="button" key={contact.id} onClick={() => setPeer(contact)}><Avatar person={contact} /><span><strong>{contact.name}</strong><small>{contact.specialty || contact.city || contact.role}</small></span></button>)}</div>{contacts.length === 0 && <div className="px-empty compact"><Video size={24} /><h3>No eligible contacts</h3></div>}</> : <><div className="px-lobby-peer"><Avatar person={peer} className="large" /><div><span className="px-kicker">Consulting with</span><h2>{peer.name}</h2><p>{peer.specialty || peer.role || "Care contact"}</p></div><button type="button" onClick={() => setPeer(null)}>Change</button></div><div className="px-device-checks"><div><CheckCircle2 size={16} /><span><strong>Private space</strong><small>Keep health information confidential.</small></span></div><div><CheckCircle2 size={16} /><span><strong>Camera & microphone</strong><small>Browser permission is requested on entry.</small></span></div><div><CheckCircle2 size={16} /><span><strong>Stable connection</strong><small>Wi-Fi or reliable mobile data recommended.</small></span></div></div>{user.role === "patient" && <label className="px-consent"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /><span><strong>I consent to this telehealth consultation</strong><small>I understand clinical information will be discussed in this room.</small></span></label>}<button className="px-primary px-enter-room" type="button" disabled={!peer || (user.role === "patient" && !consent)} onClick={enter}><Video size={18} /> Enter consultation</button></>}
             </div>
-          )}
-          <video ref={localRef} autoPlay muted playsInline className="local-video" style={{ display: joined ? "block" : "none" }} />
-          {joined && <div className="call-status"><i className={status === "Connected" ? "live" : ""} />{status}</div>}
-          {joined && (
-            <div className="product-call-controls">
-              <button onClick={toggleMic} className={!mic ? "off" : ""} title={mic ? "Mute microphone" : "Unmute microphone"}>{mic ? <Mic /> : <MicOff />}</button>
-              <button onClick={toggleCam} className={!cam ? "off" : ""} title={cam ? "Turn camera off" : "Turn camera on"}>{cam ? <Video /> : <VideoOff />}</button>
-              <button onClick={share} className={sharing ? "sharing" : ""} title="Share screen"><MonitorUp /></button>
-              <button className="hangup" onClick={stop} title="Leave consultation"><PhoneOff /></button>
-            </div>
-          )}
-        </section>
+          </div>}
+          <video ref={localRef} autoPlay muted playsInline className="px-local-video" style={{ display: joined ? "block" : "none" }} />
+          {joined && <div className="px-call-state"><i className={status === "Connected" ? "live" : ""} /> {status}</div>}
+          {joined && <div className="px-call-controls"><button type="button" onClick={toggleMic} className={!mic ? "off" : ""}>{mic ? <Mic /> : <MicOff />}</button><button type="button" onClick={toggleCam} className={!cam ? "off" : ""}>{cam ? <Video /> : <VideoOff />}</button><button type="button" onClick={share} className={sharing ? "sharing" : ""}><MonitorUp /></button><button type="button" className="hangup" onClick={stop}><PhoneOff /></button></div>}
+        </main>
 
-        <aside className="teleconsult-context">
-          <div className="teleconsult-context-head"><span className="eyebrow">Consultation context</span><h3>{peer?.name || "No participant selected"}</h3></div>
-          {peer ? <div className="teleconsult-person"><Avatar person={peer} className="large" /><div><b>{peer.name}</b><span>{peer.specialty || peer.role || "Care contact"}</span></div></div> : <EmptyPlate compact scene="consult" title="Choose a participant" />}
-          <div className="teleconsult-room-data"><div><span>Room</span><b>{roomId ? roomId.toUpperCase() : "Not assigned"}</b></div><div><span>Status</span><b>{status}</b></div><div><span>Video</span><b>{joined ? cam ? "On" : "Off" : "Standby"}</b></div><div><span>Audio</span><b>{joined ? mic ? "On" : "Muted" : "Standby"}</b></div></div>
-          <div className="teleconsult-security"><ShieldCheck size={17} /><div><b>Private consultation</b><small>Room access is tied to authenticated CareBridge identities and permitted care relationships.</small></div></div>
-          {peer && <div className="teleconsult-context-actions"><Link to={`/messages?with=${peer.id}`} className="secondary-btn full"><MessageCircle size={15} /> Open messages</Link>{user.role === "doctor" && peer.role === "patient" && <Link to={`/records/${peer.id}`} className="secondary-btn full">Open patient chart</Link>}</div>}
-          {user.role === "doctor" && peer?.role === "patient" && <div className="teleconsult-rx"><RxPad patient={peer} source="video" compact onIssued={() => push("Prescription issued. The patient can print or collect it.")} /></div>}
+        <aside className="px-video-context">
+          <header><span className="px-kicker">Clinical context</span><h3>{peer?.name || "No participant"}</h3></header>
+          {peer && <div className="px-video-person"><Avatar person={peer} className="large" /><strong>{peer.name}</strong><span>{peer.specialty || peer.role}</span></div>}
+          <div className="px-room-facts"><div><span>Room</span><strong>{roomId ? roomId.toUpperCase() : "Not assigned"}</strong></div><div><span>Status</span><strong>{status}</strong></div><div><span>Video</span><strong>{joined ? cam ? "On" : "Off" : "Standby"}</strong></div><div><span>Audio</span><strong>{joined ? mic ? "On" : "Muted" : "Standby"}</strong></div></div>
+          <div className="px-context-trust"><ShieldCheck size={17} /><span><strong>Private consultation</strong><small>Room access is tied to authenticated CareBridge identities.</small></span></div>
+          {peer && <div className="px-video-links"><Link to={`/messages?with=${peer.id}`}><MessageCircle size={15} /> Open messages</Link>{user.role === "doctor" && peer.role === "patient" && <Link to={`/records/${peer.id}`}>Open patient chart</Link>}</div>}
+          {user.role === "doctor" && peer?.role === "patient" && <div className="px-video-rx"><RxPad patient={peer} source="video" compact onIssued={() => push("Prescription issued.")} /></div>}
         </aside>
-      </div>
+      </section>
     </div>
   );
 }

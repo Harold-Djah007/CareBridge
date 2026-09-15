@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const AuthContext = createContext(null);
 const ToastContext = createContext(null);
@@ -10,6 +10,13 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem("carebridge-user")); } catch { return null; }
   });
+
+  useEffect(() => {
+    const expire = () => setUser(null);
+    window.addEventListener("carebridge:session-expired", expire);
+    return () => window.removeEventListener("carebridge:session-expired", expire);
+  }, []);
+
   const auth = useMemo(() => ({
     user,
     login: (u, token) => {

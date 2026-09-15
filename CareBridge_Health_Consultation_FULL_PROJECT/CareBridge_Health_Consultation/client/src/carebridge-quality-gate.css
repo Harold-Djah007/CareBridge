@@ -1,0 +1,117 @@
+/* CareBridge 10/10 quality gate — final accessibility/responsive correction layer. */
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--v6-accent, #1d715e) 72%, white);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 30000;
+  max-width: calc(100vw - 20px);
+  padding: 10px 14px;
+  border-radius: 10px;
+  color: #fff;
+  background: #123d34;
+  font-weight: 800;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform .16s ease;
+}
+
+.skip-link:focus { transform: translateY(0); }
+
+.cbv6-icon-btn,
+.cbv6-logout,
+.cb-notification-reader-close {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.cbv6-nav-link,
+.cbv6-command-trigger,
+.cbv6-profile,
+.cbv6-mini-profile,
+.cbv6-context-strip button,
+.cb-notification-reader-footer button {
+  touch-action: manipulation;
+}
+
+.cbv6-route-frame,
+.cbv6-content,
+.cbv6-main,
+.cbv6-shell,
+.cbx-settings-page,
+.cbx-settings-shell,
+.cbx-settings-main,
+.cbx-settings-document,
+.cbx-settings-section,
+.cbx-settings-profile-line,
+.cbx-settings-form-grid,
+.cbx-settings-inline-setting {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The legacy duty glow is an absolutely positioned sibling of the pill. Without
+   a positioned toggle wrapper its -8px inset resolves against a much larger
+   settings ancestor and creates document-level horizontal overflow. */
+.duty-toggle {
+  position: relative;
+  min-width: min(260px, 100%);
+  max-width: 100%;
+}
+.duty-toggle .duty-pill {
+  min-width: min(248px, 100%);
+  max-width: 100%;
+}
+
+/* Support badges represent unseen activity, not merely an open workflow. */
+.px-ticket-list > button.is-unread {
+  border-color: color-mix(in srgb, var(--v6-accent, #1d715e) 30%, transparent);
+  background: color-mix(in srgb, var(--v6-accent, #1d715e) 7%, white);
+}
+.px-ticket-new {
+  align-self: start;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #d85b50;
+  color: #fff;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.cbv6-content img,
+.cbv6-route-frame img {
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .cbv6-main,
+  .cbv6-content,
+  .cbv6-route-frame {
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,293 @@
+/* Premium V6 — notification reader and live-feed interaction. Loaded last. */
+
+body:has(.cb-notification-portal) {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.cb-notification-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 20px;
+  background: rgba(7, 19, 25, .52);
+  backdrop-filter: blur(10px) saturate(92%);
+  animation: cbNotificationBackdropIn .18s ease both;
+}
+
+.cb-notification-reader {
+  width: min(520px, calc(100vw - 40px));
+  max-height: min(680px, calc(100dvh - 40px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(38, 76, 66, .14);
+  border-radius: 22px;
+  color: #17342e;
+  background: #fff;
+  box-shadow: -24px 30px 90px rgba(3, 17, 21, .30);
+  animation: cbNotificationReaderIn .28s cubic-bezier(.2,.82,.2,1) both;
+}
+
+.cb-notification-reader-head {
+  flex: 0 0 auto;
+  min-height: 112px;
+  padding: 20px 20px 18px;
+  display: grid;
+  grid-template-columns: 46px minmax(0,1fr) 40px;
+  gap: 13px;
+  align-items: start;
+  border-bottom: 1px solid rgba(26, 68, 57, .10);
+  background: linear-gradient(180deg, #fbfdfc, #f6faf8);
+}
+
+.cb-notification-reader-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #4f806d;
+  background: #e8f2ed;
+}
+
+.cb-notification-reader-title { min-width: 0; }
+.cb-notification-reader-title > span {
+  display: block;
+  color: #5f846f;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.cb-notification-reader-title h2 {
+  margin: 5px 0 4px;
+  color: #18362f;
+  font-size: clamp(22px, 2.5vw, 28px);
+  line-height: 1.08;
+  letter-spacing: -.028em;
+}
+.cb-notification-reader-title small {
+  color: #73877f;
+  font-size: 12px;
+}
+
+.cb-notification-reader-close {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(35, 71, 61, .10);
+  border-radius: 12px;
+  color: #60756e;
+  background: #eef3f0;
+  cursor: pointer;
+  transition: transform .16s ease, background .16s ease;
+}
+.cb-notification-reader-close:hover { transform: rotate(4deg) scale(1.03); background: #e6eeea; }
+
+.cb-notification-reader-body {
+  min-height: 0;
+  padding: 18px 20px 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  background: #fbfcfb;
+}
+
+.cb-notification-reader-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid rgba(48, 92, 77, .11);
+  border-radius: 12px;
+  color: #617871;
+  background: #f1f6f3;
+  font-size: 11.5px;
+  font-weight: 750;
+}
+.cb-notification-reader-meta > span:first-child { display: inline-flex; align-items: center; gap: 6px; color: #4b7b69; text-transform: capitalize; }
+
+.cb-notification-reader-message {
+  margin-top: 14px;
+  padding: 18px;
+  border: 1px solid rgba(33, 73, 62, .10);
+  border-radius: 15px;
+  background: #fff;
+}
+.cb-notification-reader-message small {
+  color: #5f846f;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .10em;
+}
+.cb-notification-reader-message p {
+  margin: 10px 0 0;
+  color: #213d36;
+  font-size: 15px;
+  line-height: 1.68;
+}
+
+.cb-notification-reader-preview { margin-top: 14px; }
+.cb-notification-reader-preview > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(33, 73, 62, .10);
+  border-radius: 12px 12px 0 0;
+  background: #f4f8f6;
+}
+.cb-notification-reader-preview span { display: flex; flex-direction: column; }
+.cb-notification-reader-preview strong { color: #213d36; font-size: 12px; }
+.cb-notification-reader-preview small { margin-top: 2px; color: #778b84; font-size: 10.5px; }
+.cb-notification-reader-preview button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(33, 73, 62, .12);
+  border-radius: 9px;
+  color: #315f51;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.cb-notification-reader-preview iframe {
+  width: 100%;
+  height: min(260px, 34dvh);
+  display: block;
+  border: 1px solid rgba(33, 73, 62, .10);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: #fff;
+}
+
+.cb-notification-reader-footer {
+  flex: 0 0 auto;
+  min-height: 62px;
+  padding: 11px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid rgba(33, 73, 62, .10);
+  background: #fff;
+}
+.cb-notification-reader-footer small { color: #7b8d87; font-size: 10.5px; }
+.cb-notification-reader-footer button {
+  min-height: 38px;
+  padding: 0 17px;
+  border: 0;
+  border-radius: 11px;
+  color: #fff;
+  background: #143f36;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+/* The bell popover is a compact chooser, not a second full page. */
+.cbv6-app .cbv6-notice-panel {
+  width: min(390px, calc(100vw - 24px)) !important;
+  max-height: min(540px, calc(100dvh - 92px)) !important;
+  overflow: hidden !important;
+  z-index: 260 !important;
+}
+.cbv6-app .cbv6-notice-panel > div {
+  max-height: 380px !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+.cbv6-app .cbv6-notice-panel .cbv6-notice-item {
+  width: 100%;
+  min-height: 70px;
+  padding: 11px 13px;
+  display: grid;
+  grid-template-columns: 9px minmax(0,1fr) 18px;
+  gap: 10px;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid var(--v6-line);
+  color: var(--v6-ink);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background .16s ease, transform .16s ease;
+}
+.cbv6-app .cbv6-notice-panel .cbv6-notice-item:hover {
+  background: color-mix(in srgb, var(--v6-accent) 6%, transparent);
+  transform: translateX(2px);
+}
+.cbv6-app .cbv6-notice-panel .cbv6-notice-item.unread {
+  background: color-mix(in srgb, var(--v6-accent) 8%, transparent);
+}
+.cbv6-app .cbv6-notice-item > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #cbd6dc;
+}
+.cbv6-app .cbv6-notice-item.unread > i {
+  background: var(--v6-accent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--v6-accent) 12%, transparent);
+}
+.cbv6-app .cbv6-notice-item > div { min-width: 0; }
+.cbv6-app .cbv6-notice-item strong {
+  display: block;
+  overflow: hidden;
+  color: var(--v6-ink);
+  font-size: 12.5px !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cbv6-app .cbv6-notice-item p {
+  margin: 4px 0 0;
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--v6-muted);
+  font-size: 11.5px !important;
+  line-height: 1.45;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.cbv6-app .cbv6-notice-item > svg { color: var(--v6-muted); }
+
+/* A portal owns the whole screen: no sticky shell element may visually compete with it. */
+body:has(.cb-notification-portal) .cbv6-topbar,
+body:has(.cb-notification-portal) .cbv6-patient-dock,
+body:has(.cb-notification-portal) .cbv6-rail,
+body:has(.cb-notification-portal) .cbv6-mobile-nav {
+  pointer-events: none !important;
+}
+
+@keyframes cbNotificationBackdropIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cbNotificationReaderIn {
+  from { opacity: 0; transform: translateX(26px) scale(.985); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@media (max-width: 720px) {
+  .cb-notification-portal { align-items: flex-end; padding: 10px; }
+  .cb-notification-reader {
+    width: 100%;
+    max-height: 84dvh;
+    border-radius: 22px 22px 14px 14px;
+    animation-name: cbNotificationReaderMobileIn;
+  }
+  .cb-notification-reader-head { min-height: 100px; padding: 16px; }
+  .cb-notification-reader-body { padding: 15px; }
+  .cb-notification-reader-footer small { display: none; }
+  .cb-notification-reader-footer button { width: 100%; }
+}
+
+@keyframes cbNotificationReaderMobileIn {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: translateY(0); }
+}
