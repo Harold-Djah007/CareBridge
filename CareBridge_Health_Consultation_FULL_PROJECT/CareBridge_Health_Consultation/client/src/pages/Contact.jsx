@@ -4,6 +4,9 @@ import { api } from "../api";
 import { HOSPITAL } from "../utils";
 import { useToast } from "../state";
 import PublicChrome, { PageBanner } from "../components/PublicChrome";
+import { PublicSocial } from "../components/SocialLinks";
+import { useSite } from "../hooks/useSite";
+import { publishedSocial } from "../social";
 
 const FACTS = [
   { icon: MapPin, title: "Location", body: HOSPITAL.address },
@@ -14,6 +17,8 @@ const FACTS = [
 
 export default function Contact() {
   const { push } = useToast();
+  const { social } = useSite();
+  const channels = publishedSocial(social);
   const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
   const [busy, setBusy] = useState(false);
   const [ok, setOk] = useState(false);
@@ -80,6 +85,16 @@ export default function Contact() {
             />
           </div>
         </div>
+        {channels.length > 0 && (
+          <section className="contact-follow card">
+            <div>
+              <span className="eyebrow">Follow CareBridge</span>
+              <h2>More information, one click away</h2>
+              <p className="muted">These are the official hospital channels. Each icon opens the page hospital operations published.</p>
+            </div>
+            <PublicSocial tone="light" />
+          </section>
+        )}
       </div>
     </PublicChrome>
   );

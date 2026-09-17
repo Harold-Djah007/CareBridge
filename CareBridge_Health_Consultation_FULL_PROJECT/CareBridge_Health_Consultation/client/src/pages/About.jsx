@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import { HOSPITAL } from "../utils";
 import { CountStat, Reveal } from "../components/LiveFX";
 import PublicChrome, { PageBanner } from "../components/PublicChrome";
+import { PublicFollow, PublicSocial } from "../components/SocialLinks";
+import { useSite } from "../hooks/useSite";
+import { publishedSocial } from "../social";
 
 const SECTIONS = [
   { id: "story", label: "Our story" },
@@ -12,6 +15,8 @@ const SECTIONS = [
 
 export default function About() {
   const [tab, setTab] = useState("story");
+  const { social } = useSite();
+  const channels = publishedSocial(social);
   return (
     <PublicChrome>
       <PageBanner
@@ -52,6 +57,13 @@ export default function About() {
               <p>{HOSPITAL.address}. Clinic hours {HOSPITAL.hours}. Visiting {HOSPITAL.visiting}.</p>
               <p>Forty-four ward beds, a ground-floor pharmacy, records office, and consulting rooms for general medicine, cardiology, paediatrics, and orthopaedics. Teleconsults use the same consultants as the campus list.</p>
               <div className="campus-photo" style={{ backgroundImage: "url(/imagery/corridor.jpg)" }} />
+              {channels.length > 0 && (
+                <div className="about-follow">
+                  <span className="eyebrow">Follow the campus</span>
+                  <p className="muted">Official social channels for visiting notes and health information.</p>
+                  <PublicSocial tone="light" />
+                </div>
+              )}
             </Reveal>
           )}
         </div>
@@ -62,6 +74,7 @@ export default function About() {
         <CountStat value={8} label="Clinical services" />
         <CountStat value={24} suffix="/7" label="Emergency line" />
       </section>
+      <PublicFollow tone="light" />
     </PublicChrome>
   );
 }

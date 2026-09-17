@@ -5,7 +5,7 @@ import { api } from "../api";
 import PhotoPicker from "../components/PhotoPicker";
 import { useAuth, useToast } from "../state";
 import { HOSPITAL } from "../utils";
-import { UtilBar } from "../components/PublicChrome";
+import { UtilBar, HospitalFooter } from "../components/PublicChrome";
 
 function readIntent(params) {
   try {
@@ -93,6 +93,7 @@ export default function Register() {
           <p className="muted">{HOSPITAL.phone} · {HOSPITAL.email}</p>
         </section>
       </div>
+      <HospitalFooter />
     </div>
   );
 }

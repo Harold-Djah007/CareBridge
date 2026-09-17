@@ -122,3 +122,32 @@
   .prescription-actions > * { flex: 1; }
   .stock-toolbar { align-items: flex-start; flex-direction: column; }
 }
+
+/* ---------- Admin website & social ---------- */
+.website-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, .8fr); gap: 16px; align-items: start; }
+.website-editor { padding: 16px 18px 18px; }
+.website-count { min-height: 26px; padding: 0 9px; display: inline-flex; align-items: center; border-radius: 999px; background: #e8f7f3; color: #0d776c; font-size: 8px; font-weight: 850; }
+.website-network-list { display: grid; gap: 10px; margin: 12px 0 16px; }
+.website-network { padding: 12px; border: 1px solid #dbe5ea; border-radius: 12px; background: linear-gradient(180deg,#fff,#fbfdfe); }
+.website-network.live { border-color: #bfe3da; box-shadow: inset 3px 0 #1b9b89; }
+.website-network-head { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: 10px; align-items: center; margin-bottom: 10px; }
+.website-network-head b { display: block; font-size: 13px; }
+.website-network-head small { display: block; margin-top: 2px; color: #70848f; font-size: 11px; font-weight: 600; }
+.website-network .preview-icon { width: 42px; height: 42px; pointer-events: none; }
+.website-status { min-height: 22px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: 999px; background: #eef3f6; color: #6b7e8d; font-size: 10px; font-style: normal; font-weight: 800; }
+.website-status.on { background: #e8f7f3; color: #0d776c; }
+.website-url-row { display: flex; gap: 8px; align-items: center; }
+.website-url-row input { flex: 1; }
+.website-url-row .secondary-btn { min-height: 38px; padding: 0 10px; flex: 0 0 auto; }
+.website-actions { align-items: center; }
+.website-preview-col { display: grid; gap: 14px; }
+.website-preview-navy, .website-preview-light { padding: 16px; border-radius: 12px; display: grid; gap: 10px; }
+.website-preview-navy { background: #082b46; color: #c9d7e6; }
+.website-preview-light { background: #f6f9fa; border: 1px solid #dbe5ea; }
+.website-preview-navy small, .website-preview-light small { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; font-weight: 800; }
+.website-preview-navy small { color: #7ee0d2; }
+.website-surfaces { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: #5d7382; font-size: 13px; }
+
+@media (max-width: 980px) {
+  .website-layout { grid-template-columns: 1fr; }
+}

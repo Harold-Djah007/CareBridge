@@ -4,7 +4,7 @@ import { HeartPulse, Check, ArrowRight, UserRound, Stethoscope, Pill, Building2 
 import { api } from "../api";
 import { useAuth, useToast } from "../state";
 import { HOSPITAL } from "../utils";
-import { UtilBar } from "../components/PublicChrome";
+import { UtilBar, HospitalFooter } from "../components/PublicChrome";
 
 const DEMOS = {
   patient: { email: "patient@carebridge.test", password: "patient123", label: "Fill patient login" },
@@ -141,6 +141,7 @@ export default function Login() {
           <p className="muted">{HOSPITAL.phone} · Emergency {HOSPITAL.emergency}</p>
         </section>
       </div>
+      <HospitalFooter />
     </div>
   );
 }

@@ -454,5 +454,18 @@
       "previewUrl": "https://ethereal.email/message/apmpDQlT7djrnrepapnKHfNVsWIVeOHTAAAADP0oOP0q.nZyFZB89J5bz00",
       "sentAt": "2026-09-03T19:27:23.261Z"
     }
-  ]
+  ],
+  "site": {
+    "social": {
+      "facebook": "",
+      "instagram": "",
+      "x": "",
+      "linkedin": "",
+      "youtube": "",
+      "tiktok": "",
+      "whatsapp": ""
+    },
+    "updatedAt": null,
+    "updatedBy": null
+  }
 }
