@@ -79,6 +79,14 @@ export function PatientExperienceProvider({ children }) {
       const next = normalizePatientExperience(await api("/patient-experience"));
       setConfig(next);
       return next;
+    } catch (error) {
+      // Session expiry is handled centrally by api()/AuthProvider. Keeping this
+      // provider fail-soft prevents an unhandled promise from polluting the
+      // console while React redirects the user back to sign-in.
+      if (!String(error?.message || "").toLowerCase().includes("session has expired")) {
+        console.warn("CareBridge patient experience could not be refreshed:", error?.message || error);
+      }
+      return config;
     } finally {
       setLoading(false);
     }
@@ -121,14 +129,14 @@ export function PatientExperienceProvider({ children }) {
   };
 
   useEffect(() => {
-    refresh();
+    void refresh();
     if (!user) return undefined;
 
-    const poll = window.setInterval(refresh, 10000);
-    const onFocus = () => refresh();
+    const poll = window.setInterval(() => { void refresh(); }, 10000);
+    const onFocus = () => { void refresh(); };
     const onLocal = (event) => {
       if (event.detail) setConfig(normalizePatientExperience(event.detail));
-      else refresh();
+      else void refresh();
     };
     window.addEventListener("focus", onFocus);
     window.addEventListener("carebridge:patient-experience", onLocal);
