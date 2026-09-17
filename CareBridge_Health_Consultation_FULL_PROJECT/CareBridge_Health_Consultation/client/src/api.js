@@ -11,6 +11,14 @@ export async function api(path, options = {}) {
     ...options,
   });
   const data = await response.json().catch(() => ({}));
+
+  if (response.status === 401 && path !== "/login") {
+    localStorage.removeItem("carebridge-user");
+    localStorage.removeItem("carebridge-token");
+    window.dispatchEvent(new CustomEvent("carebridge:session-expired"));
+    throw new Error(data.message || "Your session has expired. Please sign in again.");
+  }
+
   if (!response.ok) throw new Error(data.message || "Request failed");
   return data;
 }

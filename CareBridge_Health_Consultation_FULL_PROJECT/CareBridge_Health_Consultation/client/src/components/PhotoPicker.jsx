@@ -43,7 +43,12 @@ export default function PhotoPicker({ value, name, onChange, onError }) {
 
   return (
     <div className="photo-picker">
-      <button type="button" className={`avatar large photo-preview ${value ? "has-photo" : ""}`} onClick={() => inputRef.current?.click()}>
+      <button
+        type="button"
+        className={`avatar large photo-preview ${value ? "has-photo" : ""}`}
+        aria-label={value ? "Change profile photo" : "Add profile photo"}
+        onClick={() => inputRef.current?.click()}
+      >
         {value ? <img src={value} alt="" /> : (name || "?").split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "+"}
       </button>
       <div className="grow">
@@ -54,7 +59,7 @@ export default function PhotoPicker({ value, name, onChange, onError }) {
           {value && <button type="button" className="ghost-btn" onClick={() => onChange("")}>Remove</button>}
         </div>
       </div>
-      <input ref={inputRef} type="file" accept="image/*" hidden onChange={pick} />
+      <input ref={inputRef} type="file" accept="image/*" aria-label="Profile photo file" hidden onChange={pick} />
     </div>
   );
 }

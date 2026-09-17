@@ -1,0 +1,148 @@
+/* Final Midnight surface safety net.
+   This file must load after every other CareBridge stylesheet. It neutralizes
+   remaining literal light surfaces so authenticated workspaces never render
+   pale text on white panels. */
+
+.cbv6-theme-midnight .cbv6-content {
+  --cb-final-panel: #112433;
+  --cb-final-raised: #142b3a;
+  --cb-final-soft: #0d202d;
+  --cb-final-control: #122735;
+  --cb-final-line: rgba(224, 237, 245, .16);
+  --cb-final-text: #f4f8fb;
+  --cb-final-muted: #bfd0da;
+}
+
+/* Settings / identity */
+.cbv6-theme-midnight .cbx-settings-document,
+.cbv6-theme-midnight .cbx-settings-section,
+.cbv6-theme-midnight .cbx-settings-profile-line,
+.cbv6-theme-midnight .photo-picker,
+.cbv6-theme-midnight .cbx-settings-preference-row,
+.cbv6-theme-midnight .cbx-settings-security-note,
+.cbv6-theme-midnight .cbx-settings-inline-setting {
+  color: var(--cb-final-text) !important;
+  background: var(--cb-final-panel) !important;
+  background-image: none !important;
+  border-color: var(--cb-final-line) !important;
+}
+.cbv6-theme-midnight .photo-picker :is(strong,span,p),
+.cbv6-theme-midnight .cbx-settings-document :is(h1,h2,h3,h4,strong,label) { color: var(--cb-final-text) !important; }
+.cbv6-theme-midnight .photo-picker .muted,
+.cbv6-theme-midnight .cbx-settings-document :is(p,small,.muted) { color: var(--cb-final-muted) !important; opacity: 1 !important; }
+
+/* Switchboard / messaging */
+.cbv6-theme-midnight :is(.px-comm-shell,.px-inbox-rail,.px-thread-pane,.px-context-pane,.px-contact-list>button,.px-thread-scroll,.px-composer) {
+  color: var(--cb-final-text) !important;
+  background-color: var(--cb-final-panel) !important;
+  background-image: none !important;
+  border-color: var(--cb-final-line) !important;
+}
+.cbv6-theme-midnight .px-inbox-rail,
+.cbv6-theme-midnight .px-thread-scroll { background-color: var(--cb-final-soft) !important; }
+.cbv6-theme-midnight .px-contact-list>button.active { background-color: #173140 !important; }
+.cbv6-theme-midnight :is(.px-contact-copy,.px-thread-person,.px-context-profile,.px-context-stack) :is(h2,h3,strong) { color: var(--cb-final-text) !important; }
+.cbv6-theme-midnight :is(.px-contact-copy,.px-thread-person,.px-context-profile,.px-context-stack) :is(p,small,span) { color: var(--cb-final-muted) !important; opacity: 1 !important; }
+
+/* Support desk */
+.cbv6-theme-midnight :is(.px-support-shell,.px-ticket-rail,.px-ticket-thread,.px-ticket-search,.px-ticket-list>button,.px-ticket-composer) {
+  color: var(--cb-final-text) !important;
+  background-color: var(--cb-final-panel) !important;
+  background-image: none !important;
+  border-color: var(--cb-final-line) !important;
+}
+.cbv6-theme-midnight .px-ticket-rail { background-color: var(--cb-final-soft) !important; }
+.cbv6-theme-midnight .px-ticket-list>button.active { background-color: #173140 !important; }
+.cbv6-theme-midnight .px-ticket-list>button :is(strong,em,time) { color: var(--cb-final-text) !important; }
+.cbv6-theme-midnight .px-ticket-list>button small { color: var(--cb-final-muted) !important; opacity: 1 !important; }
+
+/* Analytics / audit */
+.cbv6-theme-midnight :is(.px-report-tabs,.px-report-metrics article,.px-insight-grid article,.px-report-ledger,.px-audit-stream,.px-report-row-head,.px-report-row) {
+  color: var(--cb-final-text) !important;
+  background-color: var(--cb-final-panel) !important;
+  background-image: none !important;
+  border-color: var(--cb-final-line) !important;
+}
+.cbv6-theme-midnight .px-report-metrics article.primary { background-color: #0c4a4f !important; }
+.cbv6-theme-midnight .px-report-row-head { background-color: var(--cb-final-soft) !important; }
+.cbv6-theme-midnight :is(.px-report-metrics,.px-insight-grid,.px-report-ledger,.px-audit-stream) :is(h2,h3,h4,strong) { color: var(--cb-final-text) !important; }
+.cbv6-theme-midnight :is(.px-report-metrics,.px-insight-grid,.px-report-ledger,.px-audit-stream) :is(p,small,span,time) { color: var(--cb-final-muted) !important; opacity: 1 !important; }
+
+/* Capacity, clinic operations, cases, directory and shared admin surfaces */
+.cbv6-theme-midnight :is(.px-bed-map,.px-bed-bars,.px-bed-ward,.px-bed-numbers span,.px-admin-board,.px-case-board,.px-case-flow-board,.px-case-facts,.px-case-activity,.px-case-filterbar,.px-case-row,.px-case-detail-state,.identity-card,.identity-directory-panel,.table-wrap,.search-box,.toolbar) {
+  color: var(--cb-final-text) !important;
+  background-color: var(--cb-final-panel) !important;
+  background-image: none !important;
+  border-color: var(--cb-final-line) !important;
+}
+.cbv6-theme-midnight .px-bed-bars,
+.cbv6-theme-midnight .px-bed-numbers span,
+.cbv6-theme-midnight .px-case-filterbar { background-color: var(--cb-final-soft) !important; }
+
+/* Patient / doctor / nurse shared product and clinical surfaces */
+.cbv6-theme-midnight :is(.px-appointment-board,.px-admission-ledger,.px-ward-market,.px-capacity-board,.px-rx-zone,.px-care-filterbar,.px-network-card,.px-med-ledger,.px-med-card,.px-stock-board,.px-payment-sheet,.px-receipt-document,.identity-summary-grid article,.guide-role-card,.guide-journey-panel) {
+  color: var(--cb-final-text) !important;
+  background-color: var(--cb-final-panel) !important;
+  background-image: none !important;
+  border-color: var(--cb-final-line) !important;
+}
+
+/* Generic readable text inside normalized surfaces. */
+.cbv6-theme-midnight .cbv6-content :is(h1,h2,h3,h4,h5,h6,strong,label) { text-rendering: optimizeLegibility; }
+.cbv6-theme-midnight .cbv6-content :is(input,select,textarea) {
+  color: var(--cb-final-text) !important;
+  background-color: var(--cb-final-control) !important;
+  border-color: rgba(224, 237, 245, .22) !important;
+}
+.cbv6-theme-midnight .cbv6-content :is(input,textarea)::placeholder { color: #96aebb !important; opacity: 1 !important; }
+
+/* Fail-closed Midnight text contrast. The ID raises specificity above legacy page rules
+   without changing Pearl or Sage. Muted prose stays visibly secondary but never faint. */
+.cbv6-theme-midnight #cbv6-main :is(h1,h2,h3,h4,h5,h6,strong,label,a,button,td,th,code,dt,dd,li,span) {
+  color: var(--cb-final-text) !important;
+}
+.cbv6-theme-midnight #cbv6-main :is(p,small,.muted,[class*="muted"],[class*="note"],[class*="hint"]) {
+  color: var(--cb-final-muted) !important;
+  opacity: 1 !important;
+}
+.cbv6-theme-midnight #cbv6-main :is(.cbv6-signal,.cbv6-action-tile,.cbv6-panel,.cbv6-care-focus,.cbv6-clinician-card,.cbv6-stream-list>a,.cbv6-encounter-actions>a,.cb-px-panel,.cb-px-preview,.cb-px-statusbar,.cb-px-scopebar>button,.px-public-presence,.px-social-settings,.px-social-settings label) {
+  border-color: var(--cb-final-line) !important;
+}
+.cbv6-theme-midnight #cbv6-main :is(.ghost-btn,.secondary-btn,.chip-link,button.active,button.is-active,button.is-selected) {
+  color: var(--cb-final-text) !important;
+  background-color: #173140 !important;
+  background-image: none !important;
+}
+.cbv6-theme-midnight #cbv6-main :is(.ghost-btn.danger,[class*="danger"]) { color: #ffd6d3 !important; }
+
+/* Comfortable authenticated reading scale. V6 originally used 7-11px microcopy in many
+   surfaces; this final layer keeps dense hospital screens compact without eye strain. */
+.cbv6-app { font-size: 17px; line-height: 1.55; }
+.cbv6-brand strong { font-size: 18px !important; }
+.cbv6-brand small { font-size: 12.5px !important; }
+.cbv6-page-identity small { font-size: 11.5px !important; }
+.cbv6-page-identity strong { font-size: 16px !important; }
+.cbv6-page-identity span { font-size: 13px !important; }
+.cbv6-command-trigger span { font-size: 13.5px !important; }
+.cbv6-command-trigger kbd { font-size: 11px !important; }
+.cbv6-live { font-size: 12.5px !important; }
+.cbv6-profile strong { font-size: 14px !important; }
+.cbv6-profile small { font-size: 12px !important; }
+.cbv6-rail { font-size: 14px; }
+.cbv6-rail small,
+.cbv6-rail-scene small { font-size: 12px !important; }
+.cbv6-rail-scene strong { font-size: 14px !important; }
+.cbv6-nav-link { font-size: 14px !important; font-weight: 720; }
+.cbv6-content { font-size: 16px; line-height: 1.6; }
+.cbv6-content p,
+.cbv6-content li,
+.cbv6-content dd { font-size: 15px !important; line-height: 1.65; }
+.cbv6-content small { font-size: 13px !important; line-height: 1.5; }
+.cbv6-content .eyebrow,
+.cbv6-content [class*="kicker"] { font-size: 12px !important; }
+.cbv6-content label { font-size: 14px !important; line-height: 1.45; }
+.cbv6-content :is(input,select,textarea) { font-size: 16px !important; }
+.cbv6-content :is(button,.primary-btn,.secondary-btn,.ghost-btn) { font-size: 14px !important; }
+.cbv6-content table th { font-size: 13px !important; }
+.cbv6-content table td { font-size: 15px !important; line-height: 1.5; }
+.cbv6-content :is(.status,[class*="badge"],[class*="chip"]) { font-size: 12px !important; }

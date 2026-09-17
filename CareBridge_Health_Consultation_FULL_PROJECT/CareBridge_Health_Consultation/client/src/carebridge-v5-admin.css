@@ -1,0 +1,83 @@
+/* CareBridge Commercial V5 — admin operations surfaces */
+.v5-admin-header {
+  min-height: 180px;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 360px;
+  overflow: hidden;
+  color: #eef4f7;
+  background: #2a323a;
+  border: 1px solid #2a323a;
+  border-radius: 11px;
+}
+.v5-admin-header-copy { padding: 25px 28px; display: flex; flex-direction: column; justify-content: center; }
+.v5-admin-header .v5-kicker { color: #8fd4c7; }
+.v5-admin-header h1 { margin: 6px 0 7px; color: #fff; font-family: inherit; font-size: 32px; letter-spacing: -.04em; }
+.v5-admin-header p { max-width: 680px; margin: 0; color: #b3c0c8; font-size: 10px; line-height: 1.55; }
+.v5-admin-header-photo { min-height: 180px; background-position: center; background-size: cover; position: relative; }
+.v5-admin-header-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #2a323a 0, rgba(42,50,58,.18) 38%, rgba(42,50,58,.02)); }
+.v5-admin-status { margin-top: 17px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.v5-admin-status > span:last-child { display: inline-flex; align-items: center; gap: 5px; color: #9fb0ba; font-size: 8px; }
+.v5-pressure { min-height: 26px; padding: 0 8px; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; color: #a5ddcd; background: rgba(84,199,169,.11); border: 1px solid rgba(84,199,169,.18); font-size: 8px; font-weight: 800; }
+.v5-pressure i { width: 6px; height: 6px; border-radius: 50%; background: #63cfb3; animation: v5-status-pulse 1.8s ease-in-out infinite; }
+.v5-pressure.watch { color: #e8c883; background: rgba(224,172,75,.1); border-color: rgba(224,172,75,.18); }
+.v5-pressure.watch i { background: #d8a748; }
+.v5-pressure.critical { color: #f2aaa3; background: rgba(215,91,79,.1); border-color: rgba(215,91,79,.18); }
+.v5-pressure.critical i { background: #d65b50; }
+
+.v5-ops-grid { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(320px,.8fr); gap: 14px; }
+.v5-occupancy-body { min-height: 205px; display: grid; grid-template-columns: 130px minmax(0,1fr); gap: 20px; align-items: center; }
+.v5-occupancy-score { width: 116px; height: 116px; display: grid; place-content: center; text-align: center; border: 10px solid #dceee7; border-radius: 50%; background: #f9fcfb; box-shadow: inset 0 0 0 1px #edf2ef; }
+.v5-occupancy-score strong { color: #245f49; font-size: 27px; letter-spacing: -.04em; }
+.v5-occupancy-score span { margin-top: 2px; color: #7b8a92; font-size: 8px; }
+.v5-occupancy-score.watch { border-color: #f1ddb4; }
+.v5-occupancy-score.watch strong { color: #95661e; }
+.v5-occupancy-score.critical { border-color: #f0c8c4; }
+.v5-occupancy-score.critical strong { color: #a4483f; }
+.v5-occupancy-bars { min-width: 0; }
+
+.v5-decision-list { display: grid; gap: 5px; }
+.v5-decision-list > a { min-height: 58px; padding: 8px; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 9px; align-items: center; color: inherit; text-decoration: none; border: 1px solid #e4e9ec; border-radius: 8px; background: #fbfcfd; }
+.v5-decision-list > a:hover { border-color: #cfd9df; background: #fff; }
+.v5-decision-list > a > span { width: 34px; height: 34px; display: grid; place-items: center; color: #0f7b70; background: #edf7f4; border-radius: 8px; }
+.v5-decision-list > a > div { min-width: 0; display: flex; flex-direction: column; }
+.v5-decision-list b { font-size: 9px; }
+.v5-decision-list small { margin-top: 3px; color: #7d8b94; font-size: 7px; }
+.v5-decision-list em { min-width: 27px; height: 27px; display: grid; place-items: center; color: #516775; background: #edf1f3; border-radius: 999px; font-size: 8px; font-style: normal; font-weight: 800; }
+
+.v5-panel-note { color: #82919a; font-size: 8px; }
+.v5-ops-links { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+.v5-ops-link { min-height: 86px; padding: 12px; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 10px; align-items: center; color: inherit; text-decoration: none; border: 1px solid #e1e7ea; border-radius: 9px; background: #fbfcfd; }
+.v5-ops-link:hover { background: #fff; border-color: #cbd7dd; box-shadow: 0 7px 20px rgba(27,43,54,.055); }
+.v5-ops-link > span { width: 34px; height: 34px; display: grid; place-items: center; color: #0d776d; background: #edf7f4; border-radius: 8px; }
+.v5-ops-link > div { min-width: 0; display: flex; flex-direction: column; }
+.v5-ops-link b { font-size: 9px; }
+.v5-ops-link small { margin-top: 4px; color: #7b8a93; font-size: 7px; line-height: 1.35; }
+.v5-ops-link em { min-width: 23px; height: 23px; display: grid; place-items: center; color: #fff; background: #8c5f20; border-radius: 999px; font-size: 7px; font-style: normal; font-weight: 800; }
+.v5-ops-link > svg { color: #9aa5ac; }
+
+.v5-ops-list { display: grid; }
+.v5-ops-list > a, .v5-ops-list > div:not(.v5-empty-inline) { min-height: 58px; display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 9px; align-items: center; color: inherit; text-decoration: none; border-bottom: 1px solid #edf0f2; }
+.v5-ops-list > a:last-child, .v5-ops-list > div:last-child { border-bottom: 0; }
+.v5-ops-list > a > div, .v5-ops-list > div > div { min-width: 0; display: flex; flex-direction: column; }
+.v5-ops-list b { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.v5-ops-list small { margin-top: 3px; overflow: hidden; color: #7e8b94; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.v5-list-icon { width: 32px; height: 32px; display: grid; place-items: center; color: #0d796e; background: #edf7f4; border-radius: 7px; }
+.v5-assurance { min-height: 42px; padding: 0 12px; display: flex; align-items: center; gap: 8px; color: #5d736d; background: #eef7f4; border: 1px solid #d8e9e3; border-radius: 9px; font-size: 8px; }
+.v5-loading { min-height: 260px; display: flex; align-items: center; justify-content: center; gap: 8px; color: #72818b; }
+.v5-loading svg { animation: v5-spin 1.1s linear infinite; }
+
+@keyframes v5-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 1180px) {
+  .v5-ops-links { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 900px) {
+  .v5-admin-header { grid-template-columns: 1fr; }
+  .v5-admin-header-photo { min-height: 130px; order: -1; }
+  .v5-admin-header-photo::after { background: linear-gradient(180deg, rgba(42,50,58,.02), #2a323a 100%); }
+  .v5-ops-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .v5-ops-links { grid-template-columns: 1fr; }
+  .v5-occupancy-body { grid-template-columns: 1fr; }
+}

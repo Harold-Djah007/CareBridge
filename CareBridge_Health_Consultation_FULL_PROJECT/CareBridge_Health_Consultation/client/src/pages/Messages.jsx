@@ -1,29 +1,30 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  CalendarDays, FileText, MessageCircle, MoreHorizontal, Paperclip, Search, Send,
-  ShieldCheck, Stethoscope, UserPlus, Video,
+  CalendarDays, FileText, MessageCircle, Paperclip, Search, Send, ShieldCheck,
+  Sparkles, Stethoscope, UserPlus, Video,
 } from "lucide-react";
 import { io } from "socket.io-client";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useOutletContext, useSearchParams } from "react-router-dom";
 import { api, socketOptions, socketUrl } from "../api";
 import { useAuth, useToast } from "../state";
 import { roomIdFor } from "../utils";
-import { IMAGERY } from "../imagery";
 import Avatar from "../components/Avatar";
 import Presence from "../components/Presence";
 import RxPad from "../components/RxPad";
-import PageHero, { EmptyPlate } from "../components/PageHero";
 
 const prettyTime = (iso) => {
   if (!iso) return "";
   const date = new Date(iso);
-  const sameDay = date.toDateString() === new Date().toDateString();
-  return sameDay ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : date.toLocaleDateString([], { month: "short", day: "numeric" });
+  return date.toDateString() === new Date().toDateString()
+    ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString([], { month: "short", day: "numeric" });
 };
 
 export default function Messages() {
   const { user } = useAuth();
   const { push } = useToast();
+  const shell = useOutletContext() || {};
+  const refreshBadges = shell.refreshBadges || (() => Promise.resolve());
   const [params] = useSearchParams();
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -34,15 +35,15 @@ export default function Messages() {
   const endRef = useRef();
   const fileRef = useRef();
   const socketRef = useRef();
+  const seenRef = useRef(new Set());
 
-  const loadContacts = (keepId) => {
-    api(`/contacts?userId=${user.id}&role=${user.role}`).then((list) => {
-      const rows = user.role === "nurse" ? (list || []).filter((contact) => contact.role === "doctor" || contact.role === "admin") : list;
-      setContacts(rows);
-      const wanted = keepId || params.get("with");
-      setSelected((current) => rows.find((contact) => contact.id === (wanted || current?.id)) || (wanted ? rows.find((contact) => contact.id === wanted) : rows[0]) || null);
-    });
-  };
+  const loadContacts = (keepId) => api(`/contacts?userId=${user.id}&role=${user.role}`).then((list) => {
+    const rows = user.role === "nurse" ? (list || []).filter((contact) => ["doctor", "admin"].includes(contact.role)) : (list || []);
+    setContacts(rows);
+    const wanted = keepId || params.get("with");
+    setSelected((current) => rows.find((contact) => contact.id === (wanted || current?.id)) || rows[0] || null);
+    return rows;
+  });
 
   useEffect(() => {
     loadContacts();
@@ -67,24 +68,51 @@ export default function Messages() {
   useEffect(() => {
     if (!roomId || !socketRef.current) return undefined;
     socketRef.current.emit("join-room", roomId);
-    api(`/messages/${roomId}?userId=${user.id}`).then(setMessages);
+    api(`/messages/${roomId}?userId=${user.id}`).then((rows) => {
+      setMessages(rows);
+      rows.forEach((message) => seenRef.current.add(message.id));
+      setContacts((list) => list.map((contact) => contact.id === selected?.id ? { ...contact, unread: 0 } : contact));
+      refreshBadges();
+    });
+
     const handler = (message) => {
-      if (message.roomId === roomId) setMessages((previous) => previous.some((row) => row.id === message.id) ? previous : [...previous, message]);
-      setContacts((list) => list.map((contact) => {
-        const other = message.roomId?.split("-").find((id) => id !== user.id);
-        if (contact.id !== other) return contact;
-        return { ...contact, lastMessage: { text: message.text, timestamp: message.timestamp, senderId: message.senderId } };
-      }));
+      if (!message?.id || seenRef.current.has(message.id)) return;
+      seenRef.current.add(message.id);
+      const other = message.roomId?.split("-").find((id) => id !== user.id);
+      const isCurrentRoom = message.roomId === roomId;
+      const isIncoming = message.senderId !== user.id;
+
+      if (isCurrentRoom) {
+        setMessages((previous) => [...previous, message]);
+        setContacts((list) => list.map((contact) => contact.id === other ? {
+          ...contact,
+          unread: 0,
+          lastMessage: { text: message.text, timestamp: message.timestamp, senderId: message.senderId },
+        } : contact));
+        if (isIncoming) {
+          api(`/messages/${roomId}/read`, { method: "PATCH" }).then(refreshBadges).catch(() => refreshBadges());
+        } else {
+          refreshBadges();
+        }
+      } else {
+        setContacts((list) => list.map((contact) => contact.id === other ? {
+          ...contact,
+          unread: Number(contact.unread || 0) + (isIncoming ? 1 : 0),
+          lastMessage: { text: message.text, timestamp: message.timestamp, senderId: message.senderId },
+        } : contact));
+        refreshBadges();
+      }
     };
+
     socketRef.current.on("chat-message", handler);
     return () => socketRef.current?.off("chat-message", handler);
-  }, [roomId]);
+  }, [roomId, selected?.id]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const sendText = (value) => {
     if (!value.trim() || !selected) return;
-    if (user.role === "nurse" && selected.role === "patient") return push("Nurses cannot message patients. Write to a doctor or administrator.", "error");
+    if (user.role === "nurse" && selected.role === "patient") return push("Nurses cannot message patients directly.", "error");
     socketRef.current.emit("chat-message", { roomId, senderId: user.id, text: value.trim() });
     setText("");
   };
@@ -94,106 +122,77 @@ export default function Messages() {
     event.target.value = "";
     if (!file) return;
     sendText(`Shared a file: ${file.name}`);
-    push(`Attached ${file.name} to the conversation`);
+    push(`Attached ${file.name}`);
   };
 
   const visible = useMemo(() => contacts.filter((contact) => `${contact.name} ${contact.specialty || ""} ${contact.role || ""}`.toLowerCase().includes(query.toLowerCase())), [contacts, query]);
   const unread = contacts.reduce((sum, contact) => sum + Number(contact.unread || 0), 0);
-
-  const copy = user.role === "patient" ? {
-    eyebrow: "Secure care communication", title: "Messages", lead: "Chat with your care team, book follow-up care and move into video without losing context.", list: "Care team",
-  } : user.role === "doctor" ? {
-    eyebrow: "Clinical communication", title: "Clinical inbox", lead: "Patient and hospital conversations with charts, video and prescribing tools kept beside the thread.", list: "Clinical conversations",
-  } : user.role === "nurse" ? {
-    eyebrow: "Dispensary communication", title: "Clinical messages", lead: "Coordinate medication fulfilment with consultants and hospital operations.", list: "Hospital contacts",
-  } : {
-    eyebrow: "Hospital communications", title: "Switchboard", lead: "Coordinate patient and staff communication from a secure operational inbox.", list: "Conversations",
-  };
+  const label = user.role === "doctor" ? "Clinical inbox" : user.role === "nurse" ? "Clinical messages" : user.role === "admin" ? "Switchboard" : "Care messages";
 
   return (
-    <div className="messages-workspace product-messages-page">
-      <PageHero
-        scene="messages"
-        eyebrow={copy.eyebrow}
-        title={copy.title}
-        lead={copy.lead}
-        actions={user.role === "patient" ? <Link className="primary-btn" to="/care?from=messages"><UserPlus size={16} /> Add clinician</Link> : null}
-      />
+    <div className="px-page px-messages">
+      <section className="px-message-head">
+        <div><span className="px-kicker"><Sparkles size={14} /> Secure communication</span><h1>{label}</h1><p>One conversation surface for care coordination, follow-up and live clinical context.</p></div>
+        <div className="px-message-head-meta"><span className={connected ? "live" : "offline"}><i /> {connected ? "Live channel" : "Reconnecting"}</span><span>{contacts.length} contacts</span><span>{unread} unread</span>{user.role === "patient" && <Link className="px-primary" to="/care?from=messages"><UserPlus size={16} /> Add clinician</Link>}</div>
+      </section>
 
-      <div className="message-status-strip">
-        <span className={`product-connection ${connected ? "connected" : "offline"}`}><ShieldCheck size={14} /> {connected ? "Encrypted live channel connected" : "Reconnecting live channel"}</span>
-        <span><MessageCircle size={14} /> {contacts.length} contact{contacts.length === 1 ? "" : "s"}</span>
-        <span><FileText size={14} /> {unread} unread</span>
-      </div>
-
-      <div className="product-chat-workspace">
-        <aside className="product-conversation-list">
-          <div className="conversation-list-head"><div><span className="eyebrow">{copy.list}</span><h2>{contacts.length}</h2></div>{user.role === "patient" && <Link className="icon-btn" to="/care?from=messages" title="Add doctor"><UserPlus size={17} /></Link>}</div>
-          <label className="conversation-search"><Search size={15} /><input placeholder="Search people or conversations" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-          <div className="conversation-scroll">
-            {visible.map((contact) => (
-              <button key={contact.id} onClick={() => setSelected(contact)} className={`conversation-row ${selected?.id === contact.id ? "selected" : ""}`}>
-                <span className="conversation-avatar"><Avatar person={contact} /><i className={contact.available === false ? "busy" : "online"} /></span>
-                <span className="conversation-copy"><b>{contact.name}</b><small>{contact.lastMessage?.text || contact.specialty || contact.role || "Start a conversation"}</small></span>
-                <span className="conversation-meta">{contact.lastMessage?.timestamp && <time>{prettyTime(contact.lastMessage.timestamp)}</time>}{contact.unread > 0 && <em>{contact.unread}</em>}</span>
-              </button>
-            ))}
-            {visible.length === 0 && <EmptyPlate compact scene="messages" icon={MessageCircle} title="No conversations found" hint="Try another search or add a care contact." />}
+      <section className="px-comm-shell">
+        <aside className="px-inbox-rail">
+          <div className="px-inbox-title"><span>Conversations</span><strong>{contacts.length}</strong></div>
+          <label className="px-inbox-search"><Search size={15} /><input aria-label="Search conversations" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search people" /></label>
+          <div className="px-contact-list">
+            {visible.map((contact) => <button key={contact.id} type="button" className={selected?.id === contact.id ? "active" : ""} onClick={() => setSelected(contact)}>
+              <span className="px-contact-avatar"><Avatar person={contact} /><i className={contact.available === false ? "busy" : "online"} /></span>
+              <span className="px-contact-copy"><strong>{contact.name}</strong><small>{contact.lastMessage?.text || contact.specialty || contact.role || "Start a conversation"}</small></span>
+              <span className="px-contact-meta">{contact.lastMessage?.timestamp && <time>{prettyTime(contact.lastMessage.timestamp)}</time>}{contact.unread > 0 && <em>{contact.unread}</em>}</span>
+            </button>)}
+            {visible.length === 0 && <div className="px-empty compact"><MessageCircle size={24} /><h3>No matching conversations</h3></div>}
           </div>
         </aside>
 
-        <section className="product-chat-thread">
-          {selected ? (
-            <>
-              <header className="product-chat-head">
-                <Avatar person={selected} />
-                <div className="grow"><h3>{selected.name}</h3><span>{selected.specialty || selected.city || selected.role || "Care contact"}</span>{selected.role === "doctor" || user.role === "patient" ? <Presence person={selected} /> : null}</div>
-                <div className="product-chat-head-actions">
-                  {user.role === "patient" && <><Link className="ghost-btn" to="/appointments"><CalendarDays size={15} /> Book</Link><Link className="secondary-btn" to={`/video?with=${selected.id}`}><Video size={15} /> Video</Link></>}
-                  {user.role === "doctor" && selected.role === "patient" && <><Link className="ghost-btn" to={`/records/${selected.id}`}><FileText size={15} /> Chart</Link><Link className="secondary-btn" to={`/video?with=${selected.id}`}><Video size={15} /> Video</Link></>}
-                  <button className="icon-btn" type="button" title="Conversation options"><MoreHorizontal size={18} /></button>
-                </div>
-              </header>
-
-              <div className="product-message-thread">
-                <div className="thread-date-marker"><span>Secure CareBridge conversation</span></div>
-                {messages.length === 0 && <EmptyPlate compact scene="messages" icon={MessageCircle} title="No messages yet" hint={`Start the conversation with ${selected.name.split(" ")[0]}.`} />}
-                {messages.map((message) => (
-                  <div key={message.id} className={`product-bubble-row ${message.senderId === user.id ? "mine" : "theirs"}`}>
-                    {message.senderId !== user.id && <Avatar person={selected} className="small" />}
-                    <div className="product-bubble"><p>{message.text}</p><small>{prettyTime(message.timestamp)}</small></div>
-                  </div>
-                ))}
-                <div ref={endRef} />
+        <main className="px-thread-pane">
+          {selected ? <>
+            <header className="px-thread-head">
+              <div className="px-thread-person"><Avatar person={selected} /><div><h2>{selected.name}</h2><span>{selected.specialty || selected.role || "Care contact"}</span>{selected.role === "doctor" || user.role === "patient" ? <Presence person={selected} /> : null}</div></div>
+              <div className="px-thread-actions">
+                {user.role === "patient" && <><Link to="/appointments"><CalendarDays size={15} /> Book</Link><Link className="strong" to={`/video?with=${selected.id}`}><Video size={15} /> Video</Link></>}
+                {user.role === "doctor" && selected.role === "patient" && <><Link to={`/records/${selected.id}`}><FileText size={15} /> Chart</Link><Link className="strong" to={`/video?with=${selected.id}`}><Video size={15} /> Consult</Link></>}
               </div>
+            </header>
 
-              <form className="product-message-composer" onSubmit={(event) => { event.preventDefault(); sendText(text); }}>
-                <input type="file" hidden ref={fileRef} onChange={onFile} />
-                <button type="button" className="icon-btn" title="Attach a file" onClick={() => fileRef.current?.click()}><Paperclip size={18} /></button>
-                <textarea rows="1" placeholder={selected.available === false && user.role === "patient" ? `${selected.name.split(" ")[0]} is busy — leave a secure message` : "Write a secure message…"} value={text} onChange={(event) => setText(event.target.value)} />
-                <button className="send-btn" type="submit" aria-label="Send message"><Send size={18} /></button>
-              </form>
-            </>
-          ) : <EmptyPlate scene="messages" icon={MessageCircle} title="Choose a conversation" hint="Select a person from the left to open the secure thread." />}
-        </section>
+            <div className="px-thread-scroll">
+              <div className="px-thread-security"><ShieldCheck size={14} /> Authenticated CareBridge conversation</div>
+              {messages.length === 0 && <div className="px-empty"><MessageCircle size={28} /><h3>Start the conversation</h3><p>Messages with {selected.name.split(" ")[0]} will appear here.</p></div>}
+              {messages.map((message) => <div key={message.id} className={`px-message-row ${message.senderId === user.id ? "mine" : "theirs"}`}>
+                {message.senderId !== user.id && <Avatar person={selected} className="small" />}
+                <div className="px-message-bubble"><p>{message.text}</p><small>{prettyTime(message.timestamp)}</small></div>
+              </div>)}
+              <div ref={endRef} />
+            </div>
 
-        <aside className="product-chat-context">
-          {selected ? (
-            <>
-              <div className="chat-context-image" style={{ backgroundImage: `url(${selected.role === "doctor" || user.role === "doctor" ? IMAGERY.clinic : IMAGERY.consult})` }}><span>{selected.role === "doctor" ? "Clinical contact" : "Care context"}</span></div>
-              <div className="chat-context-person"><Avatar person={selected} className="large" /><h3>{selected.name}</h3><p>{selected.specialty || selected.role || "Care contact"}</p>{selected.role === "doctor" ? <Presence person={selected} /> : null}</div>
-              <div className="chat-context-actions">
-                {user.role === "patient" && <><Link to="/appointments"><CalendarDays size={16} /><span><b>Book appointment</b><small>Schedule care with this clinician</small></span></Link><Link to={`/video?with=${selected.id}`}><Video size={16} /><span><b>Start video</b><small>Open private consult room</small></span></Link></>}
-                {user.role === "doctor" && selected.role === "patient" && <><Link to={`/records/${selected.id}`}><FileText size={16} /><span><b>Open chart</b><small>Clinical record and history</small></span></Link><Link to={`/video?with=${selected.id}`}><Video size={16} /><span><b>Teleconsult</b><small>Open consultation room</small></span></Link></>}
-                {user.role === "nurse" && <div className="chat-context-note"><Stethoscope size={16} /><span><b>Clinical-only contact</b><small>Patient messaging is restricted for pharmacy nurses.</small></span></div>}
-              </div>
-              <div className="chat-context-security"><ShieldCheck size={16} /><div><b>Protected conversation</b><small>Messages use authenticated CareBridge identities and real-time room membership.</small></div></div>
-            </>
-          ) : <EmptyPlate compact scene="messages" title="Conversation context" hint="Contact details and care actions appear here." />}
+            <form className="px-composer" onSubmit={(event) => { event.preventDefault(); sendText(text); }}>
+              <input type="file" hidden ref={fileRef} aria-label="Attach message file" onChange={onFile} />
+              <button type="button" title="Attach file" aria-label="Attach file" onClick={() => fileRef.current?.click()}><Paperclip size={18} /></button>
+              <textarea aria-label="Message" rows="1" value={text} onChange={(e) => setText(e.target.value)} placeholder={selected.available === false && user.role === "patient" ? "Leave a secure message…" : "Write a message…"} />
+              <button className="send" type="submit" aria-label="Send"><Send size={18} /></button>
+            </form>
+          </> : <div className="px-empty large"><MessageCircle size={32} /><h3>Choose a conversation</h3><p>Select a care contact to open the secure thread.</p></div>}
+        </main>
+
+        <aside className="px-context-pane">
+          {selected ? <>
+            <div className="px-context-profile"><Avatar person={selected} className="large" /><h3>{selected.name}</h3><p>{selected.specialty || selected.role || "Care contact"}</p>{selected.role === "doctor" ? <Presence person={selected} /> : null}</div>
+            <div className="px-context-stack">
+              {user.role === "patient" && <><Link to="/appointments"><CalendarDays size={17} /><span><strong>Book care</strong><small>Schedule with this clinician</small></span></Link><Link to={`/video?with=${selected.id}`}><Video size={17} /><span><strong>Video consult</strong><small>Open a private room</small></span></Link></>}
+              {user.role === "doctor" && selected.role === "patient" && <><Link to={`/records/${selected.id}`}><FileText size={17} /><span><strong>Patient chart</strong><small>Open longitudinal record</small></span></Link><Link to={`/video?with=${selected.id}`}><Video size={17} /><span><strong>Teleconsult</strong><small>Start secure consultation</small></span></Link></>}
+              {user.role === "nurse" && <div><Stethoscope size={17} /><span><strong>Clinical channel</strong><small>Use this for dispensing coordination.</small></span></div>}
+            </div>
+            <div className="px-context-trust"><ShieldCheck size={17} /><span><strong>Protected context</strong><small>Authenticated identities and room membership are enforced by CareBridge.</small></span></div>
+          </> : <div className="px-empty compact"><ShieldCheck size={24} /><h3>Conversation context</h3></div>}
         </aside>
-      </div>
+      </section>
 
-      {user.role === "doctor" && selected?.role === "patient" && <section className="product-section top-gap clinical-message-tools"><div className="product-section-head"><div><span className="eyebrow">Clinical action</span><h2>Prescription workspace</h2></div></div><RxPad patient={selected} source="messages" onIssued={(rx) => sendText(`Issued a prescription: ${rx.drug}. Open Prescriptions to print, buy on site, or collect at Ridge pharmacy.`)} /></section>}
+      {user.role === "doctor" && selected?.role === "patient" && <section className="px-rx-zone"><header><span className="px-kicker">Clinical action</span><h2>Issue prescription without leaving the thread</h2></header><RxPad patient={selected} source="messages" onIssued={(rx) => sendText(`Issued a prescription: ${rx.drug}. Open Prescriptions for details.`)} /></section>}
     </div>
   );
 }
