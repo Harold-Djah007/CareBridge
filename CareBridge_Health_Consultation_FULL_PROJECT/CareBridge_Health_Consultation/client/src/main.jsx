@@ -29,6 +29,7 @@ import "./carebridge-patient-experience.css";
 import "./carebridge-clinical-orders.css";
 import "./carebridge-quality-gate.css";
 import "./carebridge-theme-integrity.css";
+import "./carebridge-theme-integrity-legacy.css";
 import { homeFor } from "./utils";
 import { AuthProvider, ToastProvider, useAuth } from "./state";
 import { PatientExperienceProvider, usePatientExperience } from "./patientExperience";
