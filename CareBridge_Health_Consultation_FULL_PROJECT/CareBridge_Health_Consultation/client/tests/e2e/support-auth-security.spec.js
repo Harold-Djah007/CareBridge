@@ -37,13 +37,27 @@ test("support desk derives requester and actor identity only from the authentica
   const baselineUnread = Number(baselineBadges.tickets || 0);
 
   const subject = `Identity boundary ${Date.now()}`;
-  const createdResponse = await request.post(`${API}/tickets`, {
+
+  // Fail closed when a patient deliberately claims another account in the request body.
+  const spoofedCreate = await request.post(`${API}/tickets`, {
     headers: auth(patient.token),
     data: {
       userId: admin.user.id,
       category: "account",
+      subject: `${subject} spoof attempt`,
+      body: "This request deliberately carries another account ID and must be rejected.",
+    },
+  });
+  expect(spoofedCreate.status()).toBe(403);
+
+  // A legitimate support request is owned by the authenticated patient.
+  const createdResponse = await request.post(`${API}/tickets`, {
+    headers: auth(patient.token),
+    data: {
+      userId: patient.user.id,
+      category: "account",
       subject,
-      body: "This ticket deliberately carries a spoofed userId in the test payload.",
+      body: "Legitimate authenticated patient support request.",
     },
   });
   expect(createdResponse.status()).toBe(201);
@@ -51,6 +65,7 @@ test("support desk derives requester and actor identity only from the authentica
   expect(created.userId).toBe(patient.user.id);
   expect(created.userId).not.toBe(admin.user.id);
 
+  // Query parameters cannot elevate a patient into the operations queue.
   const spoofedListResponse = await request.get(`${API}/tickets?userId=${admin.user.id}&role=admin`, {
     headers: auth(patient.token),
   });
@@ -59,6 +74,7 @@ test("support desk derives requester and actor identity only from the authentica
   expect(spoofedList.some((ticket) => ticket.id === created.id)).toBeTruthy();
   expect(spoofedList.every((ticket) => ticket.userId === patient.user.id)).toBeTruthy();
 
+  // Reply identity comes from the bearer session, never actorId supplied by the browser.
   const adminReplyResponse = await request.post(`${API}/tickets/${created.id}/replies`, {
     headers: auth(admin.token),
     data: { actorId: patient.user.id, body: "Operations reply from the authenticated admin." },
@@ -76,6 +92,7 @@ test("support desk derives requester and actor identity only from the authentica
   const unread = await unreadResponse.json();
   expect(Number(unread.tickets || 0)).toBe(baselineUnread + 1);
 
+  // Spoofed query identity still cannot change who is actually reading the ticket.
   const openedResponse = await request.get(`${API}/tickets/${created.id}?userId=${admin.user.id}&role=admin`, {
     headers: auth(patient.token),
   });
@@ -98,6 +115,7 @@ test("support desk derives requester and actor identity only from the authentica
   expect(patientMessage.authorId).toBe(patient.user.id);
   expect(patientMessage.role).toBe("patient");
 
+  // A patient cannot use a spoofed actorId to perform an operations-only status transition.
   const spoofedStatus = await request.patch(`${API}/tickets/${created.id}`, {
     headers: auth(patient.token),
     data: { actorId: admin.user.id, status: "in_progress" },
