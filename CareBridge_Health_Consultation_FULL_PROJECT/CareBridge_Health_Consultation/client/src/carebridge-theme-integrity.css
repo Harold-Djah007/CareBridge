@@ -1,0 +1,356 @@
+/* CareBridge authenticated theme-integrity layer.
+   IMPORTANT: this file is imported last. It normalizes legacy premium surfaces
+   that still carry literal light backgrounds so Midnight never produces pale
+   text on white panels. Pearl/Sage are intentionally unaffected. */
+
+.cbv6-theme-midnight .cbv6-content {
+  color-scheme: dark;
+  --ink: #f4f8fb;
+  --muted: #c2d0d9;
+  --line: rgba(224, 237, 245, .14);
+  --paper: #0a1a25;
+  --card: #112433;
+  --navy: #f4f8fb;
+  --navy-deep: #dce9ef;
+  --teal-soft: rgba(74, 201, 177, .14);
+  --cb-dark-panel: #112433;
+  --cb-dark-raised: #132a39;
+  --cb-dark-soft: #0d202d;
+  --cb-dark-control: #122735;
+  --cb-dark-line: rgba(224, 237, 245, .14);
+  --cb-dark-line-strong: rgba(224, 237, 245, .22);
+}
+
+/* Common controls and legacy cards used across patient, clinician, pharmacy and admin. */
+.cbv6-theme-midnight .cbv6-content :is(.card,.list-card,.stat-card,.ward-card,.person-card) {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .cbv6-content .secondary-btn {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-raised) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .cbv6-content .ghost-btn { color: var(--v6-accent) !important; }
+.cbv6-theme-midnight .cbv6-content .photo-picker {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-raised) !important;
+  border-color: var(--cb-dark-line-strong) !important;
+}
+.cbv6-theme-midnight .cbv6-content .photo-picker .muted { color: var(--v6-muted) !important; }
+.cbv6-theme-midnight .cbv6-content :is(input,select,textarea) {
+  color: var(--v6-ink);
+  caret-color: var(--v6-ink);
+}
+.cbv6-theme-midnight .cbv6-content :is(input,textarea)::placeholder {
+  color: #91a8b5 !important;
+  opacity: 1 !important;
+}
+
+/* Premium-page primitives. */
+.cbv6-theme-midnight .px-page {
+  --px-panel: var(--cb-dark-panel);
+  --px-soft: var(--cb-dark-soft);
+  --px-ink: var(--v6-ink);
+  --px-muted: var(--v6-muted);
+  --px-line: var(--cb-dark-line);
+  --px-teal-soft: rgba(74, 201, 177, .14);
+}
+.cbv6-theme-midnight .px-secondary,
+.cbv6-theme-midnight .px-message-head-meta > span,
+.cbv6-theme-midnight .px-verification-state,
+.cbv6-theme-midnight .px-callback-assurance {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-raised) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-segmented { background: #0a1b26 !important; }
+.cbv6-theme-midnight .px-segmented button { color: var(--v6-muted) !important; }
+.cbv6-theme-midnight .px-segmented button.active {
+  color: var(--v6-ink) !important;
+  background: #173342 !important;
+  box-shadow: none !important;
+}
+.cbv6-theme-midnight .px-signal-grid article {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-signal-grid small { color: var(--v6-muted) !important; opacity: 1 !important; }
+.cbv6-theme-midnight .px-board-note { color: var(--v6-muted) !important; opacity: 1 !important; }
+
+/* Appointments and admissions. */
+.cbv6-theme-midnight :is(.px-appointment-stage,.px-admission-hero,.px-care-hero,.px-med-hero,.px-verification-hero) {
+  color: var(--v6-ink) !important;
+  background: linear-gradient(135deg,#102432,#0d1f2b) !important;
+  border-color: var(--cb-dark-line-strong) !important;
+}
+.cbv6-theme-midnight :is(.px-stage-copy,.px-care-copy,.px-med-copy,.px-verification-hero) :is(h1,h2,h3,strong) {
+  color: var(--v6-ink) !important;
+}
+.cbv6-theme-midnight :is(.px-stage-copy,.px-care-copy,.px-med-copy,.px-verification-hero) p {
+  color: var(--v6-muted) !important;
+  opacity: 1 !important;
+}
+.cbv6-theme-midnight :is(.px-appointment-board,.px-admission-ledger,.px-ward-market,.px-capacity-board,.px-rx-zone) {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-encounter-card {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-raised) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-encounter-date strong,
+.cbv6-theme-midnight .px-encounter-person h3,
+.cbv6-theme-midnight .px-encounter-main h4 { color: var(--v6-ink) !important; }
+.cbv6-theme-midnight .px-encounter-actions :is(a,button) {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-control) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-encounter-spine i { border-color: var(--cb-dark-panel) !important; }
+.cbv6-theme-midnight .px-booking-sheet {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+}
+.cbv6-theme-midnight .px-booking-sheet > header > button {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-control) !important;
+}
+.cbv6-theme-midnight .px-sheet-body :is(input,select,textarea),
+.cbv6-theme-midnight .px-clinician-grid > button {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-control) !important;
+  border-color: var(--cb-dark-line-strong) !important;
+}
+
+/* Switchboard / secure messaging. */
+.cbv6-theme-midnight .px-comm-shell {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-inbox-rail,
+.cbv6-theme-midnight .px-thread-pane,
+.cbv6-theme-midnight .px-context-pane {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-inbox-rail { background: var(--cb-dark-soft) !important; }
+.cbv6-theme-midnight .px-inbox-search,
+.cbv6-theme-midnight .px-composer {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-control) !important;
+  border-color: var(--cb-dark-line-strong) !important;
+}
+.cbv6-theme-midnight .px-contact-list > button {
+  color: var(--v6-ink) !important;
+  border-color: transparent !important;
+}
+.cbv6-theme-midnight .px-contact-list > button:hover { background: rgba(99,215,194,.07) !important; }
+.cbv6-theme-midnight .px-contact-list > button.active {
+  color: var(--v6-ink) !important;
+  background: #173140 !important;
+  box-shadow: inset 3px 0 0 var(--v6-accent) !important;
+}
+.cbv6-theme-midnight .px-contact-copy small,
+.cbv6-theme-midnight .px-contact-meta time,
+.cbv6-theme-midnight .px-thread-person span,
+.cbv6-theme-midnight .px-context-profile p { color: var(--v6-muted) !important; opacity: 1 !important; }
+.cbv6-theme-midnight .px-thread-head { border-color: var(--cb-dark-line) !important; }
+.cbv6-theme-midnight .px-thread-actions a,
+.cbv6-theme-midnight .px-context-stack > a,
+.cbv6-theme-midnight .px-context-stack > div {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-control) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-thread-scroll { background: var(--cb-dark-soft) !important; }
+.cbv6-theme-midnight .px-message-bubble {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-raised) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-message-row.mine .px-message-bubble {
+  color: #effcf8 !important;
+  background: #155f57 !important;
+}
+.cbv6-theme-midnight .px-composer textarea { color: var(--v6-ink) !important; background: transparent !important; }
+.cbv6-theme-midnight .px-context-trust { color: var(--v6-accent) !important; background: rgba(74,201,177,.11) !important; }
+
+/* Support desk and notice centre. */
+.cbv6-theme-midnight .px-support-shell,
+.cbv6-theme-midnight .px-notice-stream {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-ticket-rail {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-soft) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-ticket-search,
+.cbv6-theme-midnight .px-ticket-composer,
+.cbv6-theme-midnight .px-notice-toolbar > label {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-control) !important;
+  border-color: var(--cb-dark-line-strong) !important;
+}
+.cbv6-theme-midnight .px-ticket-list > button { color: var(--v6-ink) !important; }
+.cbv6-theme-midnight .px-ticket-list > button.active {
+  color: var(--v6-ink) !important;
+  background: #173140 !important;
+  box-shadow: inset 3px 0 0 var(--v6-accent) !important;
+}
+.cbv6-theme-midnight .px-ticket-list > button.is-unread { background: rgba(99,215,194,.08) !important; }
+.cbv6-theme-midnight .px-ticket-head > button {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-control) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-ticket-message.requester {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-raised) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-ticket-message.operations { color: #effcf8 !important; background: #155f57 !important; }
+.cbv6-theme-midnight .px-notice-row { border-color: var(--cb-dark-line) !important; }
+
+/* Care team and prescriptions. */
+.cbv6-theme-midnight .px-care-filterbar,
+.cbv6-theme-midnight .px-network-card,
+.cbv6-theme-midnight .px-med-ledger,
+.cbv6-theme-midnight .px-med-card {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-care-filterbar select,
+.cbv6-theme-midnight .px-network-card > footer :is(a,button),
+.cbv6-theme-midnight .px-med-card > footer a {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-control) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-network-card.selected { background: linear-gradient(180deg,#173140,var(--cb-dark-panel)) !important; }
+.cbv6-theme-midnight .px-network-about,
+.cbv6-theme-midnight .px-med-note { color: var(--v6-muted) !important; background: var(--cb-dark-soft) !important; }
+.cbv6-theme-midnight .px-network-avatar i { border-color: var(--cb-dark-panel) !important; }
+
+/* Analytics and audit. */
+.cbv6-theme-midnight .px-report-tabs,
+.cbv6-theme-midnight .px-report-metrics article:not(.primary),
+.cbv6-theme-midnight .px-insight-grid article,
+.cbv6-theme-midnight .px-report-ledger,
+.cbv6-theme-midnight .px-audit-stream {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-report-tabs button { color: var(--v6-muted) !important; }
+.cbv6-theme-midnight .px-report-tabs button.active { color: #fff !important; background: #173140 !important; }
+.cbv6-theme-midnight .px-report-metrics article:not(.primary) :is(span,small),
+.cbv6-theme-midnight .px-insight-grid article p { color: var(--v6-muted) !important; opacity: 1 !important; }
+.cbv6-theme-midnight .px-report-metrics article:not(.primary) strong,
+.cbv6-theme-midnight .px-insight-grid article :is(strong,h3) { color: var(--v6-ink) !important; }
+.cbv6-theme-midnight .px-report-row-head { color: var(--v6-muted) !important; background: var(--cb-dark-soft) !important; }
+.cbv6-theme-midnight .px-report-row,
+.cbv6-theme-midnight .px-audit-row { border-color: var(--cb-dark-line) !important; }
+
+/* Finance, receipts and commerce. */
+.cbv6-theme-midnight :is(.px-payment-sheet,.px-receipt-document) {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight :is(.px-payment-instruction,.px-bank-transfer,.px-receipt-party > div) {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-soft) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .px-callback-stage {
+  color: var(--v6-ink) !important;
+  background: radial-gradient(circle at 50% 25%,rgba(74,201,177,.10),transparent 34%),linear-gradient(180deg,#102432,#0d1f2b) !important;
+  border-color: var(--cb-dark-line-strong) !important;
+}
+.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) .product-page-hero {
+  color: var(--v6-ink) !important;
+  background: linear-gradient(135deg,#102432,#0d1f2b) !important;
+}
+.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) :is(.commerce-trustbar > span,.shop-toolbar,.shop-search,.card,.pay-pick,.shelf-bar) {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) .shop-toolbar { background: rgba(17,36,51,.94) !important; }
+.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) .filters { background: var(--cb-dark-soft) !important; }
+.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) .filters button { color: var(--v6-muted) !important; }
+.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) .filters button.active { color: var(--v6-ink) !important; background: #173140 !important; }
+.cbv6-theme-midnight :is(.bill-nudge,.pending-payment-notice,.pending-payment-mini,.unpaid-bill-notice) {
+  color: var(--v6-ink) !important;
+  background: #282419 !important;
+  border-color: rgba(228,173,98,.24) !important;
+}
+
+/* Longitudinal clinical record. */
+.cbv6-theme-midnight .clinical-record-workspace > .product-page-hero,
+.cbv6-theme-midnight .record-empty-workspace > .product-page-hero {
+  color: var(--v6-ink) !important;
+  background: linear-gradient(135deg,#102432,#0d1f2b) !important;
+  border-color: var(--cb-dark-line-strong) !important;
+}
+.cbv6-theme-midnight :is(.record-identity-strip,.record-section-nav,.record-summary-metrics > div,.clinical-record-workspace .command-panel,.record-section-card,.record-latest-panel,.record-note-card) {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-panel) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight :is(.record-vitals-snapshot,.record-recent-labs,.record-entry-form) {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-soft) !important;
+}
+.cbv6-theme-midnight .record-vital-grid > div,
+.cbv6-theme-midnight .record-med-row > span,
+.cbv6-theme-midnight .record-table-wrap .table th {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-control) !important;
+}
+.cbv6-theme-midnight :is(.record-entry-form,.record-section-card) :is(input,select,textarea) {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-control) !important;
+  border-color: var(--cb-dark-line-strong) !important;
+}
+.cbv6-theme-midnight .record-risk.active,
+.cbv6-theme-midnight .record-alert-banner {
+  color: #ffb8b2 !important;
+  background: rgba(202,79,72,.12) !important;
+  border-color: rgba(239,133,133,.28) !important;
+}
+.cbv6-theme-midnight .record-risk.active b { color: #ffb8b2 !important; }
+
+/* Settings. Most settings surfaces already use V6 variables; these selectors
+   catch shared legacy controls embedded inside the settings document. */
+.cbv6-theme-midnight .cbx-settings-page .photo-picker,
+.cbv6-theme-midnight .cbx-settings-page :is(.doctor-chip,.demo-box button) {
+  color: var(--v6-ink) !important;
+  background: var(--cb-dark-raised) !important;
+  border-color: var(--cb-dark-line) !important;
+}
+.cbv6-theme-midnight .cbx-settings-page .photo-picker :is(strong,span) { opacity: 1 !important; }
+
+/* Empty states, loading states and generic utility copy should never disappear
+   against a dark panel. */
+.cbv6-theme-midnight .cbv6-content :is(.px-empty,.product-loading) { color: var(--v6-muted) !important; }
+.cbv6-theme-midnight .cbv6-content .px-empty :is(h2,h3,strong) { color: var(--v6-ink) !important; }
+.cbv6-theme-midnight .cbv6-content :is(.muted,[class*="-muted"],[class*="-meta"],[class*="-caption"]) {
+  opacity: 1;
+}
+
+@media (max-width: 720px) {
+  .cbv6-theme-midnight .px-comm-shell,
+  .cbv6-theme-midnight .px-support-shell { box-shadow: none !important; }
+}
