@@ -1,3 +1,5 @@
+import { installIdentityBoundary } from "./identityBoundary.js";
+
 const ACTIVE_STATUSES = new Set(["pending", "confirmed"]);
 const RELEASE_STATUSES = new Set(["declined", "cancelled", "discharged", "completed"]);
 const ALLOWED_STATUSES = new Set([...ACTIVE_STATUSES, ...RELEASE_STATUSES]);
@@ -94,6 +96,8 @@ async function emailOperations(db, emailPatient, item, patient) {
 }
 
 export function mountWardAutomation(app, { readDb, writeDb, safeUser, notify, emailPatient, io, wardFee, addInvoice }) {
+  installIdentityBoundary(app);
+
   // Shared live-notification read endpoint. This is mounted early with the realtime helpers
   // so opening one notification can update every badge without marking the whole feed read.
   app.patch("/api/notifications/:userId/:notificationId/read", (req, res) => {
@@ -122,12 +126,15 @@ export function mountWardAutomation(app, { readDb, writeDb, safeUser, notify, em
       return res.status(403).json({ message: "You do not have permission to create ward reservations." });
     }
     const { patientId, ward: wardName, date } = req.body || {};
+    if (actor.role === "patient" && String(patientId || "") !== String(actor.id)) {
+      return res.status(403).json({ message: "Patients can only reserve beds on their own account." });
+    }
     if (!String(patientId || "").trim() || !String(wardName || "").trim() || !String(date || "").trim()) {
       return res.status(400).json({ message: "Please choose a ward and admission date." });
     }
 
     const db = readDb();
-    const patient = (db.users || []).find((user) => user.id === patientId);
+    const patient = (db.users || []).find((user) => user.id === patientId && user.role === "patient" && user.status !== "inactive");
     if (!patient) return res.status(404).json({ message: "Patient account not found." });
 
     const item = {
