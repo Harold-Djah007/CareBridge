@@ -6,6 +6,7 @@ import { HERO_SLIDES, QUICK_ACTIONS, SERVICES, NEWS } from "../publicContent";
 import { EcgRibbon } from "../components/LiveMeter";
 import { CountStat, HeroCarousel, Reveal, SoftOrbs } from "../components/LiveFX";
 import PublicChrome from "../components/PublicChrome";
+import { PublicFollow } from "../components/SocialLinks";
 
 export default function Landing() {
   return (
@@ -109,6 +110,7 @@ export default function Landing() {
           ))}
         </div>
       </section>
+      <PublicFollow tone="navy" />
     </PublicChrome>
   );
 }

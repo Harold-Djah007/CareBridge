@@ -4,6 +4,7 @@ import { HeartPulse, Phone, MapPin, Clock, Menu, X, ShieldAlert, Mail } from "lu
 import { HOSPITAL, homeFor } from "../utils";
 import { PUBLIC_NAV } from "../publicContent";
 import { useAuth } from "../state";
+import { FooterSocial } from "./SocialLinks";
 
 export function UtilBar({ tone = "navy" }) {
   const tel = (n) => `tel:${String(n).replace(/\s/g, "")}`;
@@ -55,6 +56,7 @@ export function HospitalFooter() {
             <div><b>{HOSPITAL.name}</b><span>{HOSPITAL.campus}, {HOSPITAL.city}</span></div>
           </div>
           <p>A private hospital in Ridge, Accra. We sit with you through clinic, pharmacy, and a stay if you need one.</p>
+          <FooterSocial />
         </div>
         <div>
           <h4>Quick links</h4>

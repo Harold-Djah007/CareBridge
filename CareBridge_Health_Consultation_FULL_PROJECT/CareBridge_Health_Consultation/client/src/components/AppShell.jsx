@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   Activity, BedDouble, Bell, Building2, CalendarDays, ChevronLeft, ClipboardList,
   FolderKanban, FolderOpen, HeartPulse, Inbox, LayoutDashboard, LifeBuoy, LogOut,
-  Mail, Menu, MessageCircle, Pill, Receipt, Search, ScrollText, ShieldCheck,
+  Mail, Menu, MessageCircle, Pill, Receipt, Search, ScrollText, Share2, ShieldCheck,
   ShoppingBag, Stethoscope, UserRound, Users, Video, Wifi,
 } from "lucide-react";
 import { io } from "socket.io-client";
@@ -72,6 +72,7 @@ const NAV = {
       { to: "/admin/users", icon: Users, label: "People directory", primary: true },
       { to: "/admin/cases", icon: FolderKanban, label: "Case workflow" },
       { to: "/admin/reports", icon: ScrollText, label: "Analytics & audit", primary: true },
+      { to: "/admin/site", icon: Share2, label: "Website & social" },
       { to: "/pay", icon: Receipt, label: "Finance & receipts" },
       { to: "/billing/tariff", icon: ScrollText, label: "Tariff manager" },
     ]},
@@ -86,6 +87,7 @@ const NAV = {
 
 const PAGE_META = [
   ["/admin/reports", "Analytics & audit", "Financial, operational and audit intelligence"],
+  ["/admin/site", "Website & social", "Official public channels visitors use for more information"],
   ["/admin/appointments", "Clinic operations", "Manage the hospital diary and encounter flow"],
   ["/admin/hospital", "Capacity & beds", "Live occupancy, admission decisions and bed allocation"],
   ["/admin/users", "People directory", "Patients, clinicians, access and hospital identities"],

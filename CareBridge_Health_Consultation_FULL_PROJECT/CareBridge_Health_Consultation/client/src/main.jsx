@@ -38,6 +38,7 @@ import AdminHospital from "./pages/admin/Hospital";
 import AdminReports from "./pages/admin/Reports";
 import AdminCases from "./pages/admin/Cases";
 import AdminCaseDetail from "./pages/admin/CaseDetail";
+import AdminWebsite from "./pages/admin/Website";
 import Pay from "./pages/Pay";
 import Pharmacy from "./pages/Pharmacy";
 import PharmacyStock from "./pages/PharmacyStock";
@@ -109,6 +110,7 @@ function AppRoutes() {
           <Route path="/admin/reports" element={<RoleRoute roles={["admin"]}><AdminReports /></RoleRoute>} />
           <Route path="/admin/cases" element={<RoleRoute roles={["admin"]}><AdminCases /></RoleRoute>} />
           <Route path="/admin/cases/:id" element={<RoleRoute roles={["admin"]}><AdminCaseDetail /></RoleRoute>} />
+          <Route path="/admin/site" element={<RoleRoute roles={["admin"]}><AdminWebsite /></RoleRoute>} />
         </Route>
         <Route path="*" element={<Navigate to={user ? homeFor(user) : "/"} />} />
       </Routes>

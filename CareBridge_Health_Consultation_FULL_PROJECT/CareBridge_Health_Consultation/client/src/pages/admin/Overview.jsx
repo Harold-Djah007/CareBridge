@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity, BedDouble, Building2, CalendarDays, ChevronRight, CircleDollarSign,
-  FolderKanban, LifeBuoy, Mail, Receipt, ScrollText, ShieldCheck, Users, Wallet,
+  FolderKanban, LifeBuoy, Mail, Receipt, ScrollText, Share2, ShieldCheck, Users, Wallet,
 } from "lucide-react";
 import { api } from "../../api";
 import { HOSPITAL } from "../../utils";
@@ -118,6 +118,7 @@ export default function AdminOverview() {
           <OpsAction to="/admin/hospital" icon={Building2} title="Capacity & beds" detail="Occupancy and admission decisions" badge={pending.length || undefined} />
           <OpsAction to="/admin/appointments" icon={CalendarDays} title="Clinic operations" detail="Schedule and confirmation queue" badge={stats.pendingAppointments || undefined} />
           <OpsAction to="/admin/reports" icon={ScrollText} title="Analytics & audit" detail="Revenue, activity and traceability" />
+          <OpsAction to="/admin/site" icon={Share2} title="Website & social" detail="Public social URLs visitors click" />
           <OpsAction to="/admin/cases" icon={FolderKanban} title="Case workflow" detail="Operational files and follow-up" />
           <OpsAction to="/pay" icon={Receipt} title="Finance & receipts" detail="Verified receipts and cash review" />
           <OpsAction to="/billing/tariff" icon={Wallet} title="Tariff manager" detail="Published hospital charges" />

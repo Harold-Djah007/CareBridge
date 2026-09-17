@@ -14,6 +14,7 @@ import { mountCases } from "./cases.js";
 import { ensurePharmacy, mountPharmacy } from "./pharmacy.js";
 import { ensureCarts, mountCart, clearUserCart, removeCartKinds } from "./cart.js";
 import { authUserFromRequest, ensurePasswordSecurity, hashPassword, issueSession, passwordMatches, revokeSession } from "./auth.js";
+import { ensureSite, mountSite, publicSocial } from "./site.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,7 +28,7 @@ const readDb = () => {
   db.tickets = db.tickets || [];
   db.messageReads = db.messageReads || {};
   ensureClinical(db);
-  const dirty = ensurePharmacy(db) | ensureTariff(db) | ensureCarts(db) | ensurePasswordSecurity(db);
+  const dirty = ensurePharmacy(db) | ensureTariff(db) | ensureCarts(db) | ensurePasswordSecurity(db) | ensureSite(db);
   if (dirty) fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
   return db;
 };
@@ -214,6 +215,11 @@ const requireFields = (body, fields) => fields.filter((f) => !String(body[f] ?? 
 
 app.get("/api/health", (_, res) => res.json({ ok: true, name: "CareBridge API" }));
 
+app.get("/api/site", (_, res) => {
+  const db = readDb();
+  res.json({ social: publicSocial(db.site?.social) });
+});
+
 app.post("/api/login", (req, res) => {
   const { email, password } = req.body;
   const db = readDb();
@@ -298,6 +304,7 @@ const isPublicApiRequest = (req) => {
   const pathname = String(req.originalUrl || "").split("?")[0];
   return (
     (req.method === "GET" && pathname === "/api/doctors")
+    || (req.method === "GET" && pathname === "/api/site")
     || (req.method === "POST" && pathname === "/api/contact")
     || (req.method === "POST" && pathname === "/api/payments/webhook")
     || (req.method === "POST" && pathname === "/api/finance/webhook")
@@ -734,6 +741,7 @@ app.post("/api/emails/test", async (req, res) => {
 });
 
 app.use("/api/admin", requireAuth("admin"));
+mountSite(app, { readDb, writeDb });
 
 app.get("/api/admin/overview", (_, res) => {
   const db = readDb();

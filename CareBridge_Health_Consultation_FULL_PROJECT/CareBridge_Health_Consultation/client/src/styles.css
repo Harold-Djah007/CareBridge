@@ -1827,6 +1827,99 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
 .hospital-foot a:hover { color: #fff; }
 .hospital-foot .brand b { color: #fff; }
 .hospital-foot .brand span { color: #9db4c8; }
+.foot-follow-label {
+  margin: 16px 0 10px !important;
+  font-size: 11px !important;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7ee0d2 !important;
+  font-weight: 800;
+}
+.social-links { display: flex; flex-wrap: wrap; gap: 10px; }
+.social-link {
+  width: 42px; height: 42px; display: grid; place-items: center;
+  border-radius: 50%; color: inherit; flex: 0 0 auto; cursor: pointer;
+  transition: transform .2s ease, background .2s ease, color .2s ease, box-shadow .2s ease;
+}
+.social-links.tone-navy .social-link {
+  background: rgba(255,255,255,0.08);
+  color: #e8f4f2;
+  border: 1px solid rgba(255,255,255,0.14);
+}
+.social-links.tone-light .social-link,
+.social-link.tone-light {
+  background: #f1f7f6;
+  color: var(--navy);
+  border: 1px solid var(--line);
+}
+.social-link:hover {
+  transform: translateY(-3px);
+  color: #fff !important;
+  box-shadow: 0 10px 20px rgba(0, 51, 102, 0.16);
+}
+.social-link.net-facebook:hover { background: #1877f2; border-color: #1877f2; }
+.social-link.net-instagram:hover { background: #c13584; border-color: #c13584; }
+.social-link.net-x:hover { background: #111; border-color: #111; }
+.social-link.net-linkedin:hover { background: #0a66c2; border-color: #0a66c2; }
+.social-link.net-youtube:hover { background: #ff0000; border-color: #ff0000; }
+.social-link.net-tiktok:hover { background: #111; border-color: #111; }
+.social-link.net-whatsapp:hover { background: #25d366; border-color: #25d366; }
+.hospital-foot .social-links { margin-top: 2px; }
+.hospital-foot .social-link {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin: 0;
+  gap: 0;
+  font-size: inherit;
+}
+.hospital-foot .foot-follow-label {
+  display: block;
+  align-items: unset;
+  gap: 0;
+}
+
+.follow-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  flex-wrap: wrap;
+  padding: 48px 7vw;
+}
+.follow-block.tone-navy {
+  background: var(--navy);
+  color: #d5e4f0;
+}
+.follow-block.tone-navy h2 { color: #fff; }
+.follow-block.tone-navy .muted { color: #9db4c8; }
+.follow-block.tone-navy .eyebrow { color: #7ee0d2; }
+.follow-block.tone-light {
+  background: #f8f9fa;
+  border-top: 1px solid var(--line);
+}
+.follow-copy { max-width: 52ch; }
+.follow-copy h2 { margin: 6px 0 8px; font-size: clamp(24px, 3vw, 34px); }
+.contact-follow {
+  margin-top: 22px;
+  padding: 22px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.contact-follow h2 { margin: 4px 0 6px; }
+.about-follow {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .foot-legal {
   margin-top: 28px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.12);
   display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 12px;
@@ -1883,6 +1976,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shado
   .icon-service-grid, .photo-service-grid, .news-grid, .why-grid, .doctor-grid, .contact-facts-grid, .trust-band, .quick-band, .foot-grid {
     grid-template-columns: 1fr;
   }
+  .follow-block { padding: 32px 7vw; }
   .portal-chooser { grid-template-columns: 1fr 1fr; }
   .health-row { grid-template-columns: 1fr; }
   .health-thumb { height: 140px; }

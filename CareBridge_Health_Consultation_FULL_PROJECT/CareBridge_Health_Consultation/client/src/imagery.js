@@ -56,6 +56,7 @@ export function sceneFor(pathname = "", role) {
   if (pathname.startsWith("/care")) return "care";
   if (pathname.startsWith("/alerts")) return "alerts";
   if (pathname.startsWith("/admin/users")) return "directory";
+  if (pathname.startsWith("/admin/site")) return "directory";
   if (pathname.startsWith("/admin/reports")) return "reports";
   if (pathname.startsWith("/admin/cases")) return "cases";
   if (pathname.startsWith("/admin")) return "ops";
