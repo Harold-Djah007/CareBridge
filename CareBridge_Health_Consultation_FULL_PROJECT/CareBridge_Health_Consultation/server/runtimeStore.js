@@ -4,6 +4,31 @@ import { createPostgresRepository } from "./postgres.js";
 const clone = (value) => structuredClone(value);
 const VERSION = Symbol("carebridgeStateVersion");
 
+const CORE_ARRAY_FIELDS = [
+  "users",
+  "wards",
+  "appointments",
+  "wardBookings",
+  "messages",
+  "notifications",
+  "emails",
+  "payments",
+  "tickets",
+  "cases",
+  "sessions",
+];
+
+function normalizeRuntimeState(value) {
+  const state = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  for (const key of CORE_ARRAY_FIELDS) {
+    if (!Array.isArray(state[key])) state[key] = [];
+  }
+  if (!state.messageReads || typeof state.messageReads !== "object" || Array.isArray(state.messageReads)) {
+    state.messageReads = {};
+  }
+  return state;
+}
+
 function markVersion(payload, version) {
   if (payload && typeof payload === "object") Object.defineProperty(payload, VERSION, { value: Number(version), enumerable: false, configurable: true, writable: true });
   return payload;
@@ -23,8 +48,8 @@ export async function createRuntimeStore(dataFile) {
   if (!usePostgres) {
     return {
       provider: "atomic-json",
-      read: () => local.read(),
-      write: (db) => local.write(db),
+      read: () => normalizeRuntimeState(local.read()),
+      write: (db) => local.write(normalizeRuntimeState(db)),
       async refresh() {},
       async flush() {},
       health: () => local.health(),
@@ -35,7 +60,7 @@ export async function createRuntimeStore(dataFile) {
   if (!process.env.DATABASE_URL) throw new Error("PERSISTENCE_PROVIDER=postgres requires DATABASE_URL.");
   const repo = createPostgresRepository(process.env.DATABASE_URL);
   await repo.migrate();
-  const seed = local.read();
+  const seed = normalizeRuntimeState(local.read());
   await repo.seedIfEmpty(seed);
   const state = await repo.loadState();
   if (!state) throw new Error("CareBridge PostgreSQL runtime state could not be initialized.");
@@ -44,7 +69,7 @@ export async function createRuntimeStore(dataFile) {
   // already queued but not yet committed. This is important because a single
   // HTTP request can legitimately persist normalization/auth state and then a
   // business mutation before the first write has reached PostgreSQL.
-  let current = clone(state.payload);
+  let current = normalizeRuntimeState(clone(state.payload));
   let currentVersion = Number(state.version);
   let committedVersion = Number(state.version);
   let pending = Promise.resolve();
@@ -54,7 +79,7 @@ export async function createRuntimeStore(dataFile) {
   let lastPing = await repo.ping();
 
   function read() {
-    return markVersion(clone(current), currentVersion);
+    return markVersion(normalizeRuntimeState(clone(current)), currentVersion);
   }
 
   async function recoverFromDatabase(error) {
@@ -62,7 +87,7 @@ export async function createRuntimeStore(dataFile) {
     try {
       const latest = await repo.loadState();
       if (latest) {
-        current = clone(latest.payload);
+        current = normalizeRuntimeState(clone(latest.payload));
         currentVersion = Number(latest.version);
         committedVersion = Number(latest.version);
         lastRefreshAt = new Date().toISOString();
@@ -81,7 +106,7 @@ export async function createRuntimeStore(dataFile) {
     }
     const latest = await repo.loadState();
     if (!latest) throw new Error("CareBridge PostgreSQL runtime state disappeared.");
-    current = clone(latest.payload);
+    current = normalizeRuntimeState(clone(latest.payload));
     currentVersion = Number(latest.version);
     committedVersion = Number(latest.version);
     lastRefreshAt = new Date().toISOString();
@@ -100,7 +125,7 @@ export async function createRuntimeStore(dataFile) {
       return Promise.reject(error);
     }
 
-    const snapshot = clone(db);
+    const snapshot = normalizeRuntimeState(clone(db));
     const reservedVersion = expectedVersion + 1;
 
     // Reserve the next version immediately so a second read/write in the same
