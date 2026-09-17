@@ -8,8 +8,14 @@ import { mountClinicalSafety } from "./clinicalSafety.js";
 import { mountRevenueCycle } from "./revenueCycle.js";
 
 const nid = (p) => `${p}${Date.now()}${Math.floor(Math.random() * 900)}`;
-
 const CATEGORIES = ["billing", "clinical", "technical", "account", "admissions", "other"];
+
+function requireTicketAuth(req, res, next) {
+  if (!req.authUser) {
+    return res.status(401).json({ message: "Your session has expired. Please sign in again." });
+  }
+  return next();
+}
 
 function readStamp(db, userId, ticketId) {
   return String(db.ticketReads?.[userId]?.[ticketId] || "");
@@ -69,7 +75,6 @@ async function pingAdmins(db, { notify, emailPatient }, { title, body, email }) 
 export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPatient }) {
   mountPatientExperience(app, { readDb, writeDb });
   mountSmart(app, { readDb, writeDb });
-
   mountFhir(app, { readDb });
   mountClinicalOrders(app, { readDb, writeDb, safeUser, notify, emailPatient });
   mountClinicalSafety(app, { readDb, writeDb, safeUser, notify });
@@ -77,22 +82,21 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
   mountRevenueCycle(app, { readDb, writeDb, notify });
   mountEnterpriseOps(app, { readDb });
 
-  app.get("/api/tickets", (req, res) => {
+  app.get("/api/tickets", requireTicketAuth, (req, res) => {
     const db = readDb();
-    const { userId, role } = req.query;
-    const viewer = req.authUser || { id: userId, role };
+    const viewer = req.authUser;
     let rows = db.tickets || [];
-    if (viewer.role !== "admin") rows = rows.filter((t) => t.userId === viewer.id);
+    if (viewer.role !== "admin") rows = rows.filter((ticket) => ticket.userId === viewer.id);
     const status = req.query.status;
-    if (status && status !== "all") rows = rows.filter((t) => t.status === status);
-    res.json(rows.slice().reverse().map((t) => enrich(db, t, safeUser, viewer)));
+    if (status && status !== "all") rows = rows.filter((ticket) => ticket.status === status);
+    res.json(rows.slice().reverse().map((ticket) => enrich(db, ticket, safeUser, viewer)));
   });
 
-  app.get("/api/tickets/:id", (req, res) => {
+  app.get("/api/tickets/:id", requireTicketAuth, (req, res) => {
     const db = readDb();
-    const ticket = (db.tickets || []).find((t) => t.id === req.params.id);
+    const ticket = (db.tickets || []).find((item) => item.id === req.params.id);
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
-    const viewer = req.authUser || { id: req.query.userId, role: req.query.role };
+    const viewer = req.authUser;
     if (viewer.role !== "admin" && ticket.userId !== viewer.id) {
       return res.status(403).json({ message: "You cannot open this ticket." });
     }
@@ -101,20 +105,20 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
     res.json(enrich(db, ticket, safeUser, viewer));
   });
 
-  app.post("/api/tickets", async (req, res) => {
+  app.post("/api/tickets", requireTicketAuth, async (req, res) => {
     const subject = String(req.body.subject || "").trim();
     const body = String(req.body.body || "").trim();
-    const userId = req.body.userId;
-    if (!userId || !subject || !body) {
-      return res.status(400).json({ message: "Subject and message are required." });
-    }
+    if (!subject || !body) return res.status(400).json({ message: "Subject and message are required." });
+    if (subject.length > 160) return res.status(400).json({ message: "Keep the support subject to 160 characters or fewer." });
+    if (body.length > 5000) return res.status(400).json({ message: "Keep the support message to 5,000 characters or fewer." });
+
     const db = readDb();
-    const user = db.users.find((u) => u.id === userId);
-    if (!user) return res.status(404).json({ message: "Account not found" });
+    const user = db.users.find((item) => item.id === req.authUser.id && item.status !== "inactive");
+    if (!user) return res.status(401).json({ message: "Your account is no longer active." });
     const category = CATEGORIES.includes(req.body.category) ? req.body.category : "other";
     const ticket = {
       id: nid("tk"),
-      userId,
+      userId: user.id,
       category,
       subject,
       body,
@@ -126,7 +130,7 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
     db.tickets = db.tickets || [];
     db.tickets.push(ticket);
     markTicketRead(db, ticket.id, user.id);
-    notify(db, userId, "Support request sent", `Operations has your ticket: ${subject}`);
+    notify(db, user.id, "Support request sent", `Operations has your ticket: ${subject}`);
     await pingAdmins(db, { notify, emailPatient }, {
       title: "New support desk ticket",
       body: `${user.name} · ${category}: ${subject}`,
@@ -149,17 +153,20 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
     res.status(201).json(enrich(db, ticket, safeUser, user));
   });
 
-  app.post("/api/tickets/:id/replies", async (req, res) => {
+  app.post("/api/tickets/:id/replies", requireTicketAuth, async (req, res) => {
     const text = String(req.body.body || "").trim();
     if (!text) return res.status(400).json({ message: "Write a reply before sending." });
+    if (text.length > 5000) return res.status(400).json({ message: "Keep the support reply to 5,000 characters or fewer." });
+
     const db = readDb();
-    const ticket = (db.tickets || []).find((t) => t.id === req.params.id);
+    const ticket = (db.tickets || []).find((item) => item.id === req.params.id);
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
-    const actor = db.users.find((u) => u.id === req.body.actorId);
-    if (!actor) return res.status(404).json({ message: "Account not found" });
+    const actor = db.users.find((item) => item.id === req.authUser.id && item.status !== "inactive");
+    if (!actor) return res.status(401).json({ message: "Your account is no longer active." });
     if (actor.role !== "admin" && ticket.userId !== actor.id) {
       return res.status(403).json({ message: "You cannot reply on this ticket." });
     }
+
     const reply = {
       id: nid("tr"),
       authorId: actor.id,
@@ -209,23 +216,28 @@ export function mountSupport(app, { readDb, writeDb, safeUser, notify, emailPati
     res.status(201).json(enrich(db, ticket, safeUser, actor));
   });
 
-  app.patch("/api/tickets/:id", async (req, res) => {
+  app.patch("/api/tickets/:id", requireTicketAuth, async (req, res) => {
     const db = readDb();
-    const ticket = (db.tickets || []).find((t) => t.id === req.params.id);
+    const ticket = (db.tickets || []).find((item) => item.id === req.params.id);
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
-    const actor = db.users.find((u) => u.id === req.body.actorId);
-    if (!actor) return res.status(404).json({ message: "Account not found" });
+    const actor = db.users.find((item) => item.id === req.authUser.id && item.status !== "inactive");
+    if (!actor) return res.status(401).json({ message: "Your account is no longer active." });
     if (actor.role !== "admin" && ticket.userId !== actor.id) {
       return res.status(403).json({ message: "You cannot update this ticket." });
     }
+
     const status = req.body.status;
     if (status && !["open", "in_progress", "resolved"].includes(status)) {
       return res.status(400).json({ message: "Status must be open, in progress, or resolved." });
     }
+    if (actor.role !== "admin" && status === "in_progress") {
+      return res.status(403).json({ message: "Hospital operations controls the in-progress support state." });
+    }
     if (status) ticket.status = status;
     ticket.updatedAt = new Date().toISOString();
     markTicketRead(db, ticket.id, actor.id);
-    const owner = db.users.find((u) => u.id === ticket.userId) || {};
+    const owner = db.users.find((item) => item.id === ticket.userId) || {};
+
     if (status === "resolved") {
       notify(db, ticket.userId, "Ticket resolved", `“${ticket.subject}” is closed.`);
       if (actor.role === "admin") {
