@@ -65,16 +65,25 @@ test("support desk derives requester and actor identity only from the authentica
   expect(created.userId).toBe(patient.user.id);
   expect(created.userId).not.toBe(admin.user.id);
 
-  // Query parameters cannot elevate a patient into the operations queue.
+  // Query parameters cannot elevate a patient into the operations queue. The global
+  // identity boundary rejects the forged account/role instead of silently accepting it.
   const spoofedListResponse = await request.get(`${API}/tickets?userId=${admin.user.id}&role=admin`, {
     headers: auth(patient.token),
   });
-  expect(spoofedListResponse.ok()).toBeTruthy();
-  const spoofedList = await spoofedListResponse.json();
-  expect(spoofedList.some((ticket) => ticket.id === created.id)).toBeTruthy();
-  expect(spoofedList.every((ticket) => ticket.userId === patient.user.id)).toBeTruthy();
+  expect(spoofedListResponse.status()).toBe(403);
+
+  // Without forged identity hints, the patient still sees only their own support queue.
+  const legitimateListResponse = await request.get(`${API}/tickets`, {
+    headers: auth(patient.token),
+  });
+  expect(legitimateListResponse.ok()).toBeTruthy();
+  const legitimateList = await legitimateListResponse.json();
+  expect(legitimateList.some((ticket) => ticket.id === created.id)).toBeTruthy();
+  expect(legitimateList.every((ticket) => ticket.userId === patient.user.id)).toBeTruthy();
 
   // Reply identity comes from the bearer session, never actorId supplied by the browser.
+  // Administrators may submit compatibility metadata, but support.js still records the
+  // authenticated administrator as the author.
   const adminReplyResponse = await request.post(`${API}/tickets/${created.id}/replies`, {
     headers: auth(admin.token),
     data: { actorId: patient.user.id, body: "Operations reply from the authenticated admin." },
@@ -92,8 +101,14 @@ test("support desk derives requester and actor identity only from the authentica
   const unread = await unreadResponse.json();
   expect(Number(unread.tickets || 0)).toBe(baselineUnread + 1);
 
-  // Spoofed query identity still cannot change who is actually reading the ticket.
-  const openedResponse = await request.get(`${API}/tickets/${created.id}?userId=${admin.user.id}&role=admin`, {
+  // A forged reader identity fails closed rather than changing who is reading the ticket.
+  const spoofedOpenResponse = await request.get(`${API}/tickets/${created.id}?userId=${admin.user.id}&role=admin`, {
+    headers: auth(patient.token),
+  });
+  expect(spoofedOpenResponse.status()).toBe(403);
+
+  // Opening the ticket with the legitimate patient session acknowledges the admin reply.
+  const openedResponse = await request.get(`${API}/tickets/${created.id}`, {
     headers: auth(patient.token),
   });
   expect(openedResponse.ok()).toBeTruthy();
@@ -105,9 +120,17 @@ test("support desk derives requester and actor identity only from the authentica
   const read = await readResponse.json();
   expect(Number(read.tickets || 0)).toBe(baselineUnread);
 
-  const patientReplyResponse = await request.post(`${API}/tickets/${created.id}/replies`, {
+  // Patients cannot smuggle another actor identity into a reply.
+  const spoofedPatientReply = await request.post(`${API}/tickets/${created.id}/replies`, {
     headers: auth(patient.token),
     data: { actorId: admin.user.id, body: "Requester reply carrying a spoofed admin actorId." },
+  });
+  expect(spoofedPatientReply.status()).toBe(403);
+
+  // A normal reply is always attributed to the authenticated patient.
+  const patientReplyResponse = await request.post(`${API}/tickets/${created.id}/replies`, {
+    headers: auth(patient.token),
+    data: { body: "Requester reply from the authenticated patient." },
   });
   expect(patientReplyResponse.status()).toBe(201);
   const patientReply = await patientReplyResponse.json();
