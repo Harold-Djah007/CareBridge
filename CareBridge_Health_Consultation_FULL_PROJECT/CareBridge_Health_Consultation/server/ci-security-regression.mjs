@@ -134,8 +134,9 @@ try {
   });
   if (forgedPrescription.response.status !== 403) throw new Error(`Patient could issue a prescription: ${forgedPrescription.response.status}`);
 
-  const seededRx = seed.prescriptions.find((row) => row.patientId === patient.id);
-  if (!seededRx) throw new Error("Missing seeded prescription for clinical authorization checks");
+  const patientPrescriptions = await json(`/api/prescriptions?userId=${patient.id}&role=patient`, token2);
+  const seededRx = Array.isArray(patientPrescriptions.body) ? patientPrescriptions.body[0] : null;
+  if (!patientPrescriptions.response.ok || !seededRx?.id) throw new Error(`Missing runtime prescription for clinical authorization checks: ${patientPrescriptions.response.status} ${patientPrescriptions.text}`);
   const mutateRx = await json(`/api/prescriptions/${seededRx.id}`, token2, {
     method: "PATCH",
     body: JSON.stringify({ actorId: patient.id, status: "cancelled" }),
