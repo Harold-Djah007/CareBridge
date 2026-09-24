@@ -278,19 +278,19 @@
   background: radial-gradient(circle at 50% 25%,rgba(74,201,177,.10),transparent 34%),linear-gradient(180deg,#102432,#0d1f2b) !important;
   border-color: var(--cb-dark-line-strong) !important;
 }
-.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) .product-page-hero {
+.cbv6-theme-midnight .cbv6-content:has(.commerce-trustbar) .product-page-hero {
   color: var(--v6-ink) !important;
   background: linear-gradient(135deg,#102432,#0d1f2b) !important;
 }
-.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) :is(.commerce-trustbar > span,.shop-toolbar,.shop-search,.card,.pay-pick,.shelf-bar) {
+.cbv6-theme-midnight .cbv6-content:has(.commerce-trustbar) :is(.commerce-trustbar > span,.shop-toolbar,.shop-search,.card,.pay-pick,.shelf-bar) {
   color: var(--v6-ink) !important;
   background: var(--cb-dark-panel) !important;
   border-color: var(--cb-dark-line) !important;
 }
-.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) .shop-toolbar { background: rgba(17,36,51,.94) !important; }
-.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) .filters { background: var(--cb-dark-soft) !important; }
-.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) .filters button { color: var(--v6-muted) !important; }
-.cbv6-theme-midnight .cbx-content:has(.commerce-trustbar) .filters button.active { color: var(--v6-ink) !important; background: #173140 !important; }
+.cbv6-theme-midnight .cbv6-content:has(.commerce-trustbar) .shop-toolbar { background: rgba(17,36,51,.94) !important; }
+.cbv6-theme-midnight .cbv6-content:has(.commerce-trustbar) .filters { background: var(--cb-dark-soft) !important; }
+.cbv6-theme-midnight .cbv6-content:has(.commerce-trustbar) .filters button { color: var(--v6-muted) !important; }
+.cbv6-theme-midnight .cbv6-content:has(.commerce-trustbar) .filters button.active { color: var(--v6-ink) !important; background: #173140 !important; }
 .cbv6-theme-midnight :is(.bill-nudge,.pending-payment-notice,.pending-payment-mini,.unpaid-bill-notice) {
   color: var(--v6-ink) !important;
   background: #282419 !important;
