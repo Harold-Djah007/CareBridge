@@ -57,3 +57,15 @@
 .cbv6-content :is(input,select,textarea){font-size:16px!important}.cbv6-content :is(button,.primary-btn,.secondary-btn,.ghost-btn){font-size:14px!important}
 .cbv6-content table th{font-size:13px!important}.cbv6-content table td{font-size:15px!important;line-height:1.5}
 .cbv6-content :is(.status,[class*="badge"],[class*="chip"]){font-size:12px!important}
+
+
+/* Exact child surfaces with literal light fills in their source modules. */
+.cbv6-theme-midnight #cbv6-main :is(
+  .px-video-assurance>span,.px-lobby-contacts button,.px-room-facts>div,.px-device-checks>div,.px-consent,.px-lobby-peer>button
+){
+  color:var(--cb-final-text)!important;background:#173140!important;border-color:var(--cb-final-line)!important
+}
+.cbv6-theme-midnight #cbv6-main :is(
+  .px-video-assurance>span,.px-lobby-contacts button,.px-room-facts>div,.px-device-checks>div,.px-consent
+) small{color:var(--cb-final-muted)!important;opacity:1!important}
+.cbv6-theme-midnight #cbv6-main .unpaid-bill-icon{color:#9de7d7!important;background:#173140!important}
