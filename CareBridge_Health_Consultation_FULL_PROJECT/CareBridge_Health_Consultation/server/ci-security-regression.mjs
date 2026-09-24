@@ -9,8 +9,10 @@ if (!dataFile) throw new Error("DATA_FILE is required");
 
 const seed = JSON.parse(fs.readFileSync(dataFile, "utf8"));
 const patient = seed.users.find((user) => user.role === "patient" && user.status !== "inactive");
+const doctor = seed.users.find((user) => user.role === "doctor" && user.status !== "inactive");
 const admin = seed.users.find((user) => user.role === "admin" && user.status !== "inactive");
 if (!patient?.email || !patient?.password) throw new Error("Missing seeded patient credentials");
+if (!doctor?.email || !doctor?.password) throw new Error("Missing seeded doctor credentials");
 if (!admin?.email || !admin?.password) throw new Error("Missing seeded admin credentials");
 
 const server = spawn(process.execPath, ["index.js"], {
@@ -92,6 +94,8 @@ try {
   const login2 = await login(patient, "patient");
   const token1 = login1.token;
   const token2 = login2.token;
+  const doctorLogin = await login(doctor, "doctor");
+  const doctorToken = doctorLogin.token;
   const adminLogin = await login(admin, "admin");
   const adminToken = adminLogin.token;
   const nurseLogin = await login({ email: "nurse@carebridge.test", password: "nurse123" }, "nurse");
@@ -111,6 +115,60 @@ try {
     throw new Error(`Nurse could create ward reservation outside role boundary: ${nurseWardCreate.response.status}`);
   }
   console.log("✓ appointment + ward role boundaries");
+
+  const forgedNote = await json("/api/notes", token2, {
+    method: "POST",
+    body: JSON.stringify({ patientId: patient.id, authorId: doctor.id, subjective: "forged patient note" }),
+  });
+  if (forgedNote.response.status !== 403) throw new Error(`Patient could forge a clinician note: ${forgedNote.response.status}`);
+
+  const forgedVitals = await json("/api/vitals", token2, {
+    method: "POST",
+    body: JSON.stringify({ patientId: patient.id, actorId: patient.id, recordedBy: "Doctor", bp: "120/80", hr: 70 }),
+  });
+  if (forgedVitals.response.status !== 403) throw new Error(`Patient could write clinical vitals: ${forgedVitals.response.status}`);
+
+  const forgedPrescription = await json("/api/prescriptions", token2, {
+    method: "POST",
+    body: JSON.stringify({ patientId: patient.id, doctorId: doctor.id, drug: "Forged medicine", sig: "Once daily", qty: "1" }),
+  });
+  if (forgedPrescription.response.status !== 403) throw new Error(`Patient could issue a prescription: ${forgedPrescription.response.status}`);
+
+  const seededRx = seed.prescriptions.find((row) => row.patientId === patient.id);
+  if (!seededRx) throw new Error("Missing seeded prescription for clinical authorization checks");
+  const mutateRx = await json(`/api/prescriptions/${seededRx.id}`, token2, {
+    method: "PATCH",
+    body: JSON.stringify({ actorId: patient.id, status: "cancelled" }),
+  });
+  if (mutateRx.response.status !== 403) throw new Error(`Patient could alter clinical prescription fields: ${mutateRx.response.status}`);
+
+  const refillRx = await json(`/api/prescriptions/${seededRx.id}`, token2, {
+    method: "PATCH",
+    body: JSON.stringify({ actorId: patient.id, refillRequested: true }),
+  });
+  if (!refillRx.response.ok || refillRx.body?.refillRequested !== true) throw new Error(`Legitimate patient refill request failed: ${refillRx.response.status} ${refillRx.text}`);
+
+  const nurseChart = await json(`/api/chart/${patient.id}`, nurseToken);
+  if (nurseChart.response.status !== 403) throw new Error(`Pharmacy nurse could open full clinical chart: ${nurseChart.response.status}`);
+  const nurseBilling = await json(`/api/billing?userId=${nurseId}&role=nurse`, nurseToken);
+  if (nurseBilling.response.status !== 403) throw new Error(`Pharmacy nurse could read patient billing ledger: ${nurseBilling.response.status}`);
+
+  const clinicianNote = await json("/api/notes", doctorToken, {
+    method: "POST",
+    body: JSON.stringify({ patientId: patient.id, authorId: admin.id, subjective: "CI clinical provenance", assessment: "authorization test" }),
+  });
+  if (!clinicianNote.response.ok || clinicianNote.body?.authorId !== doctor.id || clinicianNote.body?.author !== doctor.name) {
+    throw new Error(`Clinical note did not derive author from authenticated doctor: ${clinicianNote.response.status} ${clinicianNote.text}`);
+  }
+
+  const clinicianRx = await json("/api/prescriptions", doctorToken, {
+    method: "POST",
+    body: JSON.stringify({ patientId: patient.id, doctorId: admin.id, drug: "CI provenance medicine", sig: "As directed", qty: "1" }),
+  });
+  if (!clinicianRx.response.ok || clinicianRx.body?.doctorId !== doctor.id) {
+    throw new Error(`Prescription did not derive prescriber from authenticated doctor: ${clinicianRx.response.status} ${clinicianRx.text}`);
+  }
+  console.log("✓ clinical authorization + authenticated authorship boundaries");
 
   const sessionsBefore = await json("/api/security/sessions", token2);
   if (!sessionsBefore.response.ok || !Array.isArray(sessionsBefore.body?.sessions) || sessionsBefore.body.sessions.length < 2) {
