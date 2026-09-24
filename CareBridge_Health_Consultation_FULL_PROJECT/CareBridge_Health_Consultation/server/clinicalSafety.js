@@ -101,6 +101,43 @@ function signPayload(payload, signerId) {
   return { digest, signatureHash, at };
 }
 
+export function signClinicalNote(db, note, signer) {
+  ensureState(db);
+  if (!note) throw Object.assign(new Error("Clinical note not found."), { status: 404 });
+  if (!signer || !["doctor", "admin"].includes(signer.role)) {
+    throw Object.assign(new Error("Clinical signing authority is required."), { status: 403 });
+  }
+  if (signer.role !== "admin" && note.authorId && note.authorId !== signer.id) {
+    throw Object.assign(new Error("Clinicians can sign their own note; operations may sign administratively."), { status: 403 });
+  }
+  if (note.signedAt) {
+    return {
+      note,
+      signature: db.clinicalSignatures.find((row) => row.id === note.signatureId) || null,
+      created: false,
+    };
+  }
+  const signed = signPayload(
+    { subjective: note.subjective, objective: note.objective, assessment: note.assessment, plan: note.plan },
+    signer.id
+  );
+  const signature = {
+    id: nid("sig"),
+    noteId: note.id,
+    patientId: note.patientId,
+    signerId: signer.id,
+    signerRole: signer.role,
+    type: "author",
+    ...signed,
+  };
+  db.clinicalSignatures.push(signature);
+  note.signedAt = signed.at;
+  note.signedById = signer.id;
+  note.signatureId = signature.id;
+  note.signatureHash = signature.signatureHash;
+  return { note, signature, created: true };
+}
+
 export function mountClinicalSafety(app, { readDb, writeDb, safeUser, notify }) {
   app.get("/api/clinical/order-sets", (req, res) => {
     if (!req.authUser || !["doctor", "nurse", "admin"].includes(req.authUser.role)) return res.status(403).json({ message: "Clinical staff access is required." });
@@ -162,22 +199,19 @@ export function mountClinicalSafety(app, { readDb, writeDb, safeUser, notify }) 
   });
 
   app.post("/api/notes/:id/sign", (req, res) => {
-    if (!req.authUser || !["doctor", "admin"].includes(req.authUser.role)) return res.status(403).json({ message: "Clinical signing authority is required." });
     const db = readDb();
-    ensureState(db);
     const note = (db.notes || []).find((row) => row.id === req.params.id);
-    if (!note) return res.status(404).json({ message: "Clinical note not found." });
-    if (req.authUser.role !== "admin" && note.authorId && note.authorId !== req.authUser.id) return res.status(403).json({ message: "Clinicians can sign their own note; operations may sign administratively." });
-    if (note.signedAt) return res.json(note);
-    const signed = signPayload({ subjective: note.subjective, objective: note.objective, assessment: note.assessment, plan: note.plan }, req.authUser.id);
-    const signature = { id: nid("sig"), noteId: note.id, patientId: note.patientId, signerId: req.authUser.id, signerRole: req.authUser.role, type: "author", ...signed };
-    db.clinicalSignatures.push(signature);
-    note.signedAt = signed.at;
-    note.signedById = req.authUser.id;
-    note.signatureId = signature.id;
-    note.signatureHash = signature.signatureHash;
-    writeDb(db);
-    res.json(note);
+    try {
+      const result = signClinicalNote(db, note, req.authUser);
+      if (result.created) {
+        db.audit = db.audit || [];
+        db.audit.unshift({ id: nid("au"), at: result.note.signedAt, actorId: req.authUser.id, action: "note.sign", entity: "note", entityId: result.note.id, detail: result.signature.signatureHash });
+        writeDb(db);
+      }
+      return res.json(result.note);
+    } catch (error) {
+      return res.status(error.status || 400).json({ message: error.message });
+    }
   });
 
   app.post("/api/notes/:id/cosign", (req, res) => {

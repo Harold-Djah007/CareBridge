@@ -158,8 +158,8 @@ try {
     method: "POST",
     body: JSON.stringify({ patientId: patient.id, authorId: admin.id, subjective: "CI clinical provenance", assessment: "authorization test" }),
   });
-  if (!clinicianNote.response.ok || clinicianNote.body?.authorId !== doctor.id || clinicianNote.body?.author !== doctor.name) {
-    throw new Error(`Clinical note did not derive author from authenticated doctor: ${clinicianNote.response.status} ${clinicianNote.text}`);
+  if (!clinicianNote.response.ok || clinicianNote.body?.authorId !== doctor.id || clinicianNote.body?.author !== doctor.name || !clinicianNote.body?.signedAt || !clinicianNote.body?.signatureHash) {
+    throw new Error(`Clinical note did not derive author + signature from authenticated doctor: ${clinicianNote.response.status} ${clinicianNote.text}`);
   }
 
   const clinicianRx = await json("/api/prescriptions", doctorToken, {

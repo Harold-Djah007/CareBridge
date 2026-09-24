@@ -1,3 +1,5 @@
+import { signClinicalNote } from "./clinicalSafety.js";
+
 const nid = (p) => `${p}${Date.now()}${Math.floor(Math.random() * 900)}`;
 
 const SEED = {
@@ -165,7 +167,9 @@ export function mountClinical(app, ctx) {
       plan: req.body.plan || "",
     };
     db.notes.push(note);
+    const signed = signClinicalNote(db, note, req.authUser);
     audit(db, { actorId: note.authorId, action: "note.create", entity: "note", entityId: note.id, detail: `SOAP for ${note.patientId}` });
+    audit(db, { actorId: req.authUser.id, action: "note.sign", entity: "note", entityId: note.id, detail: signed.signature?.signatureHash || note.signatureHash || "" });
     writeDb(db);
     res.status(201).json(note);
   });
