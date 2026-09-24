@@ -146,3 +146,43 @@
 .cbv6-content table th { font-size: 13px !important; }
 .cbv6-content table td { font-size: 15px !important; line-height: 1.5; }
 .cbv6-content :is(.status,[class*="badge"],[class*="chip"]) { font-size: 12px !important; }
+
+
+/* Paired Midnight surface contract.
+   Text and its containing surface move together so late legacy light backgrounds
+   cannot create bright-on-bright regressions. This intentionally targets actual
+   interactive/product surfaces rather than weakening the contrast audit. */
+.cbv6-theme-midnight #cbv6-main :is(
+  .cbv6-signal,.cbv6-action-tile,.cbv6-panel,.cbv6-care-focus,.cbv6-clinician-card,.cbv6-stream-list>a,
+  .commerce-trustbar>span,.shop-toolbar,.shop-search,.filters,.card,.pay-pick,.shelf-bar,.pharm-card,
+  .rx-pad,.rx-line,.rx-suggest,.rx-suggest-list,
+  .px-video-titlebar,.px-video-shell,.px-lobby-card,.px-lobby-peer,.px-device-checks,.px-video-context,.px-room-facts,
+  .record-summary-metrics>div,.command-panel,.record-problem-row,.record-med-row,.record-lab-row,.record-note-card,.record-rx-row,.record-billing-row,.record-intake-card,
+  .identity-card,.identity-summary-grid article,.px-case-head,.px-case-row,
+  .cb-px-panel,.cb-px-preview,.cb-px-statusbar,.cb-px-scopebar>button,.px-public-presence,.px-social-settings,.px-social-settings label,
+  .px-live-alert,.px-notice-row
+) {
+  color: var(--cb-final-text) !important;
+  background-color: var(--cb-final-panel) !important;
+  background-image: none !important;
+  border-color: var(--cb-final-line) !important;
+}
+.cbv6-theme-midnight #cbv6-main :is(
+  .cbv6-signal,.cbv6-action-tile,.cbv6-care-focus,.cbv6-clinician-card,
+  .filters button,.chip-link,.rx-suggest-list button,.px-room-facts>span,
+  .status,.identity-access,.px-live-alert-state,.stock-pill
+) {
+  color: var(--cb-final-text) !important;
+  background-color: #173140 !important;
+  background-image: none !important;
+  border-color: var(--cb-final-line) !important;
+}
+.cbv6-theme-midnight #cbv6-main :is(
+  .cbv6-signal,.cbv6-action-tile,.cbv6-panel,.cbv6-care-focus,.cbv6-clinician-card,
+  .card,.pharm-card,.rx-pad,.rx-line,.px-video-shell,.px-lobby-card,.px-video-context,
+  .command-panel,.record-problem-row,.record-med-row,.record-lab-row,.record-note-card,.record-rx-row,.record-billing-row,.record-intake-card,
+  .identity-card,.px-case-row,.cb-px-panel,.cb-px-preview,.px-social-settings label,.px-live-alert,.px-notice-row
+) :is(p,small,.muted,[class*="muted"],[class*="note"],[class*="hint"]) {
+  color: var(--cb-final-muted) !important;
+  opacity: 1 !important;
+}
