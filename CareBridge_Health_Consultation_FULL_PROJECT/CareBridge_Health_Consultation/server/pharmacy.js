@@ -352,7 +352,7 @@ export function mountPharmacy(app, ctx) {
       });
       order.invoiceId = invoice.id;
     }
-    audit(db, { actorId: req.body.actorId || patientId, action: "pharmacy.order", entity: "order", entityId: order.id, detail: `${fulfill} GHS ${taken.amount}` });
+    audit(db, { actorId: req.authUser.id, action: "pharmacy.order", entity: "order", entityId: order.id, detail: `${fulfill} GHS ${taken.amount}` });
     if (fulfill === "hospital") {
       nurses(db).forEach((n) => notify(db, n.id, "Hospital pickup", `${patient.name} ordered medicines for collection at Ridge pharmacy.`));
       notify(db, patientId, "Pharmacy queue", "The dispensary has your list. Collect at Ridge Campus pharmacy when the nurse marks it ready.");

@@ -1,0 +1,130 @@
+/* Final legacy-surface bridge for authenticated Midnight mode.
+   Kept separate from the core integrity layer so old admin/operations modules
+   can be retired later without disturbing the V6 variable-based components. */
+
+/* Generic legacy page furniture still shared by People, billing and older modules. */
+.cbv6-theme-midnight .cbv6-content .product-page-hero {
+  color: var(--v6-ink) !important;
+  background: linear-gradient(135deg,#102432,#0d1f2b) !important;
+  border-color: var(--v6-line-strong) !important;
+}
+.cbv6-theme-midnight .cbv6-content .product-page-hero :is(h1,h2,h3,strong) { color: var(--v6-ink) !important; }
+.cbv6-theme-midnight .cbv6-content .product-page-hero :is(p,small,.muted) { color: var(--v6-muted) !important; opacity: 1 !important; }
+.cbv6-theme-midnight .cbv6-content :is(.search-box,.filters,.table-wrap,.toolbar) {
+  color: var(--v6-ink) !important;
+  background-color: var(--v6-surface-solid) !important;
+  border-color: var(--v6-line) !important;
+}
+.cbv6-theme-midnight .cbv6-content .table {
+  color: var(--v6-ink) !important;
+  background: transparent !important;
+}
+.cbv6-theme-midnight .cbv6-content .table th {
+  color: var(--v6-muted) !important;
+  background: var(--v6-canvas-2) !important;
+  border-color: var(--v6-line) !important;
+}
+.cbv6-theme-midnight .cbv6-content .table td { color: var(--v6-ink) !important; border-color: var(--v6-line) !important; }
+
+/* Admin mastheads, bed capacity and clinic/admin boards. */
+.cbv6-theme-midnight .px-admin-title,
+.cbv6-theme-midnight .px-case-detail-hero {
+  color: var(--v6-ink) !important;
+  background: linear-gradient(135deg,#102432,#0d1f2b) !important;
+  border-color: var(--v6-line-strong) !important;
+}
+.cbv6-theme-midnight :is(.px-admin-title,.px-case-detail-hero) :is(h1,h2,h3,strong) { color: var(--v6-ink) !important; }
+.cbv6-theme-midnight :is(.px-admin-title,.px-case-detail-hero) p { color: var(--v6-muted) !important; opacity: 1 !important; }
+.cbv6-theme-midnight :is(.px-bed-map,.px-admin-board,.px-case-board,.px-case-flow-board,.px-case-facts,.px-case-activity) {
+  color: var(--v6-ink) !important;
+  background: var(--v6-surface-solid) !important;
+  border-color: var(--v6-line) !important;
+}
+.cbv6-theme-midnight .px-bed-bars,
+.cbv6-theme-midnight .px-bed-ward,
+.cbv6-theme-midnight .px-property-grid > div,
+.cbv6-theme-midnight .px-case-followup {
+  color: var(--v6-ink) !important;
+  background: var(--v6-canvas-2) !important;
+  border-color: var(--v6-line) !important;
+}
+.cbv6-theme-midnight .px-bed-ward > header button,
+.cbv6-theme-midnight .px-bed-numbers span,
+.cbv6-theme-midnight .px-case-children > button,
+.cbv6-theme-midnight .px-case-followup :is(select,textarea),
+.cbv6-theme-midnight .px-case-detail-state {
+  color: var(--v6-ink) !important;
+  background: var(--v6-surface-solid) !important;
+  border-color: var(--v6-line) !important;
+}
+.cbv6-theme-midnight .px-bed-meter { background: #213846 !important; }
+.cbv6-theme-midnight .px-case-filterbar {
+  color: var(--v6-ink) !important;
+  background: var(--v6-surface-solid) !important;
+  border-color: var(--v6-line) !important;
+}
+.cbv6-theme-midnight .px-case-filterbar :is(input,select) {
+  color: var(--v6-ink) !important;
+  background: var(--v6-canvas-2) !important;
+  border-color: var(--v6-line-strong) !important;
+}
+.cbv6-theme-midnight .px-case-type-summary span,
+.cbv6-theme-midnight .px-case-row em,
+.cbv6-theme-midnight .px-case-flow button span {
+  color: var(--v6-muted) !important;
+  background: var(--v6-canvas-2) !important;
+}
+.cbv6-theme-midnight .px-case-row {
+  color: var(--v6-ink) !important;
+  background: var(--v6-surface-solid) !important;
+  border-color: var(--v6-line) !important;
+}
+.cbv6-theme-midnight .px-case-row:hover { background: #173140 !important; }
+.cbv6-theme-midnight .px-case-flow button.current span { color: #fff !important; background: #155f57 !important; }
+
+/* Nurse pharmacy inventory. */
+.cbv6-theme-midnight .px-stock-hero {
+  color: var(--v6-ink) !important;
+  background: linear-gradient(135deg,#102432,#0d1f2b) !important;
+  border-color: var(--v6-line-strong) !important;
+}
+.cbv6-theme-midnight .px-stock-hero :is(h1,h2,h3,strong) { color: var(--v6-ink) !important; }
+.cbv6-theme-midnight .px-stock-hero p { color: var(--v6-muted) !important; opacity: 1 !important; }
+.cbv6-theme-midnight .px-stock-board {
+  color: var(--v6-ink) !important;
+  background: var(--v6-surface-solid) !important;
+  border-color: var(--v6-line) !important;
+}
+.cbv6-theme-midnight .px-stock-head { color: var(--v6-muted) !important; background: var(--v6-canvas-2) !important; }
+.cbv6-theme-midnight .px-stock-row { border-color: var(--v6-line) !important; }
+.cbv6-theme-midnight .px-stock-row select,
+.cbv6-theme-midnight .px-stock-number,
+.cbv6-theme-midnight .px-stock-actions button {
+  color: var(--v6-ink) !important;
+  background: var(--v6-canvas-2) !important;
+  border-color: var(--v6-line-strong) !important;
+}
+.cbv6-theme-midnight .px-stock-toggle { background: var(--v6-canvas-2) !important; }
+.cbv6-theme-midnight .px-stock-toggle.on button:first-child,
+.cbv6-theme-midnight .px-stock-toggle.off button:last-child {
+  color: var(--v6-ink) !important;
+  background: #173140 !important;
+  box-shadow: none !important;
+}
+
+/* Old directory/account cards that are still intentionally shared with V6. */
+.cbv6-theme-midnight .cbv6-content :is(.person-row,.person-card,.identity-card,.doctor-chip,.medicine-card,.pharmacy-card,.shop-product) {
+  color: var(--v6-ink) !important;
+  background-color: var(--v6-surface-solid) !important;
+  border-color: var(--v6-line) !important;
+}
+.cbv6-theme-midnight .cbv6-content :is(.person-row,.person-card,.identity-card,.doctor-chip) :is(small,p,.muted) {
+  color: var(--v6-muted) !important;
+  opacity: 1 !important;
+}
+
+/* Keep text controls legible even when a legacy module injects a literal light background. */
+.cbv6-theme-midnight .cbv6-content :is(.search-box,.px-stock-toolbar,.px-case-filterbar) input::placeholder {
+  color: #91a8b5 !important;
+  opacity: 1 !important;
+}

@@ -1,20 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search } from "lucide-react";
+import { CreditCard, Landmark, Search, ShieldCheck, Sparkles, WalletCards } from "lucide-react";
 import { api } from "../../api";
 import { ghs, prettyDate } from "../../utils";
-import PageHero from "../../components/PageHero";
 import { useAuth, useToast } from "../../state";
+import Avatar from "../../components/Avatar";
 
 function receiptKey(row) {
   return row.paymentId || row.receiptNo || row.id;
 }
 
 function haystack(row) {
-  return [
-    row.patient?.name, row.patient?.mrn, row.receiptNo, row.paymentId,
-    row.item, row.method, row.id, row.reference,
-  ].filter(Boolean).join(" ").toLowerCase();
+  return [row.patient?.name, row.patient?.mrn, row.receiptNo, row.paymentId, row.item, row.method, row.id, row.reference].filter(Boolean).join(" ").toLowerCase();
 }
 
 export default function AdminReceipts() {
@@ -23,199 +20,67 @@ export default function AdminReceipts() {
   const [invoices, setInvoices] = useState([]);
   const [payments, setPayments] = useState([]);
   const [query, setQuery] = useState("");
+  const [view, setView] = useState("settled");
   const [busyId, setBusyId] = useState("");
 
   const reload = () => {
     api("/billing?role=admin").then(setInvoices).catch(() => {});
     api("/finance/payments").then(setPayments).catch(() => {});
   };
-
-  useEffect(() => {
-    reload();
-  }, []);
+  useEffect(() => { reload(); }, []);
 
   const confirmManual = async (payment) => {
     setBusyId(payment.id);
     try {
-      await api("/finance/confirm", {
-        method: "POST",
-        body: JSON.stringify({ paymentId: payment.id, actorId: user.id }),
-      });
+      await api("/finance/confirm", { method: "POST", body: JSON.stringify({ paymentId: payment.id, actorId: user.id }) });
       push("Offline payment posted and receipt issued.");
       reload();
-    } catch (error) {
-      push(error.message, "error");
-    } finally {
-      setBusyId("");
-    }
+    } catch (error) { push(error.message, "error"); } finally { setBusyId(""); }
   };
 
   const paid = useMemo(() => {
-    const fromPayments = (payments || [])
-      .filter((p) => p.status === "paid")
-      .map((p) => {
-        const inv = invoices.find((i) => i.id === p.invoiceId || (p.invoiceIds || []).includes(i.id));
-        return {
-          id: p.id,
-          paymentId: p.id,
-          receiptNo: p.receiptNo,
-          reference: p.reference,
-          item: inv?.item || (p.invoiceIds?.length > 1 ? `${p.invoiceIds.length} billed items` : "Hospital payment"),
-          amount: p.amount,
-          method: inv?.method || p.method,
-          date: p.confirmedAt || p.createdAt,
-          patient: p.patient || inv?.patient,
-        };
-      });
-    const seen = new Set(fromPayments.map((r) => r.receiptNo || r.paymentId));
-    const fromInvoices = invoices
-      .filter((i) => i.status === "paid")
-      .filter((i) => !seen.has(i.receiptNo) && !seen.has(i.paymentId) && !fromPayments.some((r) => r.paymentId === i.paymentId || r.id === i.id))
-      .map((i) => ({
-        id: i.id,
-        paymentId: i.paymentId || i.receiptNo || i.id,
-        receiptNo: i.receiptNo || i.paymentId || i.id,
-        item: i.item,
-        amount: i.amount,
-        method: i.method,
-        date: i.paidAt || i.date,
-        patient: i.patient,
-      }));
+    const fromPayments = (payments || []).filter((payment) => payment.status === "paid").map((payment) => {
+      const invoice = invoices.find((item) => item.id === payment.invoiceId || (payment.invoiceIds || []).includes(item.id));
+      return { id: payment.id, paymentId: payment.id, receiptNo: payment.receiptNo, reference: payment.reference, item: invoice?.item || (payment.invoiceIds?.length > 1 ? `${payment.invoiceIds.length} billed items` : "Hospital payment"), amount: payment.amount, method: invoice?.method || payment.method, date: payment.confirmedAt || payment.createdAt, patient: payment.patient || invoice?.patient };
+    });
+    const seen = new Set(fromPayments.map((row) => row.receiptNo || row.paymentId));
+    const fromInvoices = invoices.filter((invoice) => invoice.status === "paid").filter((invoice) => !seen.has(invoice.receiptNo) && !seen.has(invoice.paymentId) && !fromPayments.some((row) => row.paymentId === invoice.paymentId || row.id === invoice.id)).map((invoice) => ({ id: invoice.id, paymentId: invoice.paymentId || invoice.receiptNo || invoice.id, receiptNo: invoice.receiptNo || invoice.paymentId || invoice.id, item: invoice.item, amount: invoice.amount, method: invoice.method, date: invoice.paidAt || invoice.date, patient: invoice.patient }));
     return [...fromPayments, ...fromInvoices].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
   }, [invoices, payments]);
 
-  const pendingManual = payments.filter((p) => p.status === "pending" && ["cash", "nhis"].includes(p.method));
-  const due = invoices.filter((i) => i.status === "due");
+  const pendingManual = payments.filter((payment) => payment.status === "pending" && ["cash", "nhis"].includes(payment.method));
+  const due = invoices.filter((invoice) => invoice.status === "due");
+  const collected = paid.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const outstanding = due.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const q = query.trim().toLowerCase();
-  const visible = q ? paid.filter((row) => haystack(row).includes(q)) : paid;
-  const dueVisible = q ? due.filter((row) => haystack(row).includes(q)) : due;
+  const visiblePaid = q ? paid.filter((row) => haystack(row).includes(q)) : paid;
+  const visibleDue = q ? due.filter((row) => haystack(row).includes(q)) : due;
 
   return (
-    <div>
-      <PageHero
-        scene="billing"
-        eyebrow="Accounts"
-        title="Receipts"
-        lead="Search and open paid patient receipts. Operations reviews accounts only — patients complete payment in Shop & pay."
-        actions={<Link className="secondary-btn" to="/billing/tariff">Hospital tariff</Link>}
-      />
-
-      <label className="search-box receipt-search">
-        <Search size={16} />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by patient, MRN, or receipt number"
-          aria-label="Search receipts"
-        />
-      </label>
-
-      <section className="card receipt-ledger">
-        <div className="card-head">
-          <div>
-            <span className="eyebrow">Settled</span>
-            <h3>Paid receipts</h3>
-          </div>
-          <small className="muted">{visible.length} on file</small>
-        </div>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Patient</th>
-              <th>Receipt</th>
-              <th>Item</th>
-              <th>Amount</th>
-              <th>Method</th>
-              <th>Posted</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {visible.length === 0 && (
-              <tr><td colSpan={7} className="muted">{q ? "No receipts match that search." : "No paid receipts posted yet."}</td></tr>
-            )}
-            {visible.map((row) => (
-              <tr key={receiptKey(row)}>
-                <td>
-                  <b>{row.patient?.name || "Patient"}</b>
-                  <small className="muted" style={{ display: "block" }}>{row.patient?.mrn || "—"}</small>
-                </td>
-                <td>{row.receiptNo}</td>
-                <td>{row.item}</td>
-                <td>{ghs(row.amount)}</td>
-                <td>{row.method || "—"}</td>
-                <td>{row.date?.length > 12 ? prettyDate(row.date) : row.date || "—"}</td>
-                <td><Link className="ghost-btn" to={`/receipts/${encodeURIComponent(receiptKey(row))}`}>Open</Link></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="px-page px-finance-console">
+      <section className="px-admin-title px-finance-title">
+        <div><span className="px-kicker"><Sparkles size={14} /> Revenue operations</span><h1>Finance should feel verified, not improvised.</h1><p>Settled receipts, manual-review payments and outstanding patient balances are separated into one controlled accounts workspace.</p></div>
+        <div className="px-admin-title-stat"><span>Collected</span><strong>{ghs(collected)}</strong><small>{ghs(outstanding)} outstanding</small></div>
       </section>
 
-      {pendingManual.length > 0 && (
-        <section className="card receipt-ledger manual-review-ledger">
-          <div className="card-head">
-            <div>
-              <span className="eyebrow">Verification queue</span>
-              <h3>Cash &amp; NHIS awaiting review</h3>
-            </div>
-            <small className="muted">Only post after you verify the cashier/NHIS record</small>
-          </div>
-          <table className="table">
-            <thead><tr><th>Patient</th><th>Reference</th><th>Method</th><th>Amount</th><th>Created</th><th /></tr></thead>
-            <tbody>
-              {pendingManual.map((payment) => (
-                <tr key={payment.id}>
-                  <td><b>{payment.patient?.name || "Patient"}</b><small className="muted" style={{ display: "block" }}>{payment.patient?.mrn || "—"}</small></td>
-                  <td>{payment.reference}</td>
-                  <td>{payment.method === "nhis" ? `NHIS · ${payment.nhisNumber || "policy"}` : "Cash"}</td>
-                  <td>{ghs(payment.amount)}</td>
-                  <td>{prettyDate(payment.createdAt)}</td>
-                  <td><button className="primary-btn" type="button" disabled={busyId === payment.id} onClick={() => confirmManual(payment)}>{busyId === payment.id ? "Posting…" : "Verify & post"}</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
-
-      <section className="card due-readonly">
-        <div className="card-head">
-          <div>
-            <span className="eyebrow">Outstanding</span>
-            <h3>Due invoices</h3>
-          </div>
-          <small className="muted">Read-only · patients settle in Shop &amp; pay</small>
-        </div>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Patient</th>
-              <th>Item</th>
-              <th>Amount</th>
-              <th>Date</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {dueVisible.length === 0 && (
-              <tr><td colSpan={5} className="muted">{q ? "No due invoices match that search." : "Nothing outstanding."}</td></tr>
-            )}
-            {dueVisible.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  <b>{row.patient?.name || "Patient"}</b>
-                  <small className="muted" style={{ display: "block" }}>{row.patient?.mrn || "—"}</small>
-                </td>
-                <td>{row.item}</td>
-                <td>{ghs(row.amount)}</td>
-                <td>{row.date}</td>
-                <td><span className="status pending">due</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <section className="px-signal-grid">
+        <article><span><WalletCards size={17} /></span><div><small>Paid receipts</small><strong>{paid.length}</strong></div></article>
+        <article><span><CreditCard size={17} /></span><div><small>Manual review</small><strong>{pendingManual.length}</strong></div></article>
+        <article><span><Landmark size={17} /></span><div><small>Due invoices</small><strong>{due.length}</strong></div></article>
+        <article><span><ShieldCheck size={17} /></span><div><small>Verification</small><strong>Protected</strong></div></article>
       </section>
+
+      <section className="px-finance-board">
+        <header className="px-finance-toolbar"><div><span className="px-kicker">Accounts ledger</span><h2>{view === "settled" ? `${visiblePaid.length} settled` : view === "review" ? `${pendingManual.length} awaiting review` : `${visibleDue.length} outstanding`}</h2></div><label><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search patient, MRN, receipt or reference" /></label><div className="px-segmented"><button type="button" className={view === "settled" ? "active" : ""} onClick={() => setView("settled")}>Settled</button><button type="button" className={view === "review" ? "active" : ""} onClick={() => setView("review")}>Review</button><button type="button" className={view === "due" ? "active" : ""} onClick={() => setView("due")}>Outstanding</button></div></header>
+
+        {view === "settled" && <div className="px-finance-list">{visiblePaid.map((row) => <article className="px-finance-row" key={receiptKey(row)}><div className="px-finance-person"><Avatar person={row.patient} /><span><strong>{row.patient?.name || "Patient"}</strong><small>{row.patient?.mrn || "—"}</small></span></div><div><span>Receipt</span><strong>{row.receiptNo || row.paymentId}</strong></div><div><span>Item</span><strong>{row.item}</strong></div><div><span>Method</span><strong>{row.method || "—"}</strong></div><div className="money"><span>Amount</span><strong>{ghs(row.amount)}</strong></div><time>{row.date?.length > 12 ? prettyDate(row.date) : row.date || "—"}</time><Link to={`/receipts/${encodeURIComponent(receiptKey(row))}`}>Open receipt</Link></article>)}{visiblePaid.length === 0 && <div className="px-empty"><CreditCard size={28} /><h3>No settled receipts match</h3></div>}</div>}
+
+        {view === "review" && <div className="px-finance-list">{pendingManual.map((payment) => <article className="px-finance-row review" key={payment.id}><div className="px-finance-person"><Avatar person={payment.patient} /><span><strong>{payment.patient?.name || "Patient"}</strong><small>{payment.patient?.mrn || "—"}</small></span></div><div><span>Reference</span><strong>{payment.reference}</strong></div><div><span>Method</span><strong>{payment.method === "nhis" ? `NHIS · ${payment.nhisNumber || "policy"}` : "Cash"}</strong></div><div><span>Created</span><strong>{prettyDate(payment.createdAt)}</strong></div><div className="money"><span>Amount</span><strong>{ghs(payment.amount)}</strong></div><span className="status pending">pending</span><button type="button" disabled={busyId === payment.id} onClick={() => confirmManual(payment)}>{busyId === payment.id ? "Posting…" : "Verify & post"}</button></article>)}{pendingManual.length === 0 && <div className="px-empty"><ShieldCheck size={28} /><h3>Manual review queue is clear</h3></div>}</div>}
+
+        {view === "due" && <div className="px-finance-list">{visibleDue.map((row) => <article className="px-finance-row due" key={row.id}><div className="px-finance-person"><Avatar person={row.patient} /><span><strong>{row.patient?.name || "Patient"}</strong><small>{row.patient?.mrn || "—"}</small></span></div><div><span>Invoice</span><strong>{row.id}</strong></div><div><span>Item</span><strong>{row.item}</strong></div><div><span>Date</span><strong>{row.date}</strong></div><div className="money"><span>Amount due</span><strong>{ghs(row.amount)}</strong></div><span className="status pending">due</span><small>Patient settles in Shop & Pay</small></article>)}{visibleDue.length === 0 && <div className="px-empty"><ShieldCheck size={28} /><h3>Nothing outstanding in this view</h3></div>}</div>}
+      </section>
+
+      <div className="px-finance-assurance"><ShieldCheck size={16} /><span>Cash and NHIS are posted only after operations verification. Online receipts are created only after provider confirmation.</span><Link to="/billing/tariff">Open tariff</Link></div>
     </div>
   );
 }

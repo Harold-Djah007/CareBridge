@@ -1,3 +1,5 @@
+import { signClinicalNote } from "./clinicalSafety.js";
+
 const nid = (p) => `${p}${Date.now()}${Math.floor(Math.random() * 900)}`;
 
 const SEED = {
@@ -130,8 +132,16 @@ const chartFor = (db, patientId) => {
 export function mountClinical(app, ctx) {
   const { readDb, writeDb, safeUser, notify, emailPatient } = ctx;
 
+  const requireRole = (req, res, roles, message) => {
+    if (req.authUser && roles.includes(req.authUser.role)) return true;
+    res.status(403).json({ message });
+    return false;
+  };
+  const patientExists = (db, patientId) => (db.users || []).some((user) => user.id === patientId && user.role === "patient" && user.status !== "inactive");
+
   app.get("/api/chart/:patientId", (req, res) => {
-    if (req.authUser?.role === "patient" && req.params.patientId !== req.authUser.id) return res.status(403).json({ message: "You can only open your own clinical file." });
+    if (!requireRole(req, res, ["patient", "doctor", "admin"], "Clinical records are available to the patient, clinicians, and authorized hospital operations.")) return;
+    if (req.authUser.role === "patient" && req.params.patientId !== req.authUser.id) return res.status(403).json({ message: "You can only open your own clinical file." });
     const db = readDb();
     const chart = chartFor(db, req.params.patientId);
     if (!chart) return res.status(404).json({ message: "No clinical file for that person." });
@@ -139,13 +149,16 @@ export function mountClinical(app, ctx) {
   });
 
   app.post("/api/notes", (req, res) => {
+    if (!requireRole(req, res, ["doctor", "admin"], "Only clinicians or authorized hospital operations can add clinical notes.")) return;
     const db = readDb();
+    const patientId = String(req.body.patientId || "").trim();
+    if (!patientExists(db, patientId)) return res.status(404).json({ message: "Patient account not found." });
     const note = {
       id: nid("note"),
-      patientId: req.body.patientId,
+      patientId,
       appointmentId: req.body.appointmentId || "",
-      authorId: req.body.authorId,
-      author: (db.users.find((u) => u.id === req.body.authorId) || {}).name || "Clinician",
+      authorId: req.authUser.id,
+      author: req.authUser.name || "Clinician",
       date: new Date().toISOString().slice(0, 10),
       type: "SOAP",
       subjective: req.body.subjective || "",
@@ -154,16 +167,21 @@ export function mountClinical(app, ctx) {
       plan: req.body.plan || "",
     };
     db.notes.push(note);
+    const signed = signClinicalNote(db, note, req.authUser);
     audit(db, { actorId: note.authorId, action: "note.create", entity: "note", entityId: note.id, detail: `SOAP for ${note.patientId}` });
+    audit(db, { actorId: req.authUser.id, action: "note.sign", entity: "note", entityId: note.id, detail: signed.signature?.signatureHash || note.signatureHash || "" });
     writeDb(db);
     res.status(201).json(note);
   });
 
   app.post("/api/vitals", (req, res) => {
+    if (!requireRole(req, res, ["doctor", "admin"], "Only clinicians or authorized hospital operations can record vitals.")) return;
     const db = readDb();
+    const patientId = String(req.body.patientId || "").trim();
+    if (!patientExists(db, patientId)) return res.status(404).json({ message: "Patient account not found." });
     const row = {
       id: nid("v"),
-      patientId: req.body.patientId,
+      patientId,
       takenAt: new Date().toISOString(),
       bp: req.body.bp || "",
       hr: Number(req.body.hr || 0),
@@ -171,10 +189,10 @@ export function mountClinical(app, ctx) {
       spo2: Number(req.body.spo2 || 0),
       weight: Number(req.body.weight || 0),
       bmi: Number(req.body.bmi || 0),
-      recordedBy: req.body.recordedBy || "Clinic",
+      recordedBy: req.authUser.name || "Clinic",
     };
     db.vitals.push(row);
-    audit(db, { actorId: req.body.actorId, action: "vitals.create", entity: "vitals", entityId: row.id, detail: `HR ${row.hr} BP ${row.bp}` });
+    audit(db, { actorId: req.authUser.id, action: "vitals.create", entity: "vitals", entityId: row.id, detail: `HR ${row.hr} BP ${row.bp}` });
     writeDb(db);
     res.status(201).json(row);
   });
@@ -192,24 +210,29 @@ export function mountClinical(app, ctx) {
   };
 
   app.get("/api/prescriptions", (req, res) => {
+    if (!requireRole(req, res, ["patient", "doctor", "admin"], "Prescription records are available to patients, prescribers, and authorized hospital operations.")) return;
     const db = readDb();
-    const { userId, role } = req.query;
     let rows = db.prescriptions || [];
-    if (role === "patient") rows = rows.filter((r) => r.patientId === userId);
-    if (role === "doctor") rows = rows.filter((r) => r.doctorId === userId);
-    res.json(rows.slice().reverse().map((r) => enrichRx(db, r)));
+    if (req.authUser.role === "patient") rows = rows.filter((row) => row.patientId === req.authUser.id);
+    if (req.authUser.role === "doctor") rows = rows.filter((row) => row.doctorId === req.authUser.id);
+    if (req.authUser.role === "admin" && req.query.patientId) rows = rows.filter((row) => row.patientId === req.query.patientId);
+    res.json(rows.slice().reverse().map((row) => enrichRx(db, row)));
   });
 
   app.get("/api/prescriptions/:id", (req, res) => {
+    if (!requireRole(req, res, ["patient", "doctor", "admin"], "Prescription records are available to patients, prescribers, and authorized hospital operations.")) return;
     const db = readDb();
-    const rx = (db.prescriptions || []).find((r) => r.id === req.params.id);
+    const rx = (db.prescriptions || []).find((row) => row.id === req.params.id);
     if (!rx) return res.status(404).json({ message: "Prescription not found" });
-    if (req.authUser?.role === "patient" && rx.patientId !== req.authUser.id) return res.status(403).json({ message: "That prescription is not on your patient file." });
+    if (req.authUser.role === "patient" && rx.patientId !== req.authUser.id) return res.status(403).json({ message: "That prescription is not on your patient file." });
     res.json(enrichRx(db, rx));
   });
 
   app.post("/api/prescriptions", async (req, res) => {
+    if (!requireRole(req, res, ["doctor"], "Only a signed-in prescribing clinician can issue a prescription.")) return;
     const db = readDb();
+    const patientId = String(req.body.patientId || "").trim();
+    if (!patientExists(db, patientId)) return res.status(404).json({ message: "Patient account not found." });
     const items = Array.isArray(req.body.items) && req.body.items.length
       ? req.body.items.map((row) => ({
           stockId: row.stockId || row.id || "",
@@ -223,8 +246,8 @@ export function mountClinical(app, ctx) {
     if (!items.length) return res.status(400).json({ message: "Add at least one medicine." });
     const rx = {
       id: nid("rx"),
-      patientId: req.body.patientId,
-      doctorId: req.body.doctorId,
+      patientId,
+      doctorId: req.authUser.id,
       drug: items.map((i) => i.drug).join(", "),
       sig: items.map((i) => i.sig).filter(Boolean).join("; "),
       qty: items.map((i) => i.qty).filter(Boolean).join(", "),
@@ -264,26 +287,49 @@ export function mountClinical(app, ctx) {
   });
 
   app.patch("/api/prescriptions/:id", async (req, res) => {
+    if (!requireRole(req, res, ["patient", "doctor", "admin"], "You do not have permission to update this prescription.")) return;
     const db = readDb();
-    const rx = db.prescriptions.find((r) => r.id === req.params.id);
+    const rx = db.prescriptions.find((row) => row.id === req.params.id);
     if (!rx) return res.status(404).json({ message: "Prescription not found" });
-    Object.assign(rx, req.body);
-    if (req.body.refillRequested) {
-      db.users.filter((u) => u.role === "doctor" || u.role === "admin").forEach((u) => {
-        notify(db, u.id, "Refill requested", `${rx.drug} refill requested.`);
+
+    if (req.authUser.role === "patient") {
+      if (rx.patientId !== req.authUser.id) return res.status(403).json({ message: "That prescription is not on your patient file." });
+      const allowed = new Set(["refillRequested", "actorId"]);
+      if (Object.keys(req.body || {}).some((key) => !allowed.has(key)) || req.body.refillRequested !== true) {
+        return res.status(403).json({ message: "Patients can request a refill but cannot alter a clinical prescription." });
+      }
+      rx.refillRequested = true;
+      rx.refillRequestedAt = new Date().toISOString();
+      db.users.filter((user) => user.role === "doctor" || user.role === "admin").forEach((user) => {
+        notify(db, user.id, "Refill requested", `${rx.drug} refill requested.`);
       });
       notify(db, rx.patientId, "Refill requested", `Pharmacy will review ${rx.drug}.`);
+    } else {
+      if (req.authUser.role === "doctor" && rx.doctorId !== req.authUser.id) {
+        return res.status(403).json({ message: "Prescribers can only amend prescriptions they issued." });
+      }
+      if (req.body.status !== undefined) {
+        const status = String(req.body.status).trim().toLowerCase();
+        if (!["active", "completed", "cancelled", "stopped"].includes(status)) return res.status(400).json({ message: "Invalid prescription status." });
+        rx.status = status;
+      }
+      if (req.body.notes !== undefined) rx.notes = String(req.body.notes || "").trim();
+      if (req.body.refills !== undefined) rx.refills = Math.max(0, Number(req.body.refills || 0));
+      if (req.body.refillRequested !== undefined) rx.refillRequested = Boolean(req.body.refillRequested);
+      rx.updatedAt = new Date().toISOString();
     }
-    audit(db, { actorId: req.body.actorId, action: "rx.update", entity: "prescription", entityId: rx.id, detail: JSON.stringify(req.body) });
+
+    audit(db, { actorId: req.authUser.id, action: "rx.update", entity: "prescription", entityId: rx.id, detail: req.authUser.role === "patient" ? "refill requested" : JSON.stringify({ status: rx.status, refills: rx.refills }) });
     writeDb(db);
-    res.json(rx);
+    res.json(enrichRx(db, rx));
   });
 
   app.post("/api/intakes", (req, res) => {
+    if (!requireRole(req, res, ["patient"], "Pre-visit intake is submitted by the signed-in patient.")) return;
     const db = readDb();
     const row = {
       id: nid("in"),
-      patientId: req.body.patientId,
+      patientId: req.authUser.id,
       appointmentId: req.body.appointmentId || "",
       submittedAt: new Date().toISOString(),
       symptoms: req.body.symptoms || "",
@@ -301,10 +347,11 @@ export function mountClinical(app, ctx) {
   });
 
   app.post("/api/consents", (req, res) => {
+    if (!requireRole(req, res, ["patient"], "Consent must be signed by the authenticated patient.")) return;
     const db = readDb();
     const row = {
       id: nid("cs"),
-      patientId: req.body.patientId,
+      patientId: req.authUser.id,
       type: req.body.type || "telehealth",
       signedAt: new Date().toISOString(),
       version: "2026.1",
@@ -316,11 +363,12 @@ export function mountClinical(app, ctx) {
   });
 
   app.get("/api/billing", (req, res) => {
+    if (!requireRole(req, res, ["patient", "admin"], "Billing records are available to the patient and authorized hospital operations.")) return;
     const db = readDb();
-    const { userId, role } = req.query;
     let rows = db.invoices || [];
-    if (role === "patient") rows = rows.filter((i) => i.patientId === userId);
-    res.json(rows.map((i) => ({ ...i, patient: safeUser(db.users.find((u) => u.id === i.patientId) || {}) })));
+    if (req.authUser.role === "patient") rows = rows.filter((invoice) => invoice.patientId === req.authUser.id);
+    if (req.authUser.role === "admin" && req.query.patientId) rows = rows.filter((invoice) => invoice.patientId === req.query.patientId);
+    res.json(rows.map((invoice) => ({ ...invoice, patient: safeUser(db.users.find((user) => user.id === invoice.patientId) || {}) })));
   });
 
   app.patch("/api/billing/:id/pay", (_req, res) => {
