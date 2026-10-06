@@ -46,10 +46,18 @@ export async function createRuntimeStore(dataFile) {
   const usePostgres = requested === "postgres" || (!requested && process.env.NODE_ENV === "production" && Boolean(process.env.DATABASE_URL));
 
   if (!usePostgres) {
+    let version = 0;
     return {
       provider: "atomic-json",
-      read: () => normalizeRuntimeState(local.read()),
-      write: (db) => local.write(normalizeRuntimeState(db)),
+      read: () => markVersion(normalizeRuntimeState(local.read()), version),
+      write: (db) => {
+        const expectedVersion = Number(db?.[VERSION] ?? version);
+        if (expectedVersion !== version) throw staleWrite(expectedVersion, version);
+        local.write(normalizeRuntimeState(db));
+        version += 1;
+        markVersion(db, version);
+        return db;
+      },
       async refresh() {},
       async flush() {},
       health: () => local.health(),
@@ -98,10 +106,14 @@ export async function createRuntimeStore(dataFile) {
   }
 
   async function refresh() {
+    const queued = pending;
     try {
-      await pending;
+      await queued;
     } catch (error) {
       await recoverFromDatabase(error);
+      // A failed commit must fail its request, but must not poison every future
+      // request after the authoritative state has been recovered.
+      if (pending === queued) pending = Promise.resolve();
       throw error;
     }
     const latest = await repo.loadState();

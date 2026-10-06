@@ -22,12 +22,12 @@ export default function WardBooking() {
   const [form, setForm] = useState({ ward: "General Ward", roomType: "Private Room", date: todayISO(), nights: 1, notes: "" });
 
   const isPatient = user.role === "patient";
-  const load = () => api(`/ward-bookings?userId=${user.id}&role=${user.role}`).then(setBookings);
+  const load = () => api(`/ward-bookings?userId=${user.id}&role=${user.role}`).then(setBookings).catch((error) => push(error.message, "error"));
   const loadWards = () => api("/wards").then((list) => {
     setWards(list);
     if (list[0]) setForm((current) => ({ ...current, ward: current.ward && list.some((ward) => ward.name === current.ward) ? current.ward : list[0].name }));
     return list;
-  });
+  }).catch((error) => push(error.message, "error"));
 
   useEffect(() => {
     loadWards();

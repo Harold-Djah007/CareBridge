@@ -1,4 +1,6 @@
 import nodemailer from "nodemailer";
+import { smtpOptions, assertAcceptedEmail } from "./smtp.js";
+import { newId } from "./ids.js";
 
 let transportPromise = null;
 
@@ -16,21 +18,9 @@ async function getTransport() {
   if (transportPromise) return transportPromise;
   transportPromise = (async () => {
     if (process.env.SMTP_HOST) {
-      const port = Number(process.env.SMTP_PORT || 587);
       return {
         mode: "smtp",
-        transporter: nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port,
-          secure: process.env.SMTP_SECURE === "true" || port === 465,
-          requireTLS: process.env.SMTP_REQUIRE_TLS === "true",
-          auth: process.env.SMTP_USER
-            ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-            : undefined,
-          tls: process.env.SMTP_REJECT_UNAUTHORIZED === "false"
-            ? { rejectUnauthorized: false }
-            : undefined,
-        }),
+        transporter: nodemailer.createTransport(smtpOptions()),
       };
     }
 
@@ -104,7 +94,7 @@ export function renderEmail({ heading, intro, details = [], closing }) {
 export async function deliverEmail(db, { userId, to, subject, text, html, type }) {
   const queuedAt = new Date().toISOString();
   const record = {
-    id: `e${Date.now()}${Math.floor(Math.random() * 1000)}`,
+    id: newId("email"),
     userId,
     to,
     subject,
@@ -129,6 +119,7 @@ export async function deliverEmail(db, { userId, to, subject, text, html, type }
         : "No SMTP or development preview transport is available.";
     } else {
       const info = await sendWithRetry(transporter, { from: FROM, to, subject, text, html });
+      assertAcceptedEmail(info);
       record.messageId = info.messageId || null;
       record.sentAt = new Date().toISOString();
       if (mode === "preview") {

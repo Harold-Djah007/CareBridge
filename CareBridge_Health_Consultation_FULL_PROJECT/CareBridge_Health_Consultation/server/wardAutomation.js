@@ -1,4 +1,5 @@
 import { installIdentityBoundary } from "./identityBoundary.js";
+import { newId } from "./ids.js";
 
 const ACTIVE_STATUSES = new Set(["pending", "confirmed"]);
 const RELEASE_STATUSES = new Set(["declined", "cancelled", "discharged", "completed"]);
@@ -138,7 +139,7 @@ export function mountWardAutomation(app, { readDb, writeDb, safeUser, notify, em
     if (!patient) return res.status(404).json({ message: "Patient account not found." });
 
     const item = {
-      id: `wb${Date.now()}`,
+      id: newId("wb"),
       patientId,
       ward: wardName,
       roomType: req.body.roomType || "Private Room",

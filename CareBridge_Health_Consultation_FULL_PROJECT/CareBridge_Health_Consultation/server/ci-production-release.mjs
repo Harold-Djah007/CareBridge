@@ -40,6 +40,8 @@ const productionEnv = {
   SMTP_USER: "ci@carebridge.example",
   SMTP_PASS: "carebridge-ci-smtp-password-2026-strong",
   SMTP_FROM: "CareBridge CI <ci@carebridge.example>",
+  CAREBRIDGE_TURN_URLS: "turns:relay.carebridge-ci.invalid:5349?transport=tcp",
+  CAREBRIDGE_TURN_SECRET: "carebridge-ci-turn-relay-secret-2026-strong",
 };
 
 const configReport = productionConfigurationReport(productionEnv);
@@ -149,7 +151,7 @@ try {
   if (!sessions.response.ok || !Array.isArray(sessions.body?.sessions)) throw new Error("Production session inventory is unavailable.");
   console.log("✓ authenticated production session control");
 
-  console.log("CareBridge production release certification passed.");
+  console.log("CareBridge production runtime/configuration regression passed. External service acceptance is a separate deployment check.");
 } finally {
   await stop().catch(() => {});
 }

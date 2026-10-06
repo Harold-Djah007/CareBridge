@@ -14,10 +14,48 @@ Do not call a deployment production-ready merely because the server starts. A pr
 - Real production PostgreSQL/Redis services, or the included private Docker services.
 - A real SMTP account.
 - Flutterwave server credentials and webhook secret.
+- A Coturn REST-compatible TURN relay, including TLS/TCP where required by customer networks.
 - Unique MFA and backup encryption secrets.
 - A documented backup destination outside the application host for real production retention.
 
 External FHIR, HL7, DICOM/PACS, insurer/NHIS and TURN/STUN connections are certified separately when the real provider endpoints and credentials exist.
+
+## Live service acceptance before customer handover
+
+Production startup validates configuration, including mandatory TURN and SMTP TLS. It does not prove that a provider is reachable or that a customer's network permits calls.
+
+Install the locked dependencies and the validation browser on a trusted deployment workstation:
+
+```powershell
+npm run install:all
+npx --prefix client playwright install chromium
+```
+
+Configure the private `deploy/.env.production` file with actual SMTP, Flutterwave and Coturn credentials. Never paste this file or secret keys into chat. Add these non-secret validation fields for an **existing completed** CareBridge payment:
+
+```dotenv
+CAREBRIDGE_VALIDATE_TRANSACTION_ID=provider-transaction-id
+CAREBRIDGE_VALIDATE_PAYMENT_REFERENCE=the-carebridge-payment-reference
+CAREBRIDGE_VALIDATE_PAYMENT_AMOUNT=the-expected-invoice-amount
+CAREBRIDGE_VALIDATE_PAYMENT_CURRENCY=GHS
+```
+
+Run the service checks from the application folder:
+
+```powershell
+node --env-file=deploy/.env.production scripts/validate-integrations.mjs
+```
+
+This command sends no email and creates no charge. It verifies SMTP authentication over trusted TLS, reads and matches an existing live Flutterwave transaction, and forces a browser data connection through the configured TURN relay. Missing configuration or a failed probe returns a nonzero exit code. The SMTP probe cannot prove inbox delivery; the relay probe proves connectivity from the testing workstation, not every customer's network.
+
+Before each customer handover, record the deployed version and complete these acceptance paths with the customer's actual services:
+
+1. Complete a small approved payment through the browser, then verify the webhook, invoice, receipt and provider dashboard agree. Repeat webhook delivery and confirm no duplicate fulfilment. Test cancellation, provider failure and a delayed callback. Never mark an invoice paid from a browser redirect alone.
+2. Send a test alert from the designated test account's Settings page and confirm it arrives in the intended inbox. Configure the mail provider's domain authentication and bounce monitoring. A `sent` status means the SMTP server accepted the message; it does not mean the recipient read or received it.
+3. Complete a two-device consultation with one device on Wi-Fi and the other on mobile data, then repeat on the customer's restricted network. Check audio, video, screen sharing, reconnect behaviour and hangup. Use the relay validation command from the customer's network when diagnosing failures.
+4. Run authenticated `npm run smoke:production`, restore an encrypted backup into an isolated database, and verify monitoring alerts reach the operator. Use separate database volumes and secrets for each separately hosted customer. The current application does not provide tenant isolation for a shared multi-customer service.
+
+Keep evidence for each deployed installation and rerun these checks after provider, domain, firewall or application changes. A failed or unperformed acceptance path remains a deployment blocker.
 
 ## 2. Create production secrets
 

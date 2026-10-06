@@ -23,3 +23,7 @@ backups
 *.log
 .DS_Store
 Thumbs.db
+.quality
+server/data/*.bak*
+server/data/*.sha256
+server/data/*.journal.ndjson

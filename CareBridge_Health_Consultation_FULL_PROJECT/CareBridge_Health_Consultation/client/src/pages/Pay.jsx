@@ -58,19 +58,19 @@ function PatientShop() {
   };
 
   useEffect(() => {
-    loadBills();
+    loadBills().catch((error) => push(error.message, "error"));
     api("/finance/rates").then((r) => {
       setServices(r.services || []);
       if (r.labs) setLabs(r.labs);
-    });
+    }).catch((error) => push(error.message, "error"));
     api("/pharmacy/stock").then((rows) => {
       setStock(rows);
       shop?.applyStock?.(rows);
     }).catch(() => api("/finance/pharmacy").then((rows) => {
       setStock(rows);
       shop?.applyStock?.(rows);
-    }));
-    api("/finance/labs").then(setLabs);
+    })).catch((error) => push(error.message, "error"));
+    api("/finance/labs").then(setLabs).catch((error) => push(error.message, "error"));
     api(`/finance/payments?userId=${user.id}&role=patient`).then(setPayments).catch(() => {});
     const socket = io(socketUrl, socketOptions());
     socket.on("pharmacy-stock", (rows) => {
@@ -82,7 +82,7 @@ function PatientShop() {
       if (rates?.services) setServices(rates.services);
     });
     const onBills = () => {
-      loadBills();
+      loadBills().catch((error) => push(error.message, "error"));
       api(`/finance/payments?userId=${user.id}&role=patient`).then(setPayments).catch(() => {});
     };
     window.addEventListener(BILLS_EVENT, onBills);
@@ -109,7 +109,7 @@ function PatientShop() {
       clean.delete("invoice");
       clean.delete("add");
       setParams(clean, { replace: true });
-    })();
+    })().catch((error) => push(error.message, "error"));
     return () => { cancelled = true; };
   }, [params.get("invoice"), params.get("add")]);
 

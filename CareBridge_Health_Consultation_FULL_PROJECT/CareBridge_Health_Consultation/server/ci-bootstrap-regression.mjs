@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import { ensureBootstrapAdmin } from "./bootstrap.js";
+import { passwordMatches } from "./auth.js";
+
+let db = { users: [] };
+let writes = 0;
+let flushes = 0;
+const store = { read: () => structuredClone(db), write: (next) => { writes += 1; db = next; }, flush: async () => { flushes += 1; } };
+await assert.rejects(() => ensureBootstrapAdmin(store, { NODE_ENV: "production" }));
+await assert.rejects(() => ensureBootstrapAdmin(store, { NODE_ENV: "production", CAREBRIDGE_BOOTSTRAP_ADMIN_EMAIL: "admin@example.invalid", CAREBRIDGE_BOOTSTRAP_ADMIN_PASSWORD: "admin123" }));
+assert.equal(writes, 0);
+const env = { NODE_ENV: "production", CAREBRIDGE_BOOTSTRAP_ADMIN_EMAIL: "Admin@Example.Invalid", CAREBRIDGE_BOOTSTRAP_ADMIN_PASSWORD: "Secure-fixture-password-2026" };
+assert.equal(await ensureBootstrapAdmin(store, env), true);
+assert.equal(db.users.length, 1);
+assert.equal(db.users[0].email, "admin@example.invalid");
+assert.equal(db.users[0].role, "admin");
+assert.ok(db.users[0].password.startsWith("scrypt$"));
+assert.equal(passwordMatches(env.CAREBRIDGE_BOOTSTRAP_ADMIN_PASSWORD, db.users[0].password), true);
+assert.equal(flushes, 1);
+const originalHash = db.users[0].password;
+assert.equal(await ensureBootstrapAdmin(store, { ...env, CAREBRIDGE_BOOTSTRAP_ADMIN_PASSWORD: "different-password-2026" }), false);
+assert.equal(db.users[0].password, originalHash);
+assert.equal(writes, 1);
+console.log("✓ fresh production admin is hashed and durable; missing/weak credentials fail; restarts never reset existing users");

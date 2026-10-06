@@ -38,6 +38,7 @@ export function hashPassword(password) {
 export function passwordMatches(password, stored) {
   const candidate = String(password || "");
   const value = String(stored || "");
+  if (!value || !candidate) return false;
   if (!value.startsWith("scrypt$")) return candidate === value;
   const [, salt, expectedHex] = value.split("$");
   if (!salt || !expectedHex) return false;

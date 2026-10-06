@@ -32,19 +32,23 @@ async function directLogin(page, request, role, projectName) {
   const account = ACCOUNTS[role];
   const session = await loginSession(request, role, projectName);
   await page.goto("/login");
+  await page.waitForLoadState("networkidle");
   await page.evaluate(({ user, token }) => {
     localStorage.setItem("carebridge-user", JSON.stringify(user));
     localStorage.setItem("carebridge-token", token);
   }, { user: session.user, token: session.token });
   await page.goto(account.home);
   await expect(page.locator("#cbv6-main")).toBeVisible();
+  await page.waitForLoadState("networkidle");
   return session;
 }
 
 async function waitForRoute(page) {
   await expect(page.locator("#cbv6-main")).toBeVisible();
   await page.locator(".cbv6-route-loading").waitFor({ state: "hidden", timeout: 8_000 }).catch(() => {});
-  await page.waitForTimeout(120);
+  // Assess the loaded workspace before navigating away; WebKit reports requests
+  // interrupted by a document replacement as access-control/load failures.
+  await page.waitForLoadState("networkidle");
 }
 
 async function expectViewportQuality(page, route) {
@@ -140,6 +144,39 @@ async function semanticIssues(page) {
   });
 }
 
+test("mobile navigation reaches secondary workspaces and restores focus after closing", async ({ page, request }, testInfo) => {
+  test.skip(!testInfo.project.name.includes("mobile"), "Mobile workspace drawer");
+  await directLogin(page, request, "patient", testInfo.project.name);
+  await expect(page.locator("#shop-basket")).toBeHidden();
+  const trigger = page.getByRole("button", { name: "All workspaces" });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "All workspaces" });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await dialog.getByRole("link", { name: "Admissions", exact: true }).click();
+  await expect(page).toHaveURL(/\/wards$/);
+  await expect(dialog).toBeHidden();
+});
+
+test("booking dialog keeps keyboard focus inside and closes with Escape", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "Shared dialog focus regression");
+  await directLogin(page, request, "patient", testInfo.project.name);
+  await page.goto("/appointments");
+  const trigger = page.getByRole("button", { name: "Book care", exact: true });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "Book consultation" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Confirm appointment" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("button", { name: "Close booking" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
 test("login UI establishes a secure patient session", async ({ page }) => {
   await page.goto("/login");
   await page.getByRole("tab", { name: "Patient" }).click();
@@ -152,6 +189,7 @@ test("login UI establishes a secure patient session", async ({ page }) => {
 });
 
 test("critical role workspaces render without browser crashes or viewport overflow", async ({ page, request }, testInfo) => {
+  test.setTimeout(90_000);
   const pageErrors = [];
   const serverErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -173,6 +211,7 @@ test("critical role workspaces render without browser crashes or viewport overfl
 });
 
 test("critical desktop routes meet semantic accessibility basics", async ({ page, request }, testInfo) => {
+  test.setTimeout(90_000);
   test.skip(testInfo.project.name !== "desktop-chromium", "Semantic audit runs once on desktop Chromium.");
   const failures = [];
   for (const role of Object.keys(ACCOUNTS)) {
@@ -324,4 +363,15 @@ test("admin-managed social links publish safely to the public footer", async ({ 
     data: { facebook: "javascript:alert(1)" },
   });
   expect(unsafe.status()).toBe(400);
+});
+
+test("operations dashboard recovers from unavailable data", async ({ page, request }, testInfo) => {
+  await page.route("**/api/admin/overview", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Temporary service interruption" }) }));
+  await directLogin(page, request, "admin", testInfo.project.name);
+  await expect(page.getByRole("heading", { name: "Hospital data unavailable" })).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("Temporary service interruption");
+  await page.unroute("**/api/admin/overview");
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Hospital command", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Hospital data unavailable" })).toHaveCount(0);
 });

@@ -17,7 +17,7 @@ if (!admin?.email || !admin?.password) throw new Error("Missing seeded admin cre
 
 const server = spawn(process.execPath, ["index.js"], {
   cwd: new URL(".", import.meta.url),
-  env: { ...process.env, DATA_FILE: dataFile, PORT: String(port), LOG_LEVEL: "silent", MFA_ENCRYPTION_KEY: "ci-mfa-key-rotate-in-production" },
+  env: { ...process.env, DATA_FILE: dataFile, PORT: String(port), LOG_LEVEL: "silent", CAREBRIDGE_BEHIND_TLS_PROXY: "true", MFA_ENCRYPTION_KEY: "ci-mfa-key-rotate-in-production" },
   stdio: ["ignore", "pipe", "pipe"],
 });
 let serverLog = "";

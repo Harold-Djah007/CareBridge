@@ -1,4 +1,5 @@
 import { audit } from "./clinical.js";
+import { newId } from "./ids.js";
 import { markPharmacyPaid, catalogStock, isSellable } from "./pharmacy.js";
 import { flutterwaveStatus, paymentMatchesVerification, startFlutterwavePayment, validFlutterwaveWebhook, verifyFlutterwaveTransaction } from "./flutterwave.js";
 
@@ -157,11 +158,11 @@ const receiptNo = () => {
   return `CBM-${y}${m}${day}-${Math.floor(100000 + Math.random() * 900000)}`;
 };
 
-const payRef = () => `CBPAY${Date.now().toString().slice(-10)}`;
+const payRef = () => newId("CBPAY");
 
 export function addInvoice(db, row) {
   const invoice = {
-    id: `inv${Date.now()}${Math.floor(Math.random() * 99)}`,
+    id: newId("inv"),
     currency: "GHS",
     status: "due",
     method: "",
@@ -178,7 +179,8 @@ function orderFromCatalog(catalog, items, label) {
   for (const row of items || []) {
     const product = catalog.find((p) => p.id === row.id || p.id === row.productId);
     if (!product) return { error: "Unknown catalog item.", status: 400 };
-    const qty = Math.max(1, Number(row.qty || 1));
+    const qty = Number(row.qty ?? 1);
+    if (!Number.isSafeInteger(qty) || qty < 1) return { error: "Order quantities must be positive whole numbers.", status: 400 };
     const price = Number(product.price || 0);
     lines.push({ ...product, price, qty, lineTotal: price * qty });
   }
@@ -281,6 +283,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
   const placeOrder = (kind) => async (req, res) => {
     if (!req.authUser) return res.status(401).json({ message: "Sign in to place an order." });
     const { items = [] } = req.body;
+    if (!Array.isArray(items) || items.some((item) => !item || typeof item !== "object")) return res.status(400).json({ message: "Provide a list of order items." });
     const patientId = req.authUser.role === "patient" ? req.authUser.id : req.body.patientId;
     const actorId = req.authUser.id;
     const db = readDb();
@@ -288,12 +291,16 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     const t = tariffOf(db);
     const catalog = kind === "lab" ? t.labs : (db.pharmacyStock || PHARMACY);
     if (kind === "pharmacy") {
+      const requestedByProduct = new Map();
       for (const row of items) {
         const product = catalog.find((p) => p.id === row.id || p.id === row.productId);
-        const qty = Math.max(1, Number(row.qty || 1));
+        const qty = Number(row.qty ?? 1);
+        if (!Number.isSafeInteger(qty) || qty < 1) return res.status(400).json({ message: "Medicine quantities must be positive whole numbers." });
         if (!product) return res.status(400).json({ message: "Unknown medicine." });
         const available = Number(product.qty || 0);
-        if (!isSellable(product) || available < qty) {
+        const totalRequested = qty + (requestedByProduct.get(product.id) || 0);
+        requestedByProduct.set(product.id, totalRequested);
+        if (!isSellable(product) || available < totalRequested) {
           return res.status(409).json({ message: `Only ${Math.max(0, available)} units are currently available.`, available: Math.max(0, available) });
         }
       }
@@ -333,6 +340,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     const actorId = req.authUser.id;
     const db = readDb();
     const service = tariffOf(db).services.find((s) => s.id === serviceId);
+    if (!(db.users || []).some((user) => user.id === patientId && user.role === "patient" && user.status !== "inactive")) return res.status(400).json({ message: "Choose an active patient account." });
     if (!service) return res.status(404).json({ message: "Service not on the tariff." });
     const invoice = addInvoice(db, {
       patientId,
@@ -487,6 +495,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     const patient = (db.users || []).find((u) => u.id === pid && u.role === "patient");
     if (!patient) return res.status(404).json({ message: "Patient not found." });
     const checkoutKey = String(req.body.checkoutKey || "").trim().slice(0, 120);
+    if ((req.body.invoiceIds !== undefined && !Array.isArray(req.body.invoiceIds)) || (req.body.services !== undefined && !Array.isArray(req.body.services))) return res.status(400).json({ message: "Provide lists of invoice IDs and services." });
     const invoices = [];
     for (const id of req.body.invoiceIds || []) {
       const inv = (db.invoices || []).find((i) => i.id === id && i.patientId === pid && i.status === "due");
@@ -495,7 +504,8 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     for (const svc of req.body.services || []) {
       const service = tariffOf(db).services.find((s) => s.id === svc.id || s.id === svc.productId);
       if (!service) return res.status(400).json({ message: "That hospital service is not on the tariff." });
-      const qty = Math.max(1, Math.min(50, Number(svc.qty || 1) || 1));
+      const qty = Number(svc.qty ?? 1);
+      if (!Number.isSafeInteger(qty) || qty < 1 || qty > 50) return res.status(400).json({ message: "Service quantities must be whole numbers between 1 and 50." });
       const price = Number(service.price || 0);
       let invoice = checkoutKey && (db.invoices || []).find((row) => (
         row.patientId === pid
@@ -545,7 +555,7 @@ export function mountFinance(app, { readDb, writeDb, safeUser, notify, emailPati
     const amount = Number(invoices.reduce((s, i) => s + Number(i.amount || 0), 0).toFixed(2));
     if (!(amount > 0)) return res.status(400).json({ message: "The checkout total must be greater than zero." });
     const payment = {
-      id: `pay${Date.now()}${Math.floor(Math.random() * 900)}`,
+      id: newId("pay"),
       invoiceId: invoices[0].id,
       invoiceIds: invoices.map((i) => i.id),
       patientId: invoices[0].patientId,

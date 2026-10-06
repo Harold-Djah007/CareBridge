@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import useDialogFocus from "../hooks/useDialogFocus";
 import {
   ArrowRight, CalendarDays, CheckCircle2, Clock3, MapPin, MessageCircle, Plus,
   ShieldCheck, Sparkles, Stethoscope, UserRoundCheck, Video, XCircle,
@@ -28,6 +29,9 @@ export default function Appointments() {
   const [patients, setPatients] = useState([]);
   const [view, setView] = useState("upcoming");
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const bookingRef = useRef(null);
+  useDialogFocus(bookingRef, open, () => setOpen(false));
   const [rates, setRates] = useState(null);
   const [form, setForm] = useState({
     doctorId: "",
@@ -40,11 +44,11 @@ export default function Appointments() {
 
   const isPatient = user.role === "patient";
   const isDoctor = user.role === "doctor";
-  const load = () => api(`/appointments?userId=${user.id}&role=${user.role}`).then(setAppointments);
+  const load = () => api(`/appointments?userId=${user.id}&role=${user.role}`).then(setAppointments).catch((error) => push(error.message, "error"));
 
   useEffect(() => {
     load();
-    api("/doctors").then(setDoctors);
+    api("/doctors").then(setDoctors).catch((error) => push(error.message, "error"));
     if (!isPatient) api("/patients").then(setPatients).catch(() => {});
     api("/finance/rates").then(setRates).catch(() => {});
     const socket = io(socketUrl, socketOptions());
@@ -79,16 +83,22 @@ export default function Appointments() {
     if (!form.doctorId) return push("Choose a clinician first.", "error");
     const picked = doctors.find((doctor) => doctor.id === form.doctorId);
     if (picked?.available === false) return push(`${picked.name} is currently busy.`, "error");
-    await api("/appointments", { method: "POST", body: JSON.stringify({ ...form, patientId: isPatient ? user.id : form.patientId }) });
-    setOpen(false);
-    push(isPatient ? "Consultation booked and added to your care plan." : "Appointment added to the clinical schedule.");
-    load();
+    if (saving) return;
+    setSaving(true);
+    try {
+      await api("/appointments", { method: "POST", body: JSON.stringify({ ...form, patientId: isPatient ? user.id : form.patientId }) });
+      setOpen(false);
+      push(isPatient ? "Consultation booked and added to your care plan." : "Appointment added to the clinical schedule.");
+      load();
+    } catch (error) { push(error.message, "error"); } finally { setSaving(false); }
   };
 
   const update = async (id, status) => {
-    await api(`/appointments/${id}`, { method: "PATCH", body: JSON.stringify({ status, actorId: user.id }) });
-    push(`Appointment ${status}.`);
-    load();
+    try {
+      await api(`/appointments/${id}`, { method: "PATCH", body: JSON.stringify({ status, actorId: user.id }) });
+      push(`Appointment ${status}.`);
+      load();
+    } catch (error) { push(error.message, "error"); }
   };
 
   return (
@@ -158,8 +168,8 @@ export default function Appointments() {
       </section>
 
       {open && <div className="px-modal-backdrop" onMouseDown={() => setOpen(false)}>
-        <form className="px-booking-sheet" onMouseDown={(event) => event.stopPropagation()} onSubmit={submit}>
-          <header><span className="px-sheet-icon"><Stethoscope size={20} /></span><div><span className="px-kicker">New encounter</span><h2>{isPatient ? "Book your consultation" : "Create an encounter"}</h2><p>CareBridge links scheduling, patient context and billing automatically.</p></div><button type="button" onClick={() => setOpen(false)}><XCircle size={20} /></button></header>
+        <form ref={bookingRef} className="px-booking-sheet" role="dialog" aria-modal="true" aria-label="Book consultation" onMouseDown={(event) => event.stopPropagation()} onSubmit={submit}>
+          <header><span className="px-sheet-icon"><Stethoscope size={20} /></span><div><span className="px-kicker">New encounter</span><h2>{isPatient ? "Book your consultation" : "Create an encounter"}</h2><p>CareBridge links scheduling, patient context and billing automatically.</p></div><button type="button" aria-label="Close booking" onClick={() => setOpen(false)}><XCircle size={20} /></button></header>
           <div className="px-sheet-body">
             {!isPatient && <label>Patient<select value={form.patientId} onChange={(e) => setForm({ ...form, patientId: e.target.value })} required><option value="">Select a patient</option>{patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.name}</option>)}</select></label>}
             <div className="px-sheet-block"><span className="px-kicker">Choose clinician</span><div className="px-clinician-grid">{doctors.map((doctor) => <button type="button" key={doctor.id} className={`${form.doctorId === doctor.id ? "active" : ""} ${doctor.available === false ? "busy" : ""}`} onClick={() => setForm({ ...form, doctorId: doctor.id })}><Avatar person={doctor} /><span><strong>{doctor.name}</strong><small>{doctor.specialty || "Consultant"}</small><em>{doctor.available === false ? "Busy" : "Available"}</em></span></button>)}</div></div>
@@ -168,7 +178,7 @@ export default function Appointments() {
             <label>Reason for visit<textarea rows="3" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="Brief clinical reason or patient concern" /></label>
             {quote != null && <div className="px-quote"><span><ShieldCheck size={16} /> Estimated consultation</span><strong>{ghs(quote)}</strong></div>}
           </div>
-          <footer><button className="px-secondary" type="button" onClick={() => setOpen(false)}>Cancel</button><button className="px-primary"><span>Confirm appointment</span><ArrowRight size={16} /></button></footer>
+          <footer><button className="px-secondary" type="button" onClick={() => setOpen(false)}>Cancel</button><button className="px-primary" disabled={saving}><span>{saving ? "Booking…" : "Confirm appointment"}</span><ArrowRight size={16} /></button></footer>
         </form>
       </div>}
     </div>

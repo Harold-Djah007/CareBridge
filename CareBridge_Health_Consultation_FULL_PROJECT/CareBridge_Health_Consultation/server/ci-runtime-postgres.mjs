@@ -1,6 +1,9 @@
 import fs from "fs";
 import { spawn } from "child_process";
 import pg from "pg";
+import assert from "node:assert/strict";
+import { createRuntimeStore } from "./runtimeStore.js";
+import { createPostgresRepository } from "./postgres.js";
 
 const { Pool } = pg;
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
@@ -124,6 +127,32 @@ try {
   const sessions = await requestWithDiagnostics(second, two.base, "/api/security/sessions", auth2.token);
   if (!sessions.response.ok || !Array.isArray(sessions.body?.sessions)) throw new Error(`PostgreSQL-backed session state unavailable after restart\n${second.getLog()}`);
   console.log("✓ authenticated session state persists through PostgreSQL runtime restart");
+
+  await stop(second);
+  second = null;
+  const previousProvider = process.env.PERSISTENCE_PROVIDER;
+  process.env.PERSISTENCE_PROVIDER = "postgres";
+  const runtime = await createRuntimeStore(process.env.DATA_FILE);
+  const competing = createPostgresRepository(process.env.DATABASE_URL);
+  try {
+    const outdated = runtime.read();
+    const latest = await competing.loadState();
+    latest.payload.qualityConflict = "external change retained";
+    await competing.saveState(latest.payload, { expectedVersion: latest.version });
+    await assert.rejects(runtime.write(outdated), { code: "CAREBRIDGE_STALE_WRITE" });
+    await assert.rejects(runtime.refresh(), { code: "CAREBRIDGE_STALE_WRITE" });
+    await runtime.refresh();
+    const recovered = runtime.read();
+    assert.equal(recovered.qualityConflict, "external change retained");
+    delete recovered.qualityConflict;
+    await runtime.write(recovered);
+    await runtime.flush();
+    console.log("✓ conflicting PostgreSQL writes fail safely and subsequent requests recover without a restart");
+  } finally {
+    await runtime.close();
+    await competing.close();
+    if (previousProvider === undefined) delete process.env.PERSISTENCE_PROVIDER; else process.env.PERSISTENCE_PROVIDER = previousProvider;
+  }
 
   console.log("CareBridge PostgreSQL primary-runtime regression passed.");
 } finally {

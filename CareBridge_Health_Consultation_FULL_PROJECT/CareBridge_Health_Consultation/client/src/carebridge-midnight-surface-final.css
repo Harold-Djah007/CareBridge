@@ -69,3 +69,11 @@
   .px-video-assurance>span,.px-lobby-contacts button,.px-room-facts>div,.px-device-checks>div,.px-consent
 ) small{color:var(--cb-final-muted)!important;opacity:1!important}
 .cbv6-theme-midnight #cbv6-main .unpaid-bill-icon{color:#9de7d7!important;background:#173140!important}
+
+/* Ward cards use light fills in the base theme; pair Midnight text with dark surfaces. */
+.cbv6-theme-midnight #cbv6-main :is(.px-ward-card,.px-ward-body,.px-ward-title,.px-ward-foot){
+  background-color:var(--cb-final-panel)!important;background-image:none!important;border-color:var(--cb-final-line)!important
+}
+.cbv6-theme-midnight #cbv6-main :is(.px-primary.light,.px-ward-foot button,.px-ward-title>span){
+  background-color:var(--cb-final-raised)!important;color:var(--cb-final-text)!important;border-color:var(--cb-final-line)!important
+}

@@ -24,23 +24,27 @@ export default function AdminOverview() {
   const [emails, setEmails] = useState([]);
   const [pending, setPending] = useState([]);
   const [wards, setWards] = useState([]);
+  const [error, setError] = useState("");
 
   const load = () => {
-    api("/admin/overview").then(setStats).catch(() => {});
-    api("/admin/emails").then((rows) => setEmails(rows.slice(0, 6))).catch(() => {});
-    api("/ward-bookings").then((rows) => setPending(rows.filter((ward) => ward.status === "pending"))).catch(() => {});
-    api("/wards").then(setWards).catch(() => {});
+    Promise.all([api("/admin/overview"), api("/admin/emails"), api("/ward-bookings"), api("/wards")])
+      .then(([overview, mail, bookings, beds]) => {
+        setStats(overview); setEmails(mail.slice(0, 6));
+        setPending(bookings.filter((ward) => ward.status === "pending")); setWards(beds); setError("");
+      }).catch((failure) => setError(failure.message || "Hospital data could not be refreshed."));
   };
-
   useEffect(() => {
     load();
     const timer = window.setInterval(load, 30000);
     return () => window.clearInterval(timer);
   }, []);
 
-  const occupancy = stats ? Math.round(((44 - Number(stats.bedsAvailable || 0)) / 44) * 100) : 0;
+  const capacity = wards.reduce((sum, ward) => sum + Number(ward.capacity || 0), 0);
+  const bedsAvailable = wards.reduce((sum, ward) => sum + Number(ward.available || 0), 0);
+  const occupancy = capacity ? Math.round(((capacity - bedsAvailable) / capacity) * 100) : 0;
   const occItems = useMemo(() => wards.map((ward) => ({ label: ward.name, value: Math.max(0, Number(ward.capacity || 0) - Number(ward.available || 0)), max: Number(ward.capacity || 1) })), [wards]);
 
+  if (!stats && error) return <div className="px-empty" role="alert"><h3>Hospital data unavailable</h3><p>{error}</p><button className="secondary-btn" onClick={load}>Retry</button></div>;
   if (!stats) return <div className="product-loading"><Activity className="spin-soft" size={20} /><span>Loading hospital command centre…</span></div>;
 
   const pressure = occupancy >= 90 ? "critical" : occupancy >= 75 ? "watch" : "stable";
@@ -48,6 +52,7 @@ export default function AdminOverview() {
 
   return (
     <div className="cbv6-admin-home">
+      {error && <div className="px-empty compact" role="alert"><p>Showing the last successful update. {error}</p><button className="secondary-btn" onClick={load}>Retry refresh</button></div>}
       <header className="cbv6-warroom-header">
         <div><span>RIDGE CAMPUS · LIVE OPERATIONS</span><h1>Hospital command</h1><p>A single decision surface for capacity, clinics, people, support and finance.</p></div>
         <div className="cbv6-warroom-radar"><OpsRadar occupancy={occupancy} pending={stats.pendingWards} beds={stats.bedsAvailable} /></div>

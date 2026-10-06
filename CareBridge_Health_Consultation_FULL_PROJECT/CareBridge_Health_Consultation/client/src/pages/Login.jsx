@@ -155,7 +155,7 @@ export default function Login() {
               </div>
             )}
 
-            {error && <div className="error-box">{error}</div>}
+            {error && <div className="error-box" role="alert">{error}</div>}
             <button className="primary-btn full cta-pulse" disabled={loading || (mfaStep && !mfaCode.trim())}>{loading ? "Checking…" : mfaStep ? <>Verify & sign in <ShieldCheck size={18} /></> : <>Sign in <ArrowRight size={18} /></>}</button>
 
             {!mfaStep && (

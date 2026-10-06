@@ -9,15 +9,19 @@ export default function AdminReports() {
   const [audit, setAudit] = useState([]);
   const [tab, setTab] = useState("reports");
   const [payments, setPayments] = useState([]);
+  const [error, setError] = useState("");
+  const load = () => {
+    setError("");
+    Promise.all([api("/admin/reports"), api("/admin/audit"), api("/finance/payments")]).then(([next, events, rows]) => { setStats(next); setAudit(events); setPayments(rows); }).catch((failure) => setError(failure.message));
+  };
 
   useEffect(() => {
-    api("/admin/reports").then(setStats);
-    api("/admin/audit").then(setAudit);
-    api("/finance/payments").then(setPayments);
+    load();
   }, []);
 
   const paid = useMemo(() => payments.filter((payment) => payment.status === "paid"), [payments]);
   const pending = useMemo(() => payments.filter((payment) => payment.status !== "paid"), [payments]);
+  if (error) return <div className="px-empty" role="alert"><h3>Reports could not load</h3><p>{error}</p><button className="primary-btn" onClick={load}>Try again</button></div>;
   if (!stats) return <div className="px-empty"><Activity size={28} /><h3>Loading hospital intelligence…</h3></div>;
 
   return (

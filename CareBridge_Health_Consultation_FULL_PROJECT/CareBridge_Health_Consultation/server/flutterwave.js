@@ -93,6 +93,8 @@ export function paymentMatchesVerification(payment, verification) {
   const amount = Number(verification.amount);
   const expected = Number(payment.amount);
   return verification.status === "successful"
+    && Number.isFinite(expected) && expected > 0
+    && Boolean(payment.reference)
     && String(verification.currency || "").toUpperCase() === String(payment.currency || "GHS").toUpperCase()
     && String(verification.tx_ref || "") === String(payment.reference || "")
     && Number.isFinite(amount)

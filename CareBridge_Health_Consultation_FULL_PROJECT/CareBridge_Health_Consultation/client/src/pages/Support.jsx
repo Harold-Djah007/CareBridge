@@ -54,7 +54,7 @@ export default function Support() {
     }
   };
 
-  useEffect(() => { load(); }, [user.id, user.role, filter]);
+  useEffect(() => { load().catch((error) => push(error.message, "error")); }, [user.id, user.role, filter]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -87,10 +87,12 @@ export default function Support() {
 
   const setStatus = async (status) => {
     if (!active) return;
-    const ticket = await api(`/tickets/${active.id}`, { method: "PATCH", body: JSON.stringify({ actorId: user.id, status }) });
-    setActive(ticket);
-    push(status === "resolved" ? "Ticket resolved." : "Ticket reopened.");
-    await load(ticket.id);
+    try {
+      const ticket = await api(`/tickets/${active.id}`, { method: "PATCH", body: JSON.stringify({ actorId: user.id, status }) });
+      setActive(ticket);
+      push(status === "resolved" ? "Ticket resolved." : "Ticket reopened.");
+      await load(ticket.id);
+    } catch (error) { push(error.message, "error"); }
   };
 
   const visible = tickets.filter((ticket) => `${ticket.subject} ${ticket.category} ${ticket.user?.name || ""}`.toLowerCase().includes(query.trim().toLowerCase()));

@@ -71,6 +71,7 @@ export function HeroCarousel({ slides, interval = 7000 }) {
               key={slide.image}
               type="button"
               role="tab"
+              aria-label={`Show slide ${idx + 1}`}
               aria-selected={idx === i}
               className={idx === i ? "on" : ""}
               onClick={() => setI(idx)}

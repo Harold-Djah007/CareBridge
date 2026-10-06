@@ -8,7 +8,7 @@ import PhotoPicker from "../../components/PhotoPicker";
 import Avatar from "../../components/Avatar";
 import PageHero, { EmptyPlate } from "../../components/PageHero";
 
-const blank = { name: "", email: "", password: "care123", role: "patient", phone: "", city: "", specialty: "", photo: "" };
+const blank = { name: "", email: "", password: "", role: "patient", phone: "", city: "", specialty: "", photo: "" };
 const ROLE_FILTERS = ["all", "patient", "doctor", "nurse", "admin"];
 
 export default function AdminUsers() {
@@ -22,7 +22,7 @@ export default function AdminUsers() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(blank);
 
-  const load = () => api("/admin/users").then(setUsers);
+  const load = () => api("/admin/users").then(setUsers).catch((error) => push(error.message, "error"));
   useEffect(() => { load(); }, []);
 
   const visible = useMemo(() => users.filter((person) => {
@@ -59,9 +59,11 @@ export default function AdminUsers() {
   };
 
   const toggle = async (person) => {
-    await api(`/admin/users/${person.id}`, { method: "PATCH", body: JSON.stringify({ status: person.status === "inactive" ? "active" : "inactive" }) });
-    push(person.status === "inactive" ? "Account reactivated" : "Account deactivated");
-    load();
+    try {
+      await api(`/admin/users/${person.id}`, { method: "PATCH", body: JSON.stringify({ status: person.status === "inactive" ? "active" : "inactive" }) });
+      push(person.status === "inactive" ? "Account reactivated" : "Account deactivated");
+      load();
+    } catch (error) { push(error.message, "error"); }
   };
 
   const launch = (person = null) => {
@@ -118,7 +120,7 @@ export default function AdminUsers() {
               <PhotoPicker value={form.photo} name={form.name} onChange={(photo) => setForm({ ...form, photo })} onError={(message) => push(message, "error")} />
               <label>Full name<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></label>
               <label>Email<input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></label>
-              <label>Password<input type="text" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={editing ? "Leave blank to keep current password" : ""} required={!editing} /></label>
+              <label>Password<input type="password" minLength={10} autoComplete="new-password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={editing ? "Leave blank to keep current password" : "At least 10 characters, including a letter and number"} required={!editing} /></label>
               <label>CareBridge role<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}><option value="patient">Patient</option><option value="doctor">Doctor</option><option value="nurse">Nurse / pharmacy</option><option value="admin">Administrator</option></select></label>
               <div className="identity-form-grid"><label>Phone<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label><label>City<input value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} /></label></div>
               {form.role !== "patient" && <label>Specialty / title<input value={form.specialty} onChange={(event) => setForm({ ...form, specialty: event.target.value })} /></label>}

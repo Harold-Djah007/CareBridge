@@ -1,0 +1,10 @@
+# Browser runtime version must match client/package.json @playwright/test.
+FROM mcr.microsoft.com/playwright:v1.63.0-noble
+WORKDIR /app
+COPY server/package.json server/package-lock.json ./server/
+COPY client/package.json client/package-lock.json ./client/
+RUN npm ci --prefix server --no-audit --no-fund && npm ci --prefix client --no-audit --no-fund
+COPY . .
+RUN npm run build --prefix client
+ENV CI=true CAREBRIDGE_E2E_DATA_FILE=/tmp/carebridge-browser-db.json
+CMD ["sh", "-c", "cp server/tests/fixtures/demo.json /tmp/carebridge-browser-db.json && npm run quality:budget --prefix client && npm exec --prefix client -- playwright test --config client/playwright.config.js"]

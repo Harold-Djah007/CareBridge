@@ -1,6 +1,7 @@
 import { signClinicalNote } from "./clinicalSafety.js";
+import { newId } from "./ids.js";
 
-const nid = (p) => `${p}${Date.now()}${Math.floor(Math.random() * 900)}`;
+const nid = newId;
 
 const SEED = {
   conditions: [
@@ -85,12 +86,13 @@ const SEED = {
 };
 
 export function ensureClinical(db) {
+  const initializeDemo = db.medications === undefined;
   ["medications", "conditions", "vitals", "labs", "notes", "prescriptions", "invoices", "intakes", "consents", "audit", "tickets"].forEach((k) => {
     if (!Array.isArray(db[k])) db[k] = [];
   });
-  if (!db.medications.length) {
+  if (initializeDemo && process.env.NODE_ENV !== "production") {
     Object.entries(SEED).forEach(([k, rows]) => {
-      db[k] = rows;
+      if (!db[k].length) db[k] = structuredClone(rows);
     });
   }
   return db;
@@ -179,16 +181,23 @@ export function mountClinical(app, ctx) {
     const db = readDb();
     const patientId = String(req.body.patientId || "").trim();
     if (!patientExists(db, patientId)) return res.status(404).json({ message: "Patient account not found." });
+    const measurements = {};
+    for (const key of ["hr", "temp", "spo2", "weight", "bmi"]) {
+      const value = req.body[key];
+      measurements[key] = value == null || String(value).trim() === "" ? null : Number(value);
+      if (measurements[key] !== null && (!Number.isFinite(measurements[key]) || measurements[key] < 0 || (key === "spo2" && measurements[key] > 100))) {
+        return res.status(400).json({ message: `Invalid ${key} measurement.` });
+      }
+    }
+    const bp = String(req.body.bp || "").trim();
+    if (bp && !/^\d{1,3}\/\d{1,3}$/.test(bp)) return res.status(400).json({ message: "Blood pressure must use systolic/diastolic format." });
+    if (!bp && Object.values(measurements).every((value) => value === null)) return res.status(400).json({ message: "Enter at least one measured observation." });
     const row = {
       id: nid("v"),
       patientId,
       takenAt: new Date().toISOString(),
-      bp: req.body.bp || "",
-      hr: Number(req.body.hr || 0),
-      temp: Number(req.body.temp || 0),
-      spo2: Number(req.body.spo2 || 0),
-      weight: Number(req.body.weight || 0),
-      bmi: Number(req.body.bmi || 0),
+      bp,
+      ...measurements,
       recordedBy: req.authUser.name || "Clinic",
     };
     db.vitals.push(row);

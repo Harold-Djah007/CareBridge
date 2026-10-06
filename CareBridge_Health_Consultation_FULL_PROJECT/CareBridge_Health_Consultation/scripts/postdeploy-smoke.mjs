@@ -83,4 +83,4 @@ if (email || password || role) {
   console.log("• authenticated smoke path skipped (set CAREBRIDGE_SMOKE_EMAIL/PASSWORD/ROLE to enable it)");
 }
 
-console.log("CareBridge post-deploy smoke certification passed.");
+console.log("CareBridge post-deploy smoke checks passed. Live integrations and customer-network acceptance are separate checks.");

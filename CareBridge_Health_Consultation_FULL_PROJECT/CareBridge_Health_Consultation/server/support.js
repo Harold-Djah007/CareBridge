@@ -1,4 +1,5 @@
 import { mountPatientExperience } from "./patientExperience.js";
+import { newId } from "./ids.js";
 import { mountFhir } from "./fhir.js";
 import { mountClinicalOrders } from "./clinicalOrders.js";
 import { mountEnterpriseOps } from "./enterpriseOps.js";
@@ -7,7 +8,7 @@ import { mountInterop } from "./interop.js";
 import { mountClinicalSafety } from "./clinicalSafety.js";
 import { mountRevenueCycle } from "./revenueCycle.js";
 
-const nid = (p) => `${p}${Date.now()}${Math.floor(Math.random() * 900)}`;
+const nid = newId;
 const CATEGORIES = ["billing", "clinical", "technical", "account", "admissions", "other"];
 
 function requireTicketAuth(req, res, next) {

@@ -1,4 +1,5 @@
 import { isSellable, onShelf } from "./pharmacy.js";
+import { newId } from "./ids.js";
 import { tariffOf } from "./finance.js";
 
 export const stockShortage = (n) => ({
@@ -15,7 +16,7 @@ export function ensureCarts(db) {
 }
 
 function nid() {
-  return `ci${Date.now()}${Math.floor(Math.random() * 900)}`;
+  return newId("ci");
 }
 
 function actorOf(db, req) {
@@ -203,7 +204,8 @@ function upsertLine(db, cart, userId, input) {
   const productId = productIdOf(input);
   const resolved = resolveCatalogItem(db, kind, productId, userId);
   if (resolved.error) return resolved;
-  const requested = kind === "invoice" ? 1 : Math.max(1, Number(input.qty || 1) || 1);
+  const requested = kind === "invoice" ? 1 : Number(input.qty ?? 1);
+  if (!Number.isSafeInteger(requested) || requested < 1) return { error: "Quantity must be a positive whole number.", status: 400 };
   const existing = cart.items.find((row) => kindOf(row.kind) === kind && productIdOf(row) === productId);
   const nextQty = input.replace || kind === "invoice"
     ? requested
@@ -235,7 +237,8 @@ function replaceCartItems(db, cart, userId, items) {
     const productId = productIdOf(input);
     const resolved = resolveCatalogItem(db, kind, productId, userId);
     if (resolved.error) return resolved;
-    const qty = kind === "invoice" ? 1 : Math.max(1, Number(input.qty || 1) || 1);
+    const qty = kind === "invoice" ? 1 : Number(input.qty ?? 1);
+    if (!Number.isSafeInteger(qty) || qty < 1) return { error: "Quantity must be a positive whole number.", status: 400 };
     if (kind === "med") {
       if (!resolved.sellable || resolved.available <= 0) return { ...stockShortage(0), status: 409 };
       if (qty > resolved.available) return { ...stockShortage(resolved.available), status: 409 };
@@ -305,7 +308,7 @@ export function mountCart(app, { readDb, writeDb }) {
     const line = findLine(ctx.cart, req.params.itemId);
     if (!line) return res.status(404).json({ message: "That item is not in your cart." });
     const qty = Number(req.body.qty);
-    if (!Number.isFinite(qty) || qty < 0) return res.status(400).json({ message: "Quantity is required." });
+    if (!Number.isSafeInteger(qty) || qty < 0) return res.status(400).json({ message: "Quantity must be a nonnegative whole number." });
     if (qty === 0) {
       ctx.cart.items = ctx.cart.items.filter((row) => row !== line);
     } else {

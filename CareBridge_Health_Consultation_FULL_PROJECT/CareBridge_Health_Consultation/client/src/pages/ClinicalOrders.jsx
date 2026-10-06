@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import "../carebridge-clinical-orders.css";
 import {
   Activity, AlertTriangle, ArrowRight, CheckCircle2, ClipboardPlus, FlaskConical,
   Image, LoaderCircle, Pill, Search, ShieldCheck, Stethoscope, XCircle,

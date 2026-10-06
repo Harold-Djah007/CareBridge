@@ -8,8 +8,7 @@ import { Link, useOutletContext } from "react-router-dom";
 import { io } from "socket.io-client";
 import { useAuth, useToast } from "../state";
 import { api, socketOptions, socketUrl } from "../api";
-import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate, prettyDate, ghs } from "../utils";
-import { Heartbeat } from "../components/LiveMeter";
+import { firstName, formatDate, formatTime, greeting, isUpcoming, longDate, prettyDate, ghs, todayISO } from "../utils";
 import Avatar from "../components/Avatar";
 import Presence from "../components/Presence";
 import DutyToggle from "../components/DutyToggle";
@@ -122,7 +121,7 @@ function DoctorBoard({ user, appointments, wards }) {
   const { updateUser } = useAuth();
   const { push } = useToast();
   const [busy, setBusy] = useState(false);
-  const today = useMemo(() => appointments.slice().sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)), [appointments]);
+  const today = useMemo(() => appointments.filter((row) => row.date === todayISO()).sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)), [appointments]);
   const next = today.find(isUpcoming);
   const pending = wards.filter((w) => w.status === "pending").length;
   const remaining = today.filter(isUpcoming).length;
@@ -143,7 +142,7 @@ function DoctorBoard({ user, appointments, wards }) {
     <div className="cbv6-home cbv6-doctor-home">
       <header className="cbv6-clinical-header">
         <div><span className="cbv6-kicker"><HeartPulse size={14} /> {user.department || "Outpatient"} · {longDate()}</span><h1>{greeting(user.name.replace("Dr. ", "").split(" ")[0])}</h1><p>Your clinic, active patient and clinical tools are arranged around the encounter.</p></div>
-        <div className="cbv6-clinical-live"><Heartbeat /><DutyToggle available={available} disabled={busy} hint={false} onChange={toggleAvail} /></div>
+        <div className="cbv6-clinical-live"><DutyToggle available={available} disabled={busy} hint={false} onChange={toggleAvail} /></div>
       </header>
 
       <div className="cbv6-clinical-ribbon">

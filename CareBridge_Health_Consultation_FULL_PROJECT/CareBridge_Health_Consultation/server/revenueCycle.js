@@ -29,7 +29,7 @@ function claimAmount(claim) {
 }
 
 function validateLines(lines) {
-  return Array.isArray(lines) && lines.length > 0 && lines.every((line) => String(line.description || "").trim() && Number(line.amount || 0) >= 0);
+  return Array.isArray(lines) && lines.length > 0 && lines.every((line) => line && String(line.description || "").trim() && Number.isFinite(Number(line.amount)) && Number(line.amount) >= 0);
 }
 
 function audit(db, actorId, action, entityId, detail) {

@@ -482,6 +482,7 @@ function CartDrawer() {
         className={`cart-drawer ${cart.open ? "open" : ""}`}
         id="shop-basket"
         inert={!cart.open}
+        aria-hidden={!cart.open}
         role="dialog"
         aria-modal={cart.open}
         aria-label="Shopping cart"

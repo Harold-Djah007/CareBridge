@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity, BedDouble, Bell, Building2, CalendarDays, ChevronRight, ClipboardList, Command,
   Eye, FolderKanban, FolderOpen, HeartPulse, Inbox, LayoutDashboard, LifeBuoy, LogOut,
-  Mail, MessageCircle, Pill, Receipt, Search, ScrollText, Settings2,
+  Mail, Menu, MessageCircle, Pill, Receipt, Search, ScrollText, Settings2,
   ShoppingBag, Sparkles, Stethoscope, Users, Video, Wifi, X,
 } from "lucide-react";
 import { io } from "socket.io-client";
@@ -16,6 +16,7 @@ import { LiveClock } from "./LiveMeter";
 import Avatar from "./Avatar";
 import NotificationReader, { normalizeNotification } from "./NotificationReader";
 import { photoFor, sceneFor } from "../imagery";
+import useDialogFocus from "../hooks/useDialogFocus";
 
 const NAV = {
   patient: [
@@ -148,6 +149,11 @@ export default function AppShell() {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [selectedNotice, setSelectedNotice] = useState(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const paletteRef = useRef(null);
+  const workspaceRef = useRef(null);
+  useDialogFocus(paletteRef, paletteOpen, () => setPaletteOpen(false));
+  useDialogFocus(workspaceRef, workspaceOpen, () => setWorkspaceOpen(false));
   const [paletteQuery, setPaletteQuery] = useState("");
   const [connected, setConnected] = useState(false);
   const [appearance, setAppearance] = useState(readAppearance);
@@ -159,7 +165,7 @@ export default function AppShell() {
   const scenePhoto = photoFor(scene);
   const rawNav = flatNav(user.role);
   const allNav = isPatient ? rawNav.filter((item) => !item.feature || moduleVisible(item.feature)) : rawNav;
-  const mobileNav = allNav.filter((item) => item.primary).slice(0, 5);
+  const mobileNav = allNav.filter((item) => item.primary).slice(0, 4);
   const patientShopVisible = !isPatient || moduleVisible("shop");
   const patientNotificationsVisible = !isPatient || moduleVisible("notifications");
 
@@ -176,7 +182,7 @@ export default function AppShell() {
     loadBadges();
     const socket = io(socketUrl, socketOptions());
     socket.emit("join-user", user.id);
-    socket.on("connect", () => setConnected(true));
+    socket.on("connect", () => { setConnected(true); socket.emit("join-user", user.id); });
     socket.on("disconnect", () => setConnected(false));
     const refresh = () => { loadNotes(); loadBadges(); };
     socket.on("notification", (notification) => { if (notification?.title) push(notification.title); refresh(); });
@@ -215,6 +221,7 @@ export default function AppShell() {
   useEffect(() => {
     setNoticeOpen(false);
     setPaletteOpen(false);
+    setWorkspaceOpen(false);
     setPaletteQuery("");
     loadBadges();
   }, [location.pathname]);
@@ -381,14 +388,16 @@ export default function AppShell() {
         </main>
       </div>
 
-      <nav className="cbv6-mobile-nav" aria-label="Primary navigation">{mobileNav.map((item) => navLink(item, true))}</nav>
+      <nav className="cbv6-mobile-nav" aria-label="Primary navigation">{mobileNav.map((item) => navLink(item, true))}<button type="button" className="cbv6-workspace-toggle" aria-label="All workspaces" aria-expanded={workspaceOpen} onClick={() => setWorkspaceOpen(true)}><Menu size={20} /><span>More</span></button></nav>
+
+      {workspaceOpen && <div className="cbv6-workspace-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setWorkspaceOpen(false); }}><section ref={workspaceRef} className="cbv6-workspace-menu" role="dialog" aria-modal="true" aria-label="All workspaces" tabIndex="-1"><header><div><small>{roleName} workspace</small><h2>Your care, connected.</h2></div><button type="button" aria-label="Close workspaces" onClick={() => setWorkspaceOpen(false)}><X size={20} /></button></header><nav aria-label="All workspace navigation">{allNav.map((item) => <div key={item.to} onClick={() => setWorkspaceOpen(false)}>{navLink(item)}</div>)}</nav><footer><Link to="/settings" onClick={() => setWorkspaceOpen(false)}><Settings2 size={18} /> Account & preferences</Link><button type="button" onClick={() => { setWorkspaceOpen(false); logout(); navigate("/login"); }}><LogOut size={18} /> Sign out</button></footer></section></div>}
 
       <NotificationReader notice={selectedNotice} onClose={() => setSelectedNotice(null)} />
 
       {paletteOpen && (
         <div className="cbv6-palette-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPaletteOpen(false); }}>
-          <section className="cbv6-palette" role="dialog" aria-modal="true" aria-label="CareBridge command palette">
-            <header><Command size={18} /><input autoFocus value={paletteQuery} onChange={(event) => setPaletteQuery(event.target.value)} placeholder="Type a page or workspace…" /><button type="button" onClick={() => setPaletteOpen(false)}><X size={17} /></button></header>
+          <section ref={paletteRef} className="cbv6-palette" role="dialog" aria-modal="true" aria-label="CareBridge command palette">
+            <header><Command size={18} /><input autoFocus aria-label="Find a workspace" value={paletteQuery} onChange={(event) => setPaletteQuery(event.target.value)} placeholder="Type a page or workspace…" /><button type="button" aria-label="Close command palette" onClick={() => setPaletteOpen(false)}><X size={17} /></button></header>
             <div className="cbv6-palette-list">
               {paletteItems.map((item) => {
                 const Icon = item.icon;

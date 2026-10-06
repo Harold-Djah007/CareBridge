@@ -1,6 +1,7 @@
 const nonEmpty = (value) => String(value ?? "").trim();
+import { rtcConfig } from "./rtc.js";
 const truthy = (value) => ["1", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
-const number = (value) => Number.parseInt(String(value ?? ""), 10);
+const number = (value) => Number(String(value ?? "").trim());
 
 const PLACEHOLDER = /(YOUR-|replace-with|change-me|changeme|example-secret|placeholder|dummy|sample-secret)/i;
 
@@ -57,17 +58,22 @@ export function productionConfigurationReport(env = process.env) {
   }
 
   if (!nonEmpty(env.SMTP_HOST)) issues.push("SMTP_HOST is required in production.");
-  if (!Number.isFinite(smtpPort) || smtpPort < 1 || smtpPort > 65535) issues.push("SMTP_PORT must be a valid TCP port.");
+  if (!Number.isSafeInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) issues.push("SMTP_PORT must be a valid TCP port.");
   if (!nonEmpty(env.SMTP_USER)) issues.push("SMTP_USER is required in production.");
   if (!nonEmpty(env.SMTP_PASS) || PLACEHOLDER.test(nonEmpty(env.SMTP_PASS))) issues.push("SMTP_PASS must contain a real production secret.");
   if (!nonEmpty(env.SMTP_FROM)) issues.push("SMTP_FROM is required in production.");
   if (String(env.SMTP_REJECT_UNAUTHORIZED ?? "true").toLowerCase() === "false") {
-    warnings.push("SMTP_REJECT_UNAUTHORIZED=false weakens TLS certificate verification and should only be used for a controlled private relay.");
+    issues.push("SMTP_REJECT_UNAUTHORIZED must remain true in production.");
   }
+  if (!truthy(env.SMTP_SECURE) && smtpPort !== 465 && !truthy(env.SMTP_REQUIRE_TLS)) issues.push("SMTP_REQUIRE_TLS must be true when SMTP does not use implicit TLS.");
+  if (!nonEmpty(env.CAREBRIDGE_TURN_URLS)) issues.push("CAREBRIDGE_TURN_URLS is required for production video consultations.");
+  const turnSecretIssue = secretIssue("CAREBRIDGE_TURN_SECRET", env.CAREBRIDGE_TURN_SECRET, 32);
+  if (turnSecretIssue) issues.push(turnSecretIssue);
+  try { rtcConfig("configuration-check", env); } catch { issues.push("TURN relay URLs must use turn: or turns: and have a shared secret."); }
 
-  if (!Number.isFinite(sessionDays) || sessionDays < 1 || sessionDays > 7) issues.push("SESSION_DAYS must be between 1 and 7 in production.");
-  if (!Number.isFinite(sessionCap) || sessionCap < 1 || sessionCap > 8) issues.push("SESSION_MAX_PER_USER must be between 1 and 8 in production.");
-  if (!Number.isFinite(passwordMin) || passwordMin < 10) issues.push("PASSWORD_MIN_LENGTH must be at least 10 in production.");
+  if (!Number.isSafeInteger(sessionDays) || sessionDays < 1 || sessionDays > 7) issues.push("SESSION_DAYS must be between 1 and 7 in production.");
+  if (!Number.isSafeInteger(sessionCap) || sessionCap < 1 || sessionCap > 8) issues.push("SESSION_MAX_PER_USER must be between 1 and 8 in production.");
+  if (!Number.isSafeInteger(passwordMin) || passwordMin < 10) issues.push("PASSWORD_MIN_LENGTH must be at least 10 in production.");
 
   if (!truthy(env.BACKUP_REQUIRED)) warnings.push("Set BACKUP_REQUIRED=true in the deployment environment to document that automated database backups are part of the operational contract.");
   if (!truthy(env.CAREBRIDGE_BEHIND_TLS_PROXY)) warnings.push("Set CAREBRIDGE_BEHIND_TLS_PROXY=true when the production app is served behind Caddy, Cloudflare, a load balancer, or another HTTPS reverse proxy.");
@@ -85,6 +91,7 @@ export function productionConfigurationReport(env = process.env) {
       backupKey: !secretIssue("BACKUP_ENCRYPTION_KEY", env.BACKUP_ENCRYPTION_KEY, 32),
       smtp: Boolean(nonEmpty(env.SMTP_HOST) && nonEmpty(env.SMTP_USER) && nonEmpty(env.SMTP_PASS)),
       payments: Boolean(flutterwaveKey && !PLACEHOLDER.test(flutterwaveKey)),
+      videoRelay: Boolean(nonEmpty(env.CAREBRIDGE_TURN_URLS) && !turnSecretIssue),
     },
   };
 }

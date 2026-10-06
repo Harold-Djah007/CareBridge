@@ -236,7 +236,12 @@ export function installSecurity(app, { readiness } = {}) {
     let details = {};
     try { details = typeof readiness === "function" ? readiness() : {}; } catch (error) { details = { error: error.message }; }
     const persistence = details.persistence || {};
-    const ready = persistence.readable !== false && persistence.error !== true && !details.error;
+    const ready = persistence.readable !== false
+      && !persistence.error
+      && persistence.checksumValid !== false
+      && persistence.lastPing?.ok !== false
+      && !details.error
+      && (process.env.NODE_ENV !== "production" || (details.coordination?.ok === true && distributed?.ready === true));
     res.status(ready ? 200 : 503).json({
       ok: ready,
       name: "CareBridge API",

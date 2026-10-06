@@ -49,10 +49,10 @@ jobs:
           node-version: 22
 
       - name: Install server dependencies
-        run: npm install --prefix server --no-audit --no-fund
+        run: npm ci --prefix server --no-audit --no-fund
 
       - name: Install client dependencies
-        run: npm install --prefix client --no-audit --no-fund
+        run: npm ci --prefix client --no-audit --no-fund
 
       - name: Dependency fingerprint
         shell: bash
@@ -92,6 +92,27 @@ jobs:
 
       - name: Repository release hygiene audit
         run: npm run audit:release
+
+      - name: Targeted data integrity and realtime security regression
+        run: npm run test:quality && node server/ci-integration-regression.mjs && node server/ci-bootstrap-regression.mjs
+
+      - name: SMTP TLS and authentication wire regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          FIXTURE=$(mktemp -d)
+          trap 'rm -rf "$FIXTURE"' EXIT
+          openssl req -x509 -newkey rsa:2048 -nodes -keyout "$FIXTURE/key.pem" -out "$FIXTURE/cert.pem" -days 1 -subj /CN=localhost -addext subjectAltName=DNS:localhost >/dev/null 2>&1
+          NODE_EXTRA_CA_CERTS="$FIXTURE/cert.pem" CAREBRIDGE_SMTP_TEST_CERT="$FIXTURE/cert.pem" CAREBRIDGE_SMTP_TEST_KEY="$FIXTURE/key.pem" node server/ci-smtp-regression.mjs
+
+      - name: Coturn UDP and TCP wire regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME="carebridge-turn-ci-${GITHUB_RUN_ID}"
+          trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
+          docker run -d --name "$NAME" --network host coturn/coturn:4.7.0 -n --listening-ip=127.0.0.1 --relay-ip=127.0.0.1 --listening-port=3478 --realm=carebridge-ci --use-auth-secret --static-auth-secret=carebridge-ci-relay-secret-2026-strong --allow-loopback-peers --no-tls --no-dtls --no-cli --log-file=stdout --min-port=49160 --max-port=49200
+          CAREBRIDGE_TURN_URLS=turn:127.0.0.1:3478 CAREBRIDGE_TURN_SECRET=carebridge-ci-relay-secret-2026-strong node server/ci-relay-regression.mjs
 
       - name: Validate production Compose contract
         shell: bash
@@ -205,6 +226,8 @@ jobs:
             -e SMTP_PORT=587 \
             -e SMTP_SECURE=false \
             -e SMTP_REQUIRE_TLS=true \
+            -e CAREBRIDGE_TURN_URLS=turns:relay.carebridge-ci.invalid:5349?transport=tcp \
+            -e CAREBRIDGE_TURN_SECRET=carebridge-container-ci-relay-secret-2026-strong \
             -e SMTP_REJECT_UNAUTHORIZED=true \
             -e SMTP_USER=ci@carebridge.example \
             -e SMTP_PASS=carebridge-container-ci-smtp-password-2026 \

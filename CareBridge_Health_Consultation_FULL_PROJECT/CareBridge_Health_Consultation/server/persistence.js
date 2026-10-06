@@ -107,6 +107,7 @@ export function createDurableJsonStore(file, { backups = 3 } = {}) {
   }
 
   function write(db) {
+    if (!db || typeof db !== "object" || Array.isArray(db)) throw new Error("Refusing to persist an invalid CareBridge datastore.");
     const raw = `${JSON.stringify(db, null, 2)}\n`;
     const digest = sha256(raw);
     const dir = path.dirname(dataFile);

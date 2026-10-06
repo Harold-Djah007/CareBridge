@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  CalendarDays, FileText, MessageCircle, Paperclip, Search, Send, ShieldCheck,
+  CalendarDays, FileText, MessageCircle, Search, Send, ShieldCheck,
   Sparkles, Stethoscope, UserPlus, Video,
 } from "lucide-react";
 import { io } from "socket.io-client";
@@ -33,7 +33,7 @@ export default function Messages() {
   const [query, setQuery] = useState("");
   const [connected, setConnected] = useState(false);
   const endRef = useRef();
-  const fileRef = useRef();
+  const [sending, setSending] = useState(false);
   const socketRef = useRef();
   const seenRef = useRef(new Set());
 
@@ -46,10 +46,10 @@ export default function Messages() {
   });
 
   useEffect(() => {
-    loadContacts();
+    loadContacts().catch(() => push("Could not load conversations. Please refresh and retry.", "error"));
     const socket = io(socketUrl, socketOptions());
     socket.emit("join-user", user.id);
-    socket.on("connect", () => setConnected(true));
+    socket.on("connect", () => { setConnected(true); socket.emit("join-user", user.id); });
     socket.on("disconnect", () => setConnected(false));
     socket.on("doctor-status", (payload) => {
       setContacts((list) => list.map((contact) => contact.id === payload.id ? { ...contact, available: payload.available, photo: payload.photo || contact.photo } : contact));
@@ -61,7 +61,7 @@ export default function Messages() {
 
   useEffect(() => {
     const wanted = params.get("with");
-    if (wanted) loadContacts(wanted);
+    if (wanted) loadContacts(wanted).catch((error) => push(error.message, "error"));
   }, [params.get("with")]);
 
   const roomId = selected ? roomIdFor(user.id, selected.id) : "";
@@ -73,7 +73,7 @@ export default function Messages() {
       rows.forEach((message) => seenRef.current.add(message.id));
       setContacts((list) => list.map((contact) => contact.id === selected?.id ? { ...contact, unread: 0 } : contact));
       refreshBadges();
-    });
+    }).catch((error) => push(error.message, "error"));
 
     const handler = (message) => {
       if (!message?.id || seenRef.current.has(message.id)) return;
@@ -110,19 +110,20 @@ export default function Messages() {
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  const sendText = (value) => {
+  const sendText = async (value) => {
+    if (sending) return;
     if (!value.trim() || !selected) return;
+    if (!socketRef.current?.connected) return push("Wait for the live channel to reconnect before sending.", "error");
+    if (value.trim().length > 4000) return push("Messages must be 4000 characters or fewer.", "error");
     if (user.role === "nurse" && selected.role === "patient") return push("Nurses cannot message patients directly.", "error");
-    socketRef.current.emit("chat-message", { roomId, senderId: user.id, text: value.trim() });
-    setText("");
-  };
-
-  const onFile = (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    sendText(`Shared a file: ${file.name}`);
-    push(`Attached ${file.name}`);
+    setSending(true);
+    try {
+      const result = await socketRef.current.timeout(8000).emitWithAck("chat-message", { roomId, text: value.trim() });
+      if (!result?.ok) throw new Error(result?.message || "Your message could not be saved.");
+      setText((current) => current === value ? "" : current);
+    } catch (error) {
+      push(error.message || "Message delivery was not confirmed. Please check the conversation before retrying.", "error");
+    } finally { setSending(false); }
   };
 
   const visible = useMemo(() => contacts.filter((contact) => `${contact.name} ${contact.specialty || ""} ${contact.role || ""}`.toLowerCase().includes(query.toLowerCase())), [contacts, query]);
@@ -171,10 +172,8 @@ export default function Messages() {
             </div>
 
             <form className="px-composer" onSubmit={(event) => { event.preventDefault(); sendText(text); }}>
-              <input type="file" hidden ref={fileRef} aria-label="Attach message file" onChange={onFile} />
-              <button type="button" title="Attach file" aria-label="Attach file" onClick={() => fileRef.current?.click()}><Paperclip size={18} /></button>
-              <textarea aria-label="Message" rows="1" value={text} onChange={(e) => setText(e.target.value)} placeholder={selected.available === false && user.role === "patient" ? "Leave a secure message…" : "Write a message…"} />
-              <button className="send" type="submit" aria-label="Send"><Send size={18} /></button>
+              <textarea aria-label="Message" maxLength={4000} rows="1" value={text} onChange={(e) => setText(e.target.value)} placeholder={selected.available === false && user.role === "patient" ? "Leave a secure message…" : "Write a message…"} />
+              <button className="send" type="submit" aria-label="Send" disabled={sending || !connected || !text.trim()}><Send size={18} /></button>
             </form>
           </> : <div className="px-empty large"><MessageCircle size={32} /><h3>Choose a conversation</h3><p>Select a care contact to open the secure thread.</p></div>}
         </main>

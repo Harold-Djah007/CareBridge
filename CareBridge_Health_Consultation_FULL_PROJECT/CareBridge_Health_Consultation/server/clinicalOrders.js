@@ -1,4 +1,5 @@
 import { evaluateMedicationSafety } from "./clinicalSafety.js";
+import { newId } from "./ids.js";
 
 const ORDER_TYPES = new Set(["lab", "imaging", "medication", "procedure"]);
 const ORDER_STATUSES = new Set(["draft", "active", "in_progress", "completed", "cancelled"]);
@@ -10,7 +11,7 @@ const TRANSITIONS = {
   cancelled: new Set(),
 };
 
-const nid = (prefix) => `${prefix}${Date.now()}${Math.floor(Math.random() * 900)}`;
+const nid = newId;
 const cleanText = (value, fallback = "") => String(value ?? fallback).trim();
 
 function ensureOrders(db) {

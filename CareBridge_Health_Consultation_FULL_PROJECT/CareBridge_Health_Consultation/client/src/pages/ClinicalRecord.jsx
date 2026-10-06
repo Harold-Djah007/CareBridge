@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Activity, AlertTriangle, ClipboardList, CreditCard, FileHeart, FileText, FlaskConical,
@@ -52,46 +52,57 @@ export default function ClinicalRecord() {
   const setTab = (value) => setParams((current) => { const next = new URLSearchParams(current); next.set("tab", value); return next; });
 
   const [chart, setChart] = useState(null);
+  const currentPatient = useRef(patientId);
+  currentPatient.current = patientId;
   const [note, setNote] = useState({ subjective: "", objective: "", assessment: "", plan: "" });
-  const [vital, setVital] = useState({ bp: "120/80", hr: 72, temp: 36.6, spo2: 98, weight: 70 });
+  const [vital, setVital] = useState({ bp: "", hr: "", temp: "", spo2: "", weight: "" });
   const [intake, setIntake] = useState({ symptoms: "", pain: 3, medsTaken: "", redFlags: false });
 
   const load = () => {
     if (!patientId) return;
-    api(`/chart/${patientId}`).then(setChart).catch((error) => push(error.message, "error"));
+    api(`/chart/${patientId}`).then((next) => { if (next.patient?.id === currentPatient.current) setChart(next); }).catch((error) => push(error.message, "error"));
   };
-  useEffect(() => { load(); }, [patientId]);
+  useEffect(() => { setChart(null); setNote({ subjective: "", objective: "", assessment: "", plan: "" }); setVital({ bp: "", hr: "", temp: "", spo2: "", weight: "" }); load(); }, [patientId]);
 
   const clinician = user.role === "doctor" || user.role === "admin";
   const saveNote = async (event) => {
     event.preventDefault();
-    await api("/notes", { method: "POST", body: JSON.stringify({ ...note, patientId, authorId: user.id }) });
-    setNote({ subjective: "", objective: "", assessment: "", plan: "" });
-    push("Visit note filed on the record.");
-    load();
+    try {
+      await api("/notes", { method: "POST", body: JSON.stringify({ ...note, patientId, authorId: user.id }) });
+      setNote({ subjective: "", objective: "", assessment: "", plan: "" });
+      push("Visit note filed on the record.");
+      load();
+    } catch (error) { push(error.message, "error"); }
   };
   const saveVitals = async (event) => {
     event.preventDefault();
-    await api("/vitals", { method: "POST", body: JSON.stringify({ ...vital, patientId, actorId: user.id, recordedBy: user.name }) });
-    push("Vitals recorded.");
-    load();
+    try {
+      await api("/vitals", { method: "POST", body: JSON.stringify({ ...vital, patientId, actorId: user.id, recordedBy: user.name }) });
+      setVital({ bp: "", hr: "", temp: "", spo2: "", weight: "" });
+      push("Vitals recorded.");
+      load();
+    } catch (error) { push(error.message, "error"); }
   };
   const refill = async (id) => {
-    await api(`/prescriptions/${id}`, { method: "PATCH", body: JSON.stringify({ refillRequested: true, actorId: user.id }) });
-    push("Refill requested from Ridge Campus pharmacy.");
-    load();
+    try {
+      await api(`/prescriptions/${id}`, { method: "PATCH", body: JSON.stringify({ refillRequested: true, actorId: user.id }) });
+      push("Refill requested from Ridge Campus pharmacy.");
+      load();
+    } catch (error) { push(error.message, "error"); }
   };
   const submitIntake = async (event) => {
     event.preventDefault();
-    await api("/intakes", { method: "POST", body: JSON.stringify({ ...intake, patientId: user.id }) });
-    push("Pre-visit form sent to the clinic.");
-    load();
+    try {
+      await api("/intakes", { method: "POST", body: JSON.stringify({ ...intake, patientId: user.id }) });
+      push("Pre-visit form sent to the clinic.");
+      load();
+    } catch (error) { push(error.message, "error"); }
   };
 
   if (!patientId && clinician) {
     return <div className="record-empty-workspace"><PageHero scene="records" eyebrow="Electronic health record" title="Open a patient chart" lead="Choose a patient from your caseload or directory to enter their clinical workspace." /><EmptyPlate scene="records" icon={FileHeart} title="No patient selected" hint="Open a patient from Caseload to see the complete record."><button className="primary-btn" onClick={() => navigate("/care")}>Go to caseload</button></EmptyPlate></div>;
   }
-  if (!chart) return <div className="product-loading"><HeartPulse className="spin-soft" size={20} /><span>Loading clinical record…</span></div>;
+  if (!chart || chart.patient?.id !== patientId) return <div className="product-loading"><HeartPulse className="spin-soft" size={20} /><span>Loading clinical record…</span></div>;
 
   const patient = chart.patient;
   const latest = chart.vitals[0];
@@ -132,7 +143,7 @@ export default function ClinicalRecord() {
             <div className="record-summary-stack">
               <div className="record-summary-metrics">
                 <div><span className="tone-blue"><Activity size={17} /></span><small>Latest BP</small><strong>{latest?.bp || "—"}</strong><em>{latest ? prettyDate(latest.takenAt) : "No observations"}</em></div>
-                <div><span className="tone-teal"><HeartPulse size={17} /></span><small>Heart rate</small><strong>{latest?.hr ? `${latest.hr} bpm` : "—"}</strong><em>{latest ? `SpO₂ ${latest.spo2}%` : "Not recorded"}</em></div>
+                <div><span className="tone-teal"><HeartPulse size={17} /></span><small>Heart rate</small><strong>{latest?.hr ? `${latest.hr} bpm` : "—"}</strong><em>{latest?.spo2 != null ? `SpO₂ ${latest.spo2}%` : "SpO₂ not recorded"}</em></div>
                 <div><span className="tone-violet"><Pill size={17} /></span><small>Active medicines</small><strong>{activeMeds.length}</strong><em>{chart.prescriptions.length} prescriptions on file</em></div>
                 <div><span className={due.length ? "tone-amber" : "tone-green"}><CreditCard size={17} /></span><small>Account</small><strong>{due.length ? `${due.length} due` : "Clear"}</strong><em>{due.length ? money(due.reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0)) : "No unpaid invoices"}</em></div>
               </div>
@@ -152,7 +163,7 @@ export default function ClinicalRecord() {
               <section className="command-panel record-latest-panel">
                 <div className="command-panel-head"><div><span className="eyebrow">Recent clinical activity</span><h2>Latest observations and results</h2></div></div>
                 <div className="record-activity-grid">
-                  <div className="record-vitals-snapshot"><h3>{latest ? prettyDate(latest.takenAt) : "No vitals recorded"}</h3>{latest ? <div className="record-vital-grid"><div><span>BP</span><b>{latest.bp}</b></div><div><span>HR</span><b>{latest.hr}</b></div><div><span>Temp</span><b>{latest.temp}°C</b></div><div><span>SpO₂</span><b>{latest.spo2}%</b></div></div> : <p className="muted">Clinical observations will appear here.</p>}</div>
+                  <div className="record-vitals-snapshot"><h3>{latest ? prettyDate(latest.takenAt) : "No vitals recorded"}</h3>{latest ? <div className="record-vital-grid"><div><span>BP</span><b>{latest.bp || "—"}</b></div><div><span>HR</span><b>{latest.hr ?? "—"}</b></div><div><span>Temp</span><b>{latest.temp == null ? "—" : `${latest.temp}°C`}</b></div><div><span>SpO₂</span><b>{latest.spo2 == null ? "—" : `${latest.spo2}%`}</b></div></div> : <p className="muted">Clinical observations will appear here.</p>}</div>
                   <div className="record-recent-labs"><h3>Laboratory</h3>{chart.labs.slice(0, 3).map((lab) => <div key={lab.id}><span><FlaskConical size={14} /></span><div><b>{lab.name}</b><small>{lab.date} · {lab.result}</small></div><em className={lab.flag === "normal" ? "normal" : "flagged"}>{lab.flag}</em></div>)}{chart.labs.length === 0 && <p className="muted">No results on file.</p>}</div>
                 </div>
               </section>
@@ -162,7 +173,7 @@ export default function ClinicalRecord() {
           {tab === "vitals" && (
             <section className="record-section-card">
               <div className="record-section-head"><div><span className="eyebrow">Observations</span><h2>Vitals history</h2><p>Longitudinal measurements recorded by the clinical team.</p></div>{latest && <span className="record-latest-chip">Latest · {prettyDate(latest.takenAt)}</span>}</div>
-              <div className="record-table-wrap"><table className="table"><thead><tr><th>When</th><th>BP</th><th>HR</th><th>Temp</th><th>SpO₂</th><th>Weight</th><th>Recorded by</th></tr></thead><tbody>{chart.vitals.map((row) => <tr key={row.id}><td>{prettyDate(row.takenAt)}</td><td>{row.bp}</td><td>{row.hr}</td><td>{row.temp}°C</td><td>{row.spo2}%</td><td>{row.weight || "—"}</td><td>{row.recordedBy}</td></tr>)}</tbody></table></div>
+              <div className="record-table-wrap"><table className="table"><thead><tr><th>When</th><th>BP</th><th>HR</th><th>Temp</th><th>SpO₂</th><th>Weight</th><th>Recorded by</th></tr></thead><tbody>{chart.vitals.map((row) => <tr key={row.id}><td>{prettyDate(row.takenAt)}</td><td>{row.bp || "—"}</td><td>{row.hr ?? "—"}</td><td>{row.temp == null ? "—" : `${row.temp}°C`}</td><td>{row.spo2 == null ? "—" : `${row.spo2}%`}</td><td>{row.weight || "—"}</td><td>{row.recordedBy}</td></tr>)}</tbody></table></div>
               {clinician && <form className="record-entry-form" onSubmit={saveVitals}><div className="record-entry-head"><Activity size={17} /><div><b>Record new vitals</b><small>Add a new observation set to the patient chart.</small></div></div><div className="form-grid"><label>BP<input value={vital.bp} onChange={(event) => setVital({ ...vital, bp: event.target.value })} /></label><label>Heart rate<input type="number" value={vital.hr} onChange={(event) => setVital({ ...vital, hr: event.target.value })} /></label><label>Temp °C<input type="number" step="0.1" value={vital.temp} onChange={(event) => setVital({ ...vital, temp: event.target.value })} /></label><label>SpO₂<input type="number" value={vital.spo2} onChange={(event) => setVital({ ...vital, spo2: event.target.value })} /></label><label>Weight kg<input type="number" step="0.1" value={vital.weight} onChange={(event) => setVital({ ...vital, weight: event.target.value })} /></label></div><div className="modal-actions"><button className="primary-btn"><Activity size={15} /> File observations</button></div></form>}
             </section>
           )}

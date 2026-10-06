@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import "../../carebridge-patient-experience.css";
 import {
   BedDouble, Bell, CalendarDays, Check, CheckCircle2, ClipboardList, Eye, EyeOff,
   FolderOpen, HeartPulse, LayoutDashboard, LifeBuoy, MessageCircle, RefreshCw,

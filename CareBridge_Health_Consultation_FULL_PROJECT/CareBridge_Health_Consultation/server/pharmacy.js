@@ -1,6 +1,7 @@
 import { audit } from "./clinical.js";
+import { newId } from "./ids.js";
 
-const nid = (p) => `${p}${Date.now()}${Math.floor(Math.random() * 900)}`;
+const nid = newId;
 
 export const PHARMACY_CATEGORIES = [
   "Heart",
@@ -92,6 +93,7 @@ export function catalogStock(rowsOrDb) {
 }
 
 export function ensurePharmacy(db) {
+  const initializeDemoStock = db.pharmacyStock === undefined;
   let dirty = false;
   if (!Array.isArray(db.pharmacyStock)) {
     db.pharmacyStock = [];
@@ -101,7 +103,7 @@ export function ensurePharmacy(db) {
     db.pharmacyOrders = [];
     dirty = true;
   }
-  if (!db.pharmacyStock.length) {
+  if (initializeDemoStock && process.env.NODE_ENV !== "production") {
     db.pharmacyStock = SEED_STOCK.map((row) => ({ ...row }));
     dirty = true;
   } else {
@@ -112,7 +114,7 @@ export function ensurePharmacy(db) {
         dirty = true;
       }
       if (row.qty === undefined) {
-        row.qty = SEED_STOCK.find((s) => s.id === row.id)?.qty ?? 12;
+        row.qty = process.env.NODE_ENV === "production" ? 0 : (SEED_STOCK.find((s) => s.id === row.id)?.qty ?? 12);
         dirty = true;
       }
       if (row.available === undefined) {
@@ -126,7 +128,7 @@ export function ensurePharmacy(db) {
     });
   }
   const hasNurse = (db.users || []).some((u) => u.id === "n1" || u.role === "nurse" || String(u.email).toLowerCase() === SEED_NURSE.email);
-  if (!hasNurse) {
+  if (!hasNurse && process.env.NODE_ENV !== "production") {
     db.users.push({ ...SEED_NURSE });
     dirty = true;
   }
@@ -148,9 +150,11 @@ function takeStock(db, items) {
   for (const row of items || []) {
     const product = db.pharmacyStock.find((p) => p.id === row.id || p.id === row.stockId);
     if (!product || !onShelf(product)) return { error: `Unknown medicine in the order.` };
-    const qty = Math.max(1, Number(row.qty || 1));
+    const qty = Number(row.qty ?? 1);
+    if (!Number.isSafeInteger(qty) || qty < 1) return { error: "Medicine quantities must be positive whole numbers.", status: 400 };
     const available = Number(product.qty || 0);
-    if (product.available === false || available < qty) {
+    const alreadyRequested = lines.filter((line) => line.id === product.id).reduce((total, line) => total + line.qty, 0);
+    if (product.available === false || available < qty + alreadyRequested) {
       return { error: `Only ${available} units are currently available.`, status: 409, available };
     }
     lines.push({
@@ -236,6 +240,10 @@ export function mountPharmacy(app, ctx) {
     }
     const name = String(req.body.name || "").trim();
     if (!name) return res.status(400).json({ message: "Medicine name is required." });
+    if (!Number.isFinite(Number(req.body.price ?? 0)) || Number(req.body.price ?? 0) < 0
+      || !Number.isSafeInteger(Number(req.body.qty ?? 0)) || Number(req.body.qty ?? 0) < 0) {
+      return res.status(400).json({ message: "Enter a nonnegative price and a whole stock quantity." });
+    }
     const row = {
       id: nid("ph"),
       sku: String(req.body.sku || "").trim() || `SKU-${Date.now().toString().slice(-6)}`,
@@ -265,6 +273,11 @@ export function mountPharmacy(app, ctx) {
     }
     const row = db.pharmacyStock.find((p) => p.id === req.params.id);
     if (!row) return res.status(404).json({ message: "That medicine is not on the shelf." });
+    if (["price", "qty", "restock"].some((key) => req.body[key] !== undefined
+      && (!Number.isFinite(Number(req.body[key])) || Number(req.body[key]) < 0
+        || (key !== "price" && !Number.isSafeInteger(Number(req.body[key])))))) {
+      return res.status(400).json({ message: "Price must be nonnegative; stock and restock quantities must be nonnegative whole numbers." });
+    }
     ["name", "sku", "pack", "form", "category"].forEach((key) => {
       if (req.body[key] !== undefined && String(req.body[key]).trim()) row[key] = String(req.body[key]).trim();
     });

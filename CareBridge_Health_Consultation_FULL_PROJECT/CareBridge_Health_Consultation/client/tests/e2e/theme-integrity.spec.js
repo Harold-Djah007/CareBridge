@@ -188,6 +188,7 @@ test("public CareBridge pages remain free of browser and server crashes", async 
 });
 
 test("Midnight stays readable and stable across every authenticated role workspace", async ({ page, request }, testInfo) => {
+  test.setTimeout(120_000);
   test.skip(testInfo.project.name !== "desktop-chromium", "Full Midnight route sweep runs once on desktop Chromium.");
   const pageErrors = [];
   const serverErrors = [];

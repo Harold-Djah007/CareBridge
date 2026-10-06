@@ -1,4 +1,7 @@
 import "./load-env.js";
+import { rtcConfig } from "./rtc.js";
+import { ensureBootstrapAdmin } from "./bootstrap.js";
+import { newId } from "./ids.js";
 import express from "express";
 import cors from "cors";
 import fs from "fs";
@@ -45,6 +48,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_FILE = process.env.DATA_FILE ? path.resolve(process.env.DATA_FILE) : path.join(__dirname, "data", "db.json");
 const store = await createRuntimeStore(DATA_FILE);
+await ensureBootstrapAdmin(store);
 const coordination = await createCoordination();
 let coordinationStatus = await coordination.ping().catch((error) => ({ ok: false, provider: "redis", error: error.message }));
 const coordinationTimer = setInterval(async () => {
@@ -96,7 +100,7 @@ const io = new Server(server, {
 });
 
 app.disable("x-powered-by");
-app.set("trust proxy", 1);
+app.set("trust proxy", process.env.CAREBRIDGE_BEHIND_TLS_PROXY === "true" ? 1 : false);
 installSecurity(app, {
   readiness: () => ({
     persistence: store.health(),
@@ -131,10 +135,22 @@ app.use((req, res, next) => {
     if (ending) return originalEnd(...args);
     ending = true;
     Promise.resolve(store.flush())
-      .then(() => originalEnd(...args))
+      .then(() => {
+        if (["POST", "PATCH", "DELETE"].includes(req.method) && /\/(?:logout|login|security|admin\/users|users\/)/.test(req.originalUrl || "")) {
+          const db = readDb();
+          for (const socket of io.sockets.sockets.values()) {
+            const request = { headers: { authorization: `Bearer ${socket.data.token}`, "user-agent": socket.handshake.headers?.["user-agent"] || "" } };
+            const activeUser = authUserFromRequest(db, request);
+            if (!activeUser || activeUser.role !== socket.data.user?.role) socket.disconnect(true);
+          }
+        }
+        return originalEnd(...args);
+      })
       .catch((error) => {
         if (!res.headersSent) {
           res.statusCode = error?.code === "CAREBRIDGE_STALE_WRITE" ? 409 : 503;
+          res.removeHeader("Content-Length");
+          res.removeHeader("ETag");
           res.setHeader("Content-Type", "application/json; charset=utf-8");
           return originalEnd(JSON.stringify({ message: error?.code === "CAREBRIDGE_STALE_WRITE" ? "This record changed in another session. Refresh and retry." : "CareBridge could not durably save this request.", requestId: req.id }));
         }
@@ -166,6 +182,12 @@ const requireAuth = (...roles) => (req, res, next) => {
   return next();
 };
 
+
+app.get("/api/rtc/config", requireAuth("patient", "doctor", "admin"), (req, res) => {
+  res.set("Cache-Control", "no-store");
+  try { res.json(rtcConfig(req.authUser.id)); }
+  catch { res.status(503).json({ message: "Video relay is unavailable. Please contact support." }); }
+});
 
 const SOCIAL_HOSTS = {
   facebook: ["facebook.com", "fb.com"],
@@ -297,7 +319,7 @@ const markRoomRead = (db, userId, roomId) => {
 
 const notify = (db, userId, title, body) => {
   const notification = {
-    id: `n${Date.now()}${Math.floor(Math.random() * 1000)}`,
+    id: newId("n"),
     userId,
     title,
     body,
@@ -370,7 +392,7 @@ app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
   const db = readDb();
   const user = db.users.find(
-    (u) => u.email.toLowerCase() === String(email).toLowerCase() && passwordMatches(password, u.password)
+    (u) => String(u.email).toLowerCase() === String(email || "").trim().toLowerCase() && passwordMatches(password, u.password)
   );
   if (!user) return res.status(401).json({ message: "Incorrect email or password." });
   if (user.status === "inactive") {
@@ -410,6 +432,9 @@ app.post("/api/logout", requireAuth(), async (req, res) => {
 app.post("/api/register", async (req, res) => {
   const missing = requireFields(req.body, ["name", "email", "password"]);
   if (missing.length) return res.status(400).json({ message: `Please fill in ${missing.join(", ")}.` });
+  const email = String(req.body.email).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ message: "Enter a valid email address." });
+  req.body.email = email;
   const policy = validatePassword(req.body.password);
   if (!policy.ok) return res.status(400).json({ message: policy.message, passwordPolicy: policy });
   const db = readDb();
@@ -417,7 +442,7 @@ app.post("/api/register", async (req, res) => {
     return res.status(409).json({ message: "An account with that email already exists." });
   }
   const user = {
-    id: `p${Date.now()}`,
+    id: newId("p"),
     role: "patient",
     name: req.body.name.trim(),
     email: req.body.email.trim(),
@@ -663,6 +688,14 @@ app.get("/api/contacts", (req, res) => {
   res.json([...caseload, ...staff]);
 });
 
+const validAppointmentSlot = (item) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(item.date)) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(item.time))) return false;
+  const parsed = new Date(`${item.date}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === item.date
+    && ["video", "campus", "in-person"].includes(item.mode || "video")
+    && ["pending", "confirmed", "completed", "cancelled", "declined"].includes(item.status || "confirmed");
+};
+
 app.get("/api/appointments", requireAuth("patient", "doctor", "admin"), (req, res) => {
   const { userId, role } = req.query;
   const db = readDb();
@@ -678,8 +711,14 @@ app.post("/api/appointments", requireAuth("patient", "doctor", "admin"), async (
   const db = readDb();
   const doctor = db.users.find((u) => u.id === req.body.doctorId && u.role === "doctor" && u.status !== "inactive");
   if (!doctor) return res.status(400).json({ message: "Choose a doctor from the hospital directory." });
+  const patient = db.users.find((user) => user.id === req.body.patientId && user.role === "patient" && user.status !== "inactive");
+  if (!patient) return res.status(400).json({ message: "Choose an active patient account." });
+  if (!validAppointmentSlot(req.body)) return res.status(400).json({ message: "Choose a valid appointment date, time, status, and consultation type." });
+  if (db.appointments.some((item) => item.doctorId === doctor.id && item.date === req.body.date && item.time === req.body.time && !["cancelled", "declined"].includes(item.status))) {
+    return res.status(409).json({ message: "This doctor already has an appointment at that time. Choose another slot." });
+  }
   const item = {
-    id: `apt${Date.now()}`,
+    id: newId("apt"),
     patientId: req.body.patientId,
     doctorId: req.body.doctorId,
     date: req.body.date,
@@ -728,7 +767,15 @@ app.patch("/api/appointments/:id", requireAuth("patient", "doctor", "admin"), as
   const actor = req.authUser;
   const mayEdit = actor?.role === "admin" || (actor?.role === "doctor" && item.doctorId === actor.id) || (actor?.role === "patient" && item.patientId === actor.id);
   if (!mayEdit) return res.status(403).json({ message: "You cannot update this appointment." });
+  if (actor.role === "patient" && req.body.status !== undefined && req.body.status !== "cancelled") {
+    return res.status(403).json({ message: "Patients can cancel appointments; the care team manages other statuses." });
+  }
   const allowed = actor.role === "patient" ? ["status"] : ["status", "date", "time", "reason", "mode"];
+  const proposed = { ...item, ...Object.fromEntries(allowed.filter((key) => req.body[key] !== undefined).map((key) => [key, req.body[key]])) };
+  if (!validAppointmentSlot(proposed)) return res.status(400).json({ message: "Choose a valid appointment date, time, status, and consultation type." });
+  if (!["cancelled", "declined"].includes(proposed.status) && db.appointments.some((other) => other.id !== item.id && other.doctorId === item.doctorId && other.date === proposed.date && other.time === proposed.time && !["cancelled", "declined"].includes(other.status))) {
+    return res.status(409).json({ message: "This doctor already has an appointment at that time." });
+  }
   allowed.forEach((key) => { if (req.body[key] !== undefined) item[key] = req.body[key]; });
   if (req.body.status) {
     notify(db, item.patientId, `Appointment ${req.body.status}`, `Your visit on ${item.date} is now ${req.body.status}.`);
@@ -763,6 +810,11 @@ app.patch("/api/wards/:id", (req, res) => {
   const db = readDb();
   const ward = (db.wards || []).find((w) => w.id === req.params.id);
   if (!ward) return res.status(404).json({ message: "Ward not found" });
+  const capacity = Number(req.body.capacity ?? ward.capacity);
+  const available = Number(req.body.available ?? ward.available);
+  if (!Number.isSafeInteger(capacity) || !Number.isSafeInteger(available) || capacity < 0 || available < 0 || available > capacity) {
+    return res.status(400).json({ message: "Ward capacity and available beds must be whole numbers, with available beds between zero and capacity." });
+  }
   ["name", "available", "capacity", "description"].forEach((key) => {
     if (req.body[key] !== undefined) {
       ward[key] = key === "available" || key === "capacity" ? Number(req.body[key]) : req.body[key];
@@ -919,7 +971,7 @@ app.post("/api/contact", (req, res) => {
   const db = readDb();
   db.contactMessages = db.contactMessages || [];
   db.contactMessages.push({
-    id: `cm${Date.now()}`,
+    id: newId("cm"),
     name,
     email,
     phone: String(req.body.phone || "").trim(),
@@ -951,7 +1003,7 @@ app.post("/api/admin/users", (req, res) => {
   }
   const prefix = role === "admin" ? "adm" : role[0];
   const user = {
-    id: `${prefix}${Date.now()}`,
+    id: newId(prefix),
     role,
     name: req.body.name.trim(),
     email: req.body.email.trim(),
@@ -981,6 +1033,24 @@ app.patch("/api/admin/users/:id", (req, res) => {
   const db = readDb();
   const user = db.users.find((u) => u.id === req.params.id);
   if (!user) return res.status(404).json({ message: "User not found" });
+  if (req.body.role !== undefined && !["patient", "doctor", "nurse", "admin"].includes(req.body.role)) {
+    return res.status(400).json({ message: "Choose a valid account role." });
+  }
+  if (req.body.status !== undefined && !["active", "inactive"].includes(req.body.status)) {
+    return res.status(400).json({ message: "Choose a valid account status." });
+  }
+  if (req.body.email !== undefined) {
+    const email = String(req.body.email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ message: "Enter a valid email address." });
+    if (db.users.some((other) => other.id !== user.id && String(other.email).toLowerCase() === email)) {
+      return res.status(409).json({ message: "This email address already belongs to another account." });
+    }
+    req.body.email = email;
+  }
+  if (user.role === "admin" && user.status !== "inactive" && (req.body.status === "inactive" || (req.body.role && req.body.role !== "admin"))
+    && !db.users.some((other) => other.id !== user.id && other.role === "admin" && other.status !== "inactive")) {
+    return res.status(409).json({ message: "Keep at least one active hospital administrator." });
+  }
   ["name", "email", "phone", "city", "about", "specialty", "role", "status", "available", "years"].forEach((key) => {
     if (req.body[key] !== undefined && req.body[key] !== "") user[key] = req.body[key];
   });
@@ -998,73 +1068,130 @@ app.patch("/api/admin/users/:id", (req, res) => {
   res.json(safeUser(user));
 });
 
-io.use((socket, next) => {
-  const token = String(socket.handshake.auth?.token || "");
-  const db = readDb();
-  const user = authUserFromRequest(db, { headers: { authorization: token ? `Bearer ${token}` : "", "user-agent": socket.handshake.headers?.["user-agent"] || "" } });
-  if (!user) return next(new Error("Unauthorized socket connection"));
-  socket.data.user = user;
-  return next();
+io.use(async (socket, next) => {
+  try {
+    await store.refresh();
+    const token = String(socket.handshake.auth?.token || "");
+    const db = readDb();
+    const user = authUserFromRequest(db, { headers: { authorization: token ? `Bearer ${token}` : "", "user-agent": socket.handshake.headers?.["user-agent"] || "" } });
+    if (!user) return next(new Error("Unauthorized socket connection"));
+    const session = authSessionFromRequest(db, { headers: { authorization: `Bearer ${token}`, "user-agent": socket.handshake.headers?.["user-agent"] || "" } });
+    if (coordination.enabled && process.env.REDIS_SESSION_ENFORCE === "true" && !await coordination.sessionActive(session.id)) {
+      return next(new Error("Unauthorized socket connection"));
+    }
+    socket.data.token = token;
+    socket.data.user = user;
+    return next();
+  } catch { return next(new Error("CareBridge realtime services are unavailable")); }
 });
 
 io.on("connection", (socket) => {
   const signedInUser = socket.data.user;
-  const roomAllowed = (roomId) => String(roomId || "").split("-").includes(signedInUser.id);
-  socket.on("join-user", (userId) => { if (userId === signedInUser.id) socket.join(userId); });
-  socket.on("join-room", (roomId) => { if (roomAllowed(roomId)) socket.join(roomId); });
-
-  socket.on("chat-message", async (incoming) => {
-    const roomId = String(incoming?.roomId || "");
-    if (!roomAllowed(roomId)) return;
-    const message = { ...incoming, roomId, senderId: signedInUser.id };
+  const roomAllowed = (roomId) => {
+    if (typeof roomId !== "string" || roomId.length > 200) return false;
     const db = readDb();
-    const sender = db.users.find((u) => u.id === signedInUser.id);
-    const recipientId = roomId
-      .split("-")
-      .find((id) => id !== signedInUser.id);
-    const recipient = db.users.find((u) => u.id === recipientId);
-    const nursePatient = (sender?.role === "nurse" && recipient?.role === "patient")
-      || (sender?.role === "patient" && recipient?.role === "nurse");
-    if (nursePatient) return;
-    if (sender?.role === "nurse" && recipient && !["doctor", "admin"].includes(recipient.role)) return;
-    const record = { ...message, id: `m${Date.now()}`, timestamp: new Date().toISOString() };
-    db.messages.push(record);
-    if (sender && recipient?.role === "patient" && sender.role !== "patient") {
-      notify(db, recipient.id, "New care message", `${sender.name} sent you a message.`);
-      await emailPatient(db, recipient.id, {
-        type: "message",
-        subject: `New message from ${sender.name}`,
-        heading: "You have a new care message",
-        intro: `${sender.name} wrote to you on CareBridge.`,
-        details: [
-          ["From", sender.name],
-          ["Preview", String(message.text || "").slice(0, 160)],
-        ],
-        closing: "Open Messages in CareBridge to reply.",
-      });
-    }
-    writeDb(db);
-    io.to(message.roomId).emit("chat-message", record);
-    if (recipientId) {
-      io.to(recipientId).emit("chat-message", record);
-      io.to(recipientId).emit("badges-updated", { messages: unreadMessages(db, recipientId) });
-    }
-    if (message.senderId) io.to(message.senderId).emit("chat-message", record);
+    const actor = db.users.find((user) => user.id === signedInUser.id && user.status !== "inactive");
+    const peer = db.users.find((user) => user.id !== signedInUser.id && user.status !== "inactive"
+      && [signedInUser.id, user.id].sort().join("-") === roomId);
+    if (!actor || !peer) return false;
+    if ((actor.role === "nurse" && peer.role === "patient") || (actor.role === "patient" && peer.role === "nurse")) return false;
+    return actor.role !== "nurse" || ["doctor", "admin"].includes(peer.role);
+  };
+  let packetCount = 0;
+  let packetWindow = Date.now();
+  socket.use(async (_packet, next) => {
+    try {
+      if (Date.now() - packetWindow >= 60_000) { packetWindow = Date.now(); packetCount = 0; }
+      if (++packetCount > 600) return next(new Error("Too many realtime requests"));
+      await store.refresh();
+      const db = readDb();
+      const request = { headers: { authorization: `Bearer ${socket.data.token}`, "user-agent": socket.handshake.headers?.["user-agent"] || "" } };
+      const session = authSessionFromRequest(db, request);
+      const active = authUserFromRequest(db, request)
+        && (!coordination.enabled || process.env.REDIS_SESSION_ENFORCE !== "true" || await coordination.sessionActive(session?.id));
+      if (!active) { socket.disconnect(true); return next(new Error("Your session has expired")); }
+      return next();
+    } catch { return next(new Error("CareBridge realtime services are unavailable")); }
+  });
+  socket.on("join-user", (userId) => { if (userId === signedInUser.id) socket.join(userId); });
+  socket.on("join-room", async (roomId, acknowledge) => {
+    if (!roomAllowed(roomId)) { if (typeof acknowledge === "function") acknowledge({ ok: false }); return; }
+    await socket.join(roomId);
+    socket.to(roomId).emit("webrtc-participant-ready");
+    if (typeof acknowledge === "function") acknowledge({ ok: true, participants: io.sockets.adapter.rooms.get(roomId)?.size || 0 });
   });
 
-  socket.on("webrtc-offer", ({ roomId, offer }) => { if (roomAllowed(roomId)) socket.to(roomId).emit("webrtc-offer", { offer }); });
-  socket.on("webrtc-answer", ({ roomId, answer }) => { if (roomAllowed(roomId)) socket.to(roomId).emit("webrtc-answer", { answer }); });
-  socket.on("webrtc-ice", ({ roomId, candidate }) => { if (roomAllowed(roomId)) socket.to(roomId).emit("webrtc-ice", { candidate }); });
+  socket.on("chat-message", async (incoming, acknowledge) => {
+    const reply = (result) => { if (typeof acknowledge === "function") acknowledge(result); };
+    try {
+      const roomId = String(incoming?.roomId || "");
+      if (!roomAllowed(roomId)) return reply({ ok: false, message: "You cannot send to this conversation." });
+      const text = typeof incoming?.text === "string" ? incoming.text.trim() : "";
+      if (!text || text.length > 4000) return reply({ ok: false, message: "Messages must contain between 1 and 4000 characters." });
+      const message = { text, roomId, senderId: signedInUser.id };
+      const db = readDb();
+      const sender = db.users.find((u) => u.id === signedInUser.id);
+      const recipientId = roomId
+        .split("-")
+        .find((id) => id !== signedInUser.id);
+      const recipient = db.users.find((u) => u.id === recipientId);
+      const nursePatient = (sender?.role === "nurse" && recipient?.role === "patient")
+        || (sender?.role === "patient" && recipient?.role === "nurse");
+      if (nursePatient) return;
+      if (sender?.role === "nurse" && recipient && !["doctor", "admin"].includes(recipient.role)) return;
+      const record = { ...message, id: newId("m"), timestamp: new Date().toISOString() };
+      db.messages.push(record);
+      if (sender && recipient?.role === "patient" && sender.role !== "patient") {
+        notify(db, recipient.id, "New care message", `${sender.name} sent you a message.`);
+        await emailPatient(db, recipient.id, {
+          type: "message",
+          subject: `New message from ${sender.name}`,
+          heading: "You have a new care message",
+          intro: `${sender.name} wrote to you on CareBridge.`,
+          details: [
+            ["From", sender.name],
+            ["Preview", String(message.text || "").slice(0, 160)],
+          ],
+          closing: "Open Messages in CareBridge to reply.",
+        });
+      }
+      await writeDb(db);
+      await store.flush();
+      io.to(message.roomId).emit("chat-message", record);
+      if (recipientId) {
+        io.to(recipientId).emit("chat-message", record);
+        io.to(recipientId).emit("badges-updated", { messages: unreadMessages(db, recipientId) });
+      }
+      if (message.senderId) io.to(message.senderId).emit("chat-message", record);
+      reply({ ok: true, message: record });
+    } catch {
+      reply({ ok: false, message: "Your message could not be saved. Please retry." });
+    }
+  });
+
+  socket.on("webrtc-hangup", (payload, acknowledge) => { const roomId = payload?.roomId; if (roomAllowed(roomId) && socket.rooms.has(roomId)) socket.to(roomId).emit("webrtc-hangup"); if (typeof acknowledge === "function") acknowledge(); });
+  socket.on("webrtc-offer", (payload) => { const { roomId, offer } = payload || {}; if (roomAllowed(roomId) && offer?.type === "offer" && typeof offer.sdp === "string") socket.to(roomId).emit("webrtc-offer", { offer }); });
+  socket.on("webrtc-answer", (payload) => { const { roomId, answer } = payload || {}; if (roomAllowed(roomId) && answer?.type === "answer" && typeof answer.sdp === "string") socket.to(roomId).emit("webrtc-answer", { answer }); });
+  socket.on("webrtc-ice", (payload) => { const { roomId, candidate } = payload || {}; if (roomAllowed(roomId) && candidate && typeof candidate === "object") socket.to(roomId).emit("webrtc-ice", { candidate }); });
 });
 
 const dist = path.join(__dirname, "..", "client", "dist");
+app.use("/api", (_req, res) => res.status(404).json({ message: "API endpoint not found." }));
 if (fs.existsSync(dist)) {
   app.use(express.static(dist));
   app.get("/{*path}", (_, res) => res.sendFile(path.join(dist, "index.html")));
 }
 
+app.use((error, req, res, _next) => {
+  if (res.headersSent) return _next(error);
+  const status = error.code === "CAREBRIDGE_STALE_WRITE" ? 409 : error.type === "entity.parse.failed" ? 400 : error.type === "entity.too.large" ? 413 : 500;
+  const message = status === 409 ? "This record changed in another session. Refresh and retry." : status === 400 ? "Request body must contain valid JSON." : status === 413 ? "Request body is too large." : "CareBridge could not complete this request.";
+  console.error(JSON.stringify({ level: "error", event: "request_error", requestId: req.id, message: error.message }));
+  res.status(status).json({ message, requestId: req.id });
+});
+
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`CareBridge server running on http://localhost:${PORT} · ${store.provider}${coordination.enabled ? " · Redis" : ""}`));
+server.listen(PORT, "0.0.0.0", () => console.log(`CareBridge server running on http://localhost:${PORT} · ${store.provider}${coordination.enabled ? " · Redis" : ""}`));
 
 let shuttingDown = false;
 const shutdown = async (signal) => {

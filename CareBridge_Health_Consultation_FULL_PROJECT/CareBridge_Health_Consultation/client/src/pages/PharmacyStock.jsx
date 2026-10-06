@@ -22,7 +22,7 @@ export default function PharmacyStock() {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
 
-  const load = () => api("/pharmacy/stock?manage=1").then(setStock);
+  const load = () => api("/pharmacy/stock?manage=1").then(setStock).catch((error) => push(error.message, "error"));
   useEffect(() => {
     load();
     api("/pharmacy/categories").then(setCategories).catch(() => {});
