@@ -110,9 +110,13 @@ jobs:
         run: |
           set -euo pipefail
           NAME="carebridge-turn-ci-${GITHUB_RUN_ID}"
-          trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
-          docker run -d --name "$NAME" --network host coturn/coturn:4.7.0 -n --listening-ip=127.0.0.1 --relay-ip=127.0.0.1 --listening-port=3478 --realm=carebridge-ci --use-auth-secret --static-auth-secret=carebridge-ci-relay-secret-2026-strong --allow-loopback-peers --no-tls --no-dtls --no-cli --log-file=stdout --min-port=49160 --max-port=49200
-          CAREBRIDGE_TURN_URLS=turn:127.0.0.1:3478 CAREBRIDGE_TURN_SECRET=carebridge-ci-relay-secret-2026-strong node server/ci-relay-regression.mjs
+          NETWORK="${NAME}-network"
+          IMAGE="carebridge-relay-ci:${GITHUB_RUN_ID}"
+          trap 'docker logs "$NAME" 2>/dev/null || true; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker network rm "$NETWORK" >/dev/null 2>&1 || true' EXIT
+          docker build -f Dockerfile.quality -t "$IMAGE" .
+          docker network create "$NETWORK"
+          docker run -d --name "$NAME" --network "$NETWORK" coturn/coturn:4.7.0 -n --listening-ip=0.0.0.0 --listening-port=3478 --realm=carebridge-ci --use-auth-secret --static-auth-secret=carebridge-ci-relay-secret-2026-strong --no-tls --no-dtls --no-cli --log-file=stdout --min-port=49160 --max-port=49200
+          docker run --rm --ipc=host --network "$NETWORK" -e CAREBRIDGE_TURN_URLS="turn:${NAME}:3478" -e CAREBRIDGE_TURN_SECRET=carebridge-ci-relay-secret-2026-strong "$IMAGE" node server/ci-relay-regression.mjs
 
       - name: Validate production Compose contract
         shell: bash
