@@ -1,0 +1,2 @@
+.carebridge-demo-notice { position: fixed; bottom: 0; inset-inline: 0; z-index: 20000; padding: 8px 14px; background: #17363c; color: #fff; text-align: center; font: 12px/1.5 system-ui, sans-serif; box-shadow: 0 -2px 12px #0003; pointer-events: none; }
+body:has(.carebridge-demo-notice) { padding-bottom: 52px; }

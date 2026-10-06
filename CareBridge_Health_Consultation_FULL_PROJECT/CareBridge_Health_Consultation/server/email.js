@@ -17,6 +17,7 @@ const escapeHtml = (value) => String(value ?? "")
 async function getTransport() {
   if (transportPromise) return transportPromise;
   transportPromise = (async () => {
+    if (process.env.CAREBRIDGE_DEMO === "true") return { mode: "none", transporter: null };
     if (process.env.SMTP_HOST) {
       return {
         mode: "smtp",

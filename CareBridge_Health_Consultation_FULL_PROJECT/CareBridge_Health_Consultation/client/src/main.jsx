@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import "./styles.css";
+import "./demo.css";
 import "./carebridge-refresh.css";
 import "./carebridge-field.css";
 import "./carebridge-live.css";
@@ -164,7 +165,7 @@ function AppRoutes() {
 }
 
 function App() {
-  return <ErrorBoundary><AuthProvider><ToastProvider><PatientExperienceProvider><AppRoutes /></PatientExperienceProvider></ToastProvider></AuthProvider></ErrorBoundary>;
+  return <><ErrorBoundary><AuthProvider><ToastProvider><PatientExperienceProvider><AppRoutes /></PatientExperienceProvider></ToastProvider></AuthProvider></ErrorBoundary>{import.meta.env.VITE_CAREBRIDGE_DEMO === "true" && <aside className="carebridge-demo-notice" aria-label="Demo notice"><strong>CareBridge demo</strong> · Sample data resets on restart. Use fictional information. Live payments and email are disabled.</aside>}</>;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
