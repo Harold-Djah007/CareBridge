@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { createRequire } from "node:module";
 import { smtpOptions, assertAcceptedEmail } from "./smtp.js";
 import { productionConfigurationReport } from "./productionConfig.js";
-import { paymentMatchesVerification, validFlutterwaveWebhook, verifyFlutterwaveTransaction } from "./flutterwave.js";
+import { flutterwaveStatus, startFlutterwavePayment, paymentMatchesVerification, validFlutterwaveWebhook, verifyFlutterwaveTransaction } from "./flutterwave.js";
 import { verifySmtp, verifyPayment } from "../scripts/integration-checks.mjs";
 
 const secure = smtpOptions({ NODE_ENV: "production", SMTP_REJECT_UNAUTHORIZED: "false", SMTP_REQUIRE_TLS: "false" });
@@ -47,6 +47,48 @@ const require = createRequire(import.meta.url);
 const nodemailer = require("nodemailer");
 const originalTransport = nodemailer.createTransport;
 try {
+  const charge = { ...payment, id: "payment-1", patientId: "patient-1", invoiceIds: ["invoice-1"], phone: "0240000000" };
+  const user = { email: "patient@example.invalid", name: "Test Patient" };
+  const req = { get: () => null, protocol: "https", ip: "127.0.0.1" };
+  for (const method of ["card", "momo", "bank"]) {
+    globalThis.fetch = async (url, options) => {
+      assert.equal(options.method, "POST");
+      assert.equal(options.headers.Authorization, `Bearer ${env.FLW_SECRET_KEY}`);
+      const body = JSON.parse(options.body);
+      assert.equal(body.tx_ref, payment.reference);
+      assert.equal(body.amount, "20.00");
+      assert.equal(body.currency, "GHS");
+      assert.equal(body.meta.patient_id, charge.patientId);
+      if (method === "card") {
+        assert.ok(url.endsWith("/payments"));
+        assert.equal(body.payment_options, "card");
+        return { ok: true, json: async () => ({ data: { link: "https://checkout.flutterwave.com/test" } }) };
+      }
+      if (method === "momo") {
+        assert.ok(url.endsWith("/charges?type=mobile_money_ghana"));
+        assert.equal(body.network, "VODAFONE");
+        assert.equal(body.phone_number, charge.phone);
+        return { ok: true, json: async () => ({ data: { id: 123, status: "pending" } }) };
+      }
+      assert.ok(url.endsWith("/charges?type=bank_transfer"));
+      assert.equal(body.bank_transfer_options.expires, 3600);
+      return { ok: true, json: async () => ({ data: { id: 123 }, meta: { authorization: { transfer_account: "0000000000", transfer_bank: "Test bank", transfer_amount: 20 } } }) };
+    };
+    const result = await startFlutterwavePayment({ req, user, payment: { ...charge, method, network: "telecel" } });
+    assert.equal(result.mode, { card: "redirect", momo: "pending", bank: "bank_transfer" }[method]);
+    if (method === "bank") assert.equal(result.bankTransfer.account, "0000000000");
+  }
+  const originalDemo = process.env.CAREBRIDGE_DEMO;
+  try {
+    process.env.CAREBRIDGE_DEMO = "true";
+    assert.equal(flutterwaveStatus().configured, false);
+    globalThis.fetch = async () => { assert.fail("Demo must never contact the payment provider"); };
+    await assert.rejects(() => startFlutterwavePayment({ req, user, payment: { ...charge, method: "card" } }), { status: 503 });
+  } finally {
+    if (originalDemo === undefined) delete process.env.CAREBRIDGE_DEMO;
+    else process.env.CAREBRIDGE_DEMO = originalDemo;
+  }
+  console.log("✓ card checkout, Ghana Mobile Money and bank transfer contracts; demo blocks provider charges even with credentials");
   globalThis.fetch = async (url, options) => {
     assert.ok(url.endsWith("/transactions/123/verify"));
     assert.equal(options.method, "GET");
