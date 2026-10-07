@@ -13,7 +13,7 @@ function MapEditor({ title, note, values, onChange, extra }) {
       <h3>{title}</h3>
       {note && <p className="muted">{note}</p>}
       {extra}
-      <table className="table">
+      <div className="table-scroll" role="region" aria-label={`${title} fees`} tabIndex="0"><table className="table">
         <thead><tr><th>Item</th><th>Fee (GHS)</th></tr></thead>
         <tbody>
           {Object.entries(values || {}).map(([name, fee]) => (
@@ -22,6 +22,7 @@ function MapEditor({ title, note, values, onChange, extra }) {
               <td>
                 <input
                   className="stock-input"
+                  aria-label={`${name} fee in GHS`}
                   type="number"
                   min="0"
                   value={fee}
@@ -31,7 +32,7 @@ function MapEditor({ title, note, values, onChange, extra }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </section>
   );
 }
@@ -41,7 +42,7 @@ function RowsEditor({ title, rows, fields, onChange }) {
   return (
     <section className="card">
       <h3>{title}</h3>
-      <table className="table">
+      <div className="table-scroll" role="region" aria-label={`${title} editor`} tabIndex="0"><table className="table">
         <thead>
           <tr>
             {fields.map((f) => <th key={f.key}>{f.label}</th>)}
@@ -53,10 +54,11 @@ function RowsEditor({ title, rows, fields, onChange }) {
               {fields.map((f) => (
                 <td key={f.key}>
                   {f.type === "check" ? (
-                    <input type="checkbox" checked={Boolean(row[f.key])} onChange={(e) => setRow(i, { [f.key]: e.target.checked })} />
+                    <input type="checkbox" aria-label={`${row.name || title} ${f.label}`} checked={Boolean(row[f.key])} onChange={(e) => setRow(i, { [f.key]: e.target.checked })} />
                   ) : (
                     <input
                       className={f.type === "number" ? "stock-input" : ""}
+                      aria-label={`${row.name || title} ${f.label}`}
                       type={f.type || "text"}
                       min={f.type === "number" ? 0 : undefined}
                       value={row[f.key] ?? ""}
@@ -68,7 +70,7 @@ function RowsEditor({ title, rows, fields, onChange }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </section>
   );
 }

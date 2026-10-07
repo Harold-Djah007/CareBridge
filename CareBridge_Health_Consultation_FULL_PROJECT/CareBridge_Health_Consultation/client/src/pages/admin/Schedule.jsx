@@ -53,8 +53,8 @@ export default function AdminSchedule() {
             <time><strong>{formatTime(appointment.time)}</strong><small>{formatDate(appointment.date)}</small></time>
             <div className="px-clinic-person"><Avatar person={appointment.patient} /><span><strong>{appointment.patient?.name || "Patient"}</strong><small>{appointment.patient?.mrn || "Patient record"}</small></span></div>
             <div className="px-clinic-person"><Avatar person={appointment.doctor} /><span><strong>{appointment.doctor?.name || "Clinician"}</strong><small>{appointment.doctor?.specialty || "Consultant"}</small></span></div>
-            <div><strong>{appointment.reason || "Consultation"}</strong><small>{appointment.mode === "video" ? "Teleconsult" : "Ridge Campus"}</small></div>
-            <div><span className={`status ${appointment.status}`}>{appointment.status}</span></div>
+            <div className="px-clinic-visit"><strong>{appointment.reason || "Consultation"}</strong><small>{appointment.mode === "video" ? "Teleconsult" : "Ridge Campus"}</small></div>
+            <div className="px-clinic-state"><span className={`status ${appointment.status}`}>{appointment.status}</span></div>
             <div className="px-clinic-actions">{appointment.status === "pending" && <button className="approve" type="button" onClick={() => update(appointment.id, "confirmed")}><CheckCircle2 size={14} /> Confirm</button>}{!["completed","cancelled"].includes(appointment.status) && <button type="button" onClick={() => update(appointment.id, "completed")}>Complete</button>}{appointment.status !== "cancelled" && <button className="danger" type="button" aria-label={`Cancel appointment for ${appointment.patient?.name || "patient"}`} onClick={() => update(appointment.id, "cancelled")}><XCircle size={14} /></button>}</div>
           </article>)}
           {visible.length === 0 && <div className="px-empty"><Stethoscope size={28} /><h3>No encounters match this view</h3></div>}

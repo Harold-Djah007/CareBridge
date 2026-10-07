@@ -116,7 +116,7 @@ export default function Alerts() {
       </section>
 
       <section className="px-notice-toolbar">
-        <label><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search notifications" /></label>
+        <label><Search size={15} /><input aria-label="Search notifications" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search notifications" /></label>
         <div className="px-segmented">{["all", "appointment", "ward", "message", "account", "support", "test"].map((item) => <button key={item} type="button" className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>)}</div>
       </section>
 

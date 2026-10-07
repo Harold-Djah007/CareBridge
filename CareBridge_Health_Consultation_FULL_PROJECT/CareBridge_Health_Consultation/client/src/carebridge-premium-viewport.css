@@ -435,8 +435,8 @@ body:has(.cbv6-palette-backdrop) {
 .cbv6-theme-midnight .px-clinic-head { background: var(--v6-canvas-2) !important; }
 .cbv6-theme-midnight .px-clinic-row:hover { background: var(--v6-accent-soft) !important; }
 
-@media (max-width: 1180px) {
-  .cbv6-app .px-clinic-head { display: none; }
+@container (max-width: 1100px) {
+  .cbv6-app .px-clinic-head, .cbv6-app .px-clinic-columns { display: none; }
   .cbv6-app .px-clinic-list {
     padding: 12px;
     display: grid;
@@ -457,7 +457,7 @@ body:has(.cbv6-palette-backdrop) {
   .cbv6-app .px-clinic-row:hover { transform: translateY(-1px); }
   .cbv6-app .px-clinic-person,
   .cbv6-app .px-clinic-visit { grid-column: 2; }
-  .cbv6-app .px-clinic-row > .status { grid-column: 1; grid-row: 2; }
+  .cbv6-app .px-clinic-row > .px-clinic-state { grid-column: 1; grid-row: 2; }
   .cbv6-app .px-clinic-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: 9px; border-top: 1px solid var(--v6-line); }
 }
 

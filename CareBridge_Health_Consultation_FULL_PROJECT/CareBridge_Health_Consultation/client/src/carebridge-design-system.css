@@ -145,4 +145,46 @@ body{font-family:var(--cb-font);-webkit-font-smoothing:antialiased}
   .cbv6-app .px-consent > span { min-width: 0; }
   .cbv6-app .px-enter-room { min-height: 46px; }
 }
+/* Intrinsic form and grid widths must never enlarge a portal page. */
+.cbv6-content :is(.px-page,.cbx-settings-page,.cbx-settings-shell,.cbx-settings-document-head,.cbx-settings-section-head,.photo-picker,.dashboard-grid,.cb-order-page,.cb-order-workspace)>*{min-width:0}
+.cbv6-content :is(input,select,textarea){min-width:0;max-width:100%}
+.cbv6-content :is(.cbx-settings-profile-line,.photo-picker,.photo-picker .grow,.px-notice-toolbar,.cb-order-toolbar){min-width:0;max-width:100%}
+.cbv6-content .table-scroll{width:100%;min-width:0;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.cbv6-content .px-clinic-board{container-type:inline-size}
+.cbv6-content .px-clinic-row>div{min-width:0;overflow-wrap:anywhere}
+.cbv6-content .cb-order-workspace{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)}
+.cbv6-content :is(.cb-order-head,.cb-order-patientbar)>div{min-width:0}
+.cbv6-content :is(.cb-order-head,.cb-order-patientbar,.cbx-settings-document-head,.cbx-settings-inline-setting) :is(p,strong,small){overflow-wrap:anywhere}
+.cbv6-content .px-notice-toolbar input{width:100%;min-width:0}
+.cbv6-content .px-stock-radar small{max-width:100%;padding-inline:12px;line-height:1.4;white-space:normal}
+.cbv6-content .px-stock-check{flex-direction:row;min-height:44px}
+.cbv6-content .px-stock-check input{width:18px;height:18px;flex:0 0 18px;margin:0}
+@media(max-width:1150px){.cbv6-content .cb-order-workspace{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:980px){
+  .cbv6-app .cbv6-patient-dock{display:none}
+  .cbv6-app .cbv6-content{padding-bottom:calc(100px + env(safe-area-inset-bottom))!important}
+  .cbv6-mobile-nav .cbv6-nav-link>span:not(.cbv6-nav-icon){max-width:100%;line-height:1.15;text-align:center;white-space:normal;overflow-wrap:normal;font-size:10px!important}
+  .cbv6-mobile-nav .cbv6-workspace-toggle{font-size:10px}
+  .cbv6-content .cbv6-warroom-radar{min-width:0;width:100%;justify-content:center}
+  .cbv6-content .ops-radar-card{width:min(280px,100%);max-width:100%}
+}
+@media(max-width:700px){
+  .cbv6-app .cbv6-context-strip{display:none}
+  .cbv6-content :is(.px-notice-centre,.cbx-settings-shell,.cb-order-page){min-width:0;width:100%}
+  .cbv6-content :is(.px-segmented,.px-report-tabs){width:100%;max-width:100%;flex-wrap:wrap}
+  .cbv6-content :is(.px-segmented,.px-report-tabs)>button{min-height:40px;flex:1 1 auto;justify-content:center}
+  .cbv6-content .cb-order-head{flex-direction:column;align-items:stretch;padding:20px;gap:14px}
+  .cbv6-content .cb-order-patient-select{width:100%;min-width:0}
+  .cbv6-content .cb-order-patient-select select{width:100%;max-width:100%}
+  .cbv6-content .cb-order-signals{width:100%;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cbv6-content .cb-order-toolbar input{min-width:0;width:100%}
+  .cbv6-content :is(.cbx-settings-profile-line,.photo-picker){flex-direction:column;align-items:flex-start}
+  .cbv6-content .cbx-settings-document-head>div{flex:1;min-width:0}
+  .cbv6-content .cbx-settings-document-head>svg{flex-shrink:0}
+  .cbv6-content :is(.cbx-settings-inline-setting,.cbx-settings-section-head){flex-wrap:wrap;gap:12px}
+  .cbv6-content .cbx-settings-form-grid{grid-template-columns:minmax(0,1fr)}
+  .cbv6-content #tariff-form .dashboard-grid{grid-template-columns:minmax(0,1fr)}
+  .cbv6-content .px-clinic-toolbar{grid-template-columns:minmax(0,1fr)}
+  .cbv6-content .px-clinic-actions{flex-wrap:wrap}
+}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}

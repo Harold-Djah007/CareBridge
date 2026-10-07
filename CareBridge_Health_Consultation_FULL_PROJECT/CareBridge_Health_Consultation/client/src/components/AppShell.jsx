@@ -87,6 +87,15 @@ const NAV = {
   ],
 };
 
+// Short visible labels keep the five-item mobile dock readable; aria-label retains
+// the full destination name for assistive technology and keyboard navigation.
+const COMPACT_LABELS = {
+  "Appointments": "Visits", "Health record": "Records", "Clinical home": "Home",
+  "Caseload": "Patients", "Dispensing board": "Dispense", "Clinical orders": "Orders",
+  "Inventory": "Stock", "Clinical messages": "Messages", "Operations home": "Home",
+  "Capacity & beds": "Beds", "Clinic operations": "Clinic",
+};
+
 const PAGE_META = [
   ["/admin/patient-experience", "Patient experience", "Choose what patients see in CareBridge"],
   ["/admin/reports", "Analytics & audit", "Operational intelligence and governance"],
@@ -270,11 +279,12 @@ export default function AppShell() {
       <NavLink
         key={`${compact ? "compact-" : ""}${item.to}`}
         to={item.to}
+        aria-label={item.label}
         end={item.end}
         className={({ isActive }) => `cbv6-nav-link ${isActive ? "is-active" : ""}`}
       >
         <span className="cbv6-nav-icon"><Icon size={compact ? 19 : 18} /></span>
-        <span>{item.label}</span>
+        <span>{compact ? (COMPACT_LABELS[item.label] || item.label) : item.label}</span>
         {shown > 0 && <b>{shown > 99 ? "99+" : shown}</b>}
       </NavLink>
     );

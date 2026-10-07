@@ -221,35 +221,35 @@
    The route frame intentionally receives the highest local stacking context while a
    modal is mounted, because fixed descendants cannot otherwise outrank a sticky
    patient dock if an ancestor has established a stacking context. */
-body:has(.px-modal-backdrop) {
+body:has(:is(.px-modal-backdrop,.cb-order-modal)) {
   overflow: hidden !important;
   overscroll-behavior: none;
 }
 
-.cbv6-app:has(.px-modal-backdrop) .cbv6-shell,
-.cbv6-app:has(.px-modal-backdrop) .cbv6-main,
-.cbv6-app:has(.px-modal-backdrop) .cbv6-content,
-.cbv6-app:has(.px-modal-backdrop) .cbv6-route-frame {
+.cbv6-app:has(:is(.px-modal-backdrop,.cb-order-modal)) .cbv6-shell,
+.cbv6-app:has(:is(.px-modal-backdrop,.cb-order-modal)) .cbv6-main,
+.cbv6-app:has(:is(.px-modal-backdrop,.cb-order-modal)) .cbv6-content,
+.cbv6-app:has(:is(.px-modal-backdrop,.cb-order-modal)) .cbv6-route-frame {
   position: relative;
   z-index: 10000 !important;
 }
 
-.cbv6-app:has(.px-modal-backdrop) .cbv6-route-frame {
+.cbv6-app:has(:is(.px-modal-backdrop,.cb-order-modal)) .cbv6-route-frame {
   animation: none !important;
   opacity: 1 !important;
   transform: none !important;
   filter: none !important;
 }
 
-.cbv6-app:has(.px-modal-backdrop) .cbv6-topbar,
-.cbv6-app:has(.px-modal-backdrop) .cbv6-patient-dock,
-.cbv6-app:has(.px-modal-backdrop) .cbv6-mobile-nav,
-.cbv6-app:has(.px-modal-backdrop) .cbv6-context-strip {
+.cbv6-app:has(:is(.px-modal-backdrop,.cb-order-modal)) .cbv6-topbar,
+.cbv6-app:has(:is(.px-modal-backdrop,.cb-order-modal)) .cbv6-patient-dock,
+.cbv6-app:has(:is(.px-modal-backdrop,.cb-order-modal)) .cbv6-mobile-nav,
+.cbv6-app:has(:is(.px-modal-backdrop,.cb-order-modal)) .cbv6-context-strip {
   z-index: 1 !important;
   pointer-events: none !important;
 }
 
-.cbv6-app:has(.px-modal-backdrop) .cbv6-patient-dock-inner {
+.cbv6-app:has(:is(.px-modal-backdrop,.cb-order-modal)) .cbv6-patient-dock-inner {
   pointer-events: none !important;
 }
 
