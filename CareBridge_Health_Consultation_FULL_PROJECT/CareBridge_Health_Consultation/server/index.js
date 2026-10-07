@@ -101,7 +101,7 @@ const io = new Server(server, {
 
 app.disable("x-powered-by");
 app.set("trust proxy", process.env.CAREBRIDGE_BEHIND_TLS_PROXY === "true" ? 1 : false);
-installSecurity(app, {
+const securityGuards = installSecurity(app, {
   readiness: () => ({
     persistence: store.health(),
     coordination: coordinationStatus,
@@ -388,7 +388,7 @@ app.get("/api/health", (req, res) => res.json({
   coordination: coordinationStatus.provider || "none",
 }));
 
-app.post("/api/login", async (req, res) => {
+app.post("/api/login", securityGuards.checkLogin, async (req, res) => {
   const { email, password } = req.body;
   const db = readDb();
   const user = db.users.find(

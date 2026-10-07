@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CircleAlert, CircleCheck, LoaderCircle, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import { api } from "../api";
@@ -9,28 +9,40 @@ export default function PaymentStatus() {
   const [payment, setPayment] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
+  const requestRef = useRef(null);
 
   const load = async (refresh = false) => {
+    if (requestRef.current) return;
+    const controller = new AbortController();
+    requestRef.current = controller;
     try {
-      const result = await api(`/finance/payments/${encodeURIComponent(id)}/status${refresh ? "?refresh=1" : ""}`);
+      const result = await api(`/finance/payments/${encodeURIComponent(id)}/status${refresh ? "?refresh=1" : ""}`, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       setPayment(result.payment);
       setError("");
       return result.payment;
     } catch (err) {
-      setError(err.message);
+      if (!controller.signal.aborted) setError(err.message);
       return null;
-    } finally { setBusy(false); }
+    } finally {
+      if (requestRef.current === controller) requestRef.current = null;
+      if (!controller.signal.aborted) setBusy(false);
+    }
   };
 
   useEffect(() => {
     let active = true;
-    load(true);
-    const timer = window.setInterval(async () => {
-      if (!active || payment?.status === "paid" || payment?.status === "failed") return;
-      await load(true);
-    }, 8000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [id, payment?.status]);
+    let timer;
+    setPayment(null);
+    setError("");
+    setBusy(true);
+    const poll = async () => {
+      const result = await load(true);
+      if (active && !["paid", "failed"].includes(result?.status)) timer = window.setTimeout(poll, 8000);
+    };
+    poll();
+    return () => { active = false; window.clearTimeout(timer); requestRef.current?.abort(); requestRef.current = null; };
+  }, [id]);
 
   const bank = payment?.bankTransfer;
   const paid = payment?.status === "paid";

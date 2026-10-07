@@ -93,6 +93,9 @@ jobs:
       - name: Repository release hygiene audit
         run: npm run audit:release
 
+      - name: Backup and restore script safety
+        run: node server/ci-backup-scripts.mjs
+
       - name: Targeted data integrity and realtime security regression
         run: npm run test:quality && node server/ci-integration-regression.mjs && node server/ci-bootstrap-regression.mjs
 
@@ -139,14 +142,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp server/data/db.json /tmp/carebridge-ci-db.json
+          cp server/tests/fixtures/demo.json /tmp/carebridge-ci-db.json
           DATA_FILE=/tmp/carebridge-ci-db.json PORT=5055 LOG_LEVEL=silent node server/ci-role-regression.mjs
 
       - name: Security and persistence regression
         shell: bash
         run: |
           set -euo pipefail
-          cp server/data/db.json /tmp/carebridge-security-ci-db.json
+          cp server/tests/fixtures/demo.json /tmp/carebridge-security-ci-db.json
           DATA_FILE=/tmp/carebridge-security-ci-db.json PORT=5056 LOG_LEVEL=silent node server/ci-security-regression.mjs
 
       - name: PostgreSQL enterprise persistence regression
@@ -155,7 +158,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carebridge_ci
         run: |
           set -euo pipefail
-          cp server/data/db.json /tmp/carebridge-postgres-ci-db.json
+          cp server/tests/fixtures/demo.json /tmp/carebridge-postgres-ci-db.json
           DATA_FILE=/tmp/carebridge-postgres-ci-db.json node server/ci-postgres-regression.mjs
 
       - name: Enterprise 9.5 interoperability clinical finance and Redis regression
@@ -165,7 +168,7 @@ jobs:
           MFA_ENCRYPTION_KEY: ci-carebridge-mfa-encryption-key-2026
         run: |
           set -euo pipefail
-          cp server/data/db.json /tmp/carebridge-enterprise95-ci-db.json
+          cp server/tests/fixtures/demo.json /tmp/carebridge-enterprise95-ci-db.json
           DATA_FILE=/tmp/carebridge-enterprise95-ci-db.json PORT=5057 LOG_LEVEL=silent node server/ci-enterprise95-regression.mjs
 
       - name: PostgreSQL primary runtime restart regression
@@ -175,7 +178,7 @@ jobs:
           MFA_ENCRYPTION_KEY: ci-carebridge-mfa-encryption-key-2026
         run: |
           set -euo pipefail
-          cp server/data/db.json /tmp/carebridge-runtime-postgres-ci-db.json
+          cp server/tests/fixtures/demo.json /tmp/carebridge-runtime-postgres-ci-db.json
           DATA_FILE=/tmp/carebridge-runtime-postgres-ci-db.json LOG_LEVEL=silent node server/ci-runtime-postgres.mjs
 
       - name: Encrypted PostgreSQL disaster-recovery drill
@@ -185,7 +188,7 @@ jobs:
           BACKUP_ENCRYPTION_KEY: ci-carebridge-backup-key-2026
         run: |
           set -euo pipefail
-          cp server/data/db.json /tmp/carebridge-dr-ci-db.json
+          cp server/tests/fixtures/demo.json /tmp/carebridge-dr-ci-db.json
           DATA_FILE=/tmp/carebridge-dr-ci-db.json node server/ci-disaster-recovery.mjs
 
       - name: Production-mode release certification
@@ -195,7 +198,7 @@ jobs:
           REDIS_URL: redis://127.0.0.1:6379
         run: |
           set -euo pipefail
-          cp server/data/db.json /tmp/carebridge-production-ci-db.json
+          cp server/tests/fixtures/demo.json /tmp/carebridge-production-ci-db.json
           DATA_FILE=/tmp/carebridge-production-ci-db.json node server/ci-production-release.mjs
 
       - name: Built production container runtime smoke
@@ -262,14 +265,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp server/data/db.json /tmp/carebridge-load-ci-db.json
+          cp server/tests/fixtures/demo.json /tmp/carebridge-load-ci-db.json
           DATA_FILE=/tmp/carebridge-load-ci-db.json PORT=5062 LOG_LEVEL=silent CI_P95_BUDGET_MS=1000 node server/ci-load-slo-regression.mjs
 
       - name: Browser UX quality regression across desktop and mobile
         shell: bash
         run: |
           set -euo pipefail
-          cp server/data/db.json /tmp/carebridge-browser-ci-db.json
+          cp server/tests/fixtures/demo.json /tmp/carebridge-browser-ci-db.json
           CAREBRIDGE_E2E_DATA_FILE=/tmp/carebridge-browser-ci-db.json npm run quality:e2e --prefix client
 
       - name: Preserve browser failure evidence

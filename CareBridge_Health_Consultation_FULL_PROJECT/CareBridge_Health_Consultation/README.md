@@ -54,6 +54,8 @@ Open:
 - Frontend: `http://localhost:5173`
 - API: `http://localhost:5000`
 
+If port 5000 is occupied, `npm run dev` selects a free API port and points the frontend and live connection at it. Vite prints the actual frontend URL if 5173 is occupied. Existing processes are left running. To require a specific API port, set `PORT` before starting; an occupied explicit port produces a clear startup error.
+
 Windows users can also run `start-windows.bat`. Linux/macOS users can run `./start-linux-mac.sh`.
 
 ## Configure Flutterwave

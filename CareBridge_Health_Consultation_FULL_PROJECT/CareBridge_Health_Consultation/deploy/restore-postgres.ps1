@@ -18,6 +18,7 @@ try {
     $Remote = "/tmp/carebridge-restore.dump"
 
     $HashFile = "$ResolvedBackup.sha256"
+    if (-not (Test-Path -LiteralPath $HashFile)) { throw "Backup checksum file is required before restore." }
     if (Test-Path $HashFile) {
         $Expected = ((Get-Content $HashFile -Raw).Trim() -split "\s+")[0].ToLower()
         $Actual = (Get-FileHash -Algorithm SHA256 -Path $ResolvedBackup).Hash.ToLower()
@@ -25,11 +26,13 @@ try {
         Write-Host "Backup SHA256 verified."
     }
 
-    & docker @Compose stop app
-    if ($LASTEXITCODE -ne 0) { throw "Failed to stop CareBridge app." }
-
     & docker @Compose cp $ResolvedBackup "postgres:$Remote"
     if ($LASTEXITCODE -ne 0) { throw "Failed to copy backup into PostgreSQL container." }
+    & docker @Compose exec -T postgres pg_restore --list $Remote
+    if ($LASTEXITCODE -ne 0) { throw "Backup is not a readable PostgreSQL archive." }
+
+    & docker @Compose stop app
+    if ($LASTEXITCODE -ne 0) { throw "Failed to stop CareBridge app." }
 
     & docker @Compose exec -T postgres sh -lc "dropdb -U carebridge --if-exists carebridge && createdb -U carebridge carebridge && pg_restore -U carebridge -d carebridge --no-owner --no-privileges $Remote && rm -f $Remote"
     if ($LASTEXITCODE -ne 0) { throw "PostgreSQL restore failed." }

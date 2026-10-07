@@ -20,12 +20,19 @@ ENV_FILE=${CAREBRIDGE_ENV_FILE:-deploy/.env.production}
 COMPOSE_FILE=${CAREBRIDGE_COMPOSE_FILE:-docker-compose.production.yml}
 REMOTE=/tmp/carebridge-restore.dump
 
-if [ -f "${BACKUP}.sha256" ] && command -v sha256sum >/dev/null 2>&1; then
+[ -f "${BACKUP}.sha256" ] || { echo "Backup checksum file is required before restore." >&2; exit 2; }
+if command -v sha256sum >/dev/null 2>&1; then
   (cd "$(dirname "$BACKUP")" && sha256sum -c "$(basename "$BACKUP").sha256")
+elif command -v shasum >/dev/null 2>&1; then
+  (cd "$(dirname "$BACKUP")" && shasum -a 256 -c "$(basename "$BACKUP").sha256")
+else
+  echo "Install sha256sum or shasum to verify this backup before restore." >&2
+  exit 2
 fi
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" stop app
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" cp "$BACKUP" "postgres:${REMOTE}"
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres pg_restore --list "$REMOTE" >/dev/null
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" stop app
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres sh -lc \
   "dropdb -U carebridge --if-exists carebridge && createdb -U carebridge carebridge && pg_restore -U carebridge -d carebridge --no-owner --no-privileges ${REMOTE} && rm -f ${REMOTE}"
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" start app

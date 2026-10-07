@@ -1,6 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import assert from "node:assert/strict";
 import { createPostgresRepository } from "./postgres.js";
 import { exportRecoverySnapshot, inspectRecoverySnapshot, restoreRecoverySnapshot } from "./disasterRecovery.js";
 
@@ -28,6 +29,17 @@ const exported = await exportRecoverySnapshot({ databaseUrl: process.env.DATABAS
 if (!exported.encrypted || !exported.payloadChecksum || !fs.existsSync(snapshotPath)) throw new Error("Encrypted DR snapshot export failed");
 const inspected = await inspectRecoverySnapshot({ source: snapshotPath, encryptionKey: key });
 if (inspected.payloadChecksum !== exported.payloadChecksum || inspected.sourceVersion !== before.version) throw new Error("DR snapshot verification failed");
+await assert.rejects(() => inspectRecoverySnapshot({ source: snapshotPath, encryptionKey: "wrong-key" }));
+await assert.rejects(() => restoreRecoverySnapshot({ databaseUrl: process.env.DATABASE_URL, source: snapshotPath, encryptionKey: key }), /explicitly supply the current database version/);
+const previousEnvironment = process.env.NODE_ENV;
+try {
+  process.env.NODE_ENV = "production";
+  for (const encryptionKey of ["", "short"]) await assert.rejects(() => exportRecoverySnapshot({ databaseUrl: process.env.DATABASE_URL, destination: snapshotPath, encryptionKey }), /at least 32 characters/);
+} finally {
+  if (previousEnvironment === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = previousEnvironment;
+}
+console.log("✓ wrong encryption keys, weak production keys and unapproved record replacement rejected");
 console.log(`✓ encrypted, checksummed recovery snapshot at version ${before.version}`);
 
 const mutateRepo = createPostgresRepository(process.env.DATABASE_URL);

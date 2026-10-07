@@ -5,7 +5,7 @@
   "scripts": {
     "validate:integrations": "node scripts/validate-integrations.mjs",
     "install:all": "npm ci --prefix server && npm ci --prefix client",
-    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "dev": "node scripts/dev.mjs",
     "build": "npm run build --prefix client",
     "start": "npm start --prefix server",
     "test:quality": "node server/ci-quality-regression.mjs",

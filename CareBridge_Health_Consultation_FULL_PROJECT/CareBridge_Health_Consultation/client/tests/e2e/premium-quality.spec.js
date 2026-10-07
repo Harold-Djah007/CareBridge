@@ -441,3 +441,28 @@ test("operations dashboard recovers from unavailable data", async ({ page, reque
   await expect(page.getByRole("heading", { name: "Hospital command", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Hospital data unavailable" })).toHaveCount(0);
 });
+
+test("payment status discards a delayed response after navigation", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium");
+  await directLogin(page, request, "patient", testInfo.project.name);
+  let release;
+  let started;
+  const received = new Promise((resolve) => { started = resolve; });
+  const delayed = new Promise((resolve) => { release = resolve; });
+  await page.route("**/api/finance/payments/old-payment/status*", async (route) => {
+    started();
+    await delayed;
+    await route.fulfill({ json: { payment: { id: "old-payment", reference: "Old payment", status: "paid", amount: 20, method: "cash" } } }).catch(() => {});
+  });
+  await page.route("**/api/finance/payments/new-payment/status*", (route) => route.fulfill({ json: { payment: { id: "new-payment", reference: "New payment", status: "paid", amount: 30, method: "cash" } } }));
+  await page.goto("/payments/old-payment");
+  await received;
+  await page.evaluate(() => {
+    history.pushState({}, "", "/payments/new-payment");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(page.getByRole("link", { name: "Open receipt" })).toHaveAttribute("href", "/receipts/new-payment");
+  release();
+  await expect(page.locator(".px-payment-sheet")).toContainText("New payment");
+  await expect(page.getByRole("link", { name: "Open receipt" })).toHaveAttribute("href", "/receipts/new-payment");
+});

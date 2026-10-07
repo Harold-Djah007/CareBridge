@@ -40,6 +40,7 @@ function decrypt(envelope, key) {
 export async function exportRecoverySnapshot({ databaseUrl = process.env.DATABASE_URL, destination, encryptionKey = process.env.BACKUP_ENCRYPTION_KEY } = {}) {
   if (!databaseUrl) throw new Error("DATABASE_URL is required.");
   if (!destination) throw new Error("Snapshot destination is required.");
+  if (process.env.NODE_ENV === "production" && String(encryptionKey || "").length < 32) throw new Error("Production backups require an encryption key of at least 32 characters.");
   const repo = createPostgresRepository(databaseUrl);
   try {
     await repo.migrate();
@@ -89,7 +90,7 @@ export async function restoreRecoverySnapshot({ databaseUrl = process.env.DATABA
       const seeded = await repo.seedIfEmpty(snapshot.payload);
       return { restored: true, version: seeded.state.version, sourceVersion: snapshot.sourceVersion, payloadChecksum: snapshot.payloadChecksum };
     }
-    if (expectedCurrentVersion !== null && Number(expectedCurrentVersion) !== Number(current.version)) throw new Error(`Recovery precondition failed: expected current version ${expectedCurrentVersion}, found ${current.version}.`);
+    if (!Number.isSafeInteger(Number(expectedCurrentVersion)) || expectedCurrentVersion === null || Number(expectedCurrentVersion) !== Number(current.version)) throw new Error(`Recovery precondition failed: explicitly supply the current database version (${current.version}) before replacing existing records.`);
     const saved = await repo.saveState(snapshot.payload, {
       expectedVersion: current.version,
       outbox: [{ topic: "system.recovery-restored", aggregateType: "system", aggregateId: "primary", payload: { sourceVersion: snapshot.sourceVersion, restoredAt: new Date().toISOString() } }],

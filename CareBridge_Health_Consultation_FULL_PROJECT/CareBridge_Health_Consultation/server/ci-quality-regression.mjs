@@ -85,6 +85,28 @@ try {
   assert.equal(sent.headers["Content-Type"], "application/json");
   assert.equal(sent.headers["X-Custom"], "preserved");
   console.log("✓ custom API headers preserve authorization and content type");
+  let calls = 0;
+  globalThis.fetch = (_url, { signal }) => {
+    calls += 1;
+    return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason), { once: true }));
+  };
+  await assert.rejects(() => api("/cart/checkout", { method: "POST", timeoutMs: 5 }), /Check its status before repeating/);
+  assert.equal(calls, 1, "Timed-out writes must not be retried automatically");
+  globalThis.fetch = async () => ({ status: 200, ok: true, json: async () => { throw new SyntaxError("HTML response"); } });
+  await assert.rejects(() => api("/cart"), /unreadable response/);
+  globalThis.fetch = async () => ({ status: 204, ok: true });
+  assert.deepEqual(await api("/cart"), {});
+  const cancellation = new AbortController();
+  cancellation.abort();
+  globalThis.fetch = async (_url, { signal }) => { assert.equal(signal.aborted, true); throw signal.reason; };
+  await assert.rejects(() => api("/cart", { signal: cancellation.signal }), { name: "AbortError" });
+  globalThis.fetch = async () => {
+    globalThis.localStorage.getItem = () => "new-session-token";
+    return { status: 401, ok: false, json: async () => ({ message: "Old session expired" }) };
+  };
+  await assert.rejects(() => api("/cart"), /Old session expired/);
+  assert.equal(localStorage.getItem("carebridge-token"), "new-session-token");
+  console.log("✓ bounded requests, no automatic write retries, cancellation, invalid responses and stale-session protection");
 } finally { globalThis.fetch = originalFetch; delete globalThis.localStorage; delete globalThis.window; }
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "carebridge-quality-"));
@@ -186,10 +208,12 @@ try {
   await disconnected;
   console.log("✓ socket rooms require real participants and revoked sessions lose realtime access");
 
-  for (let attempt = 0; attempt < 7; attempt++) {
+  for (let attempt = 0; attempt < 9; attempt++) {
     const response = await fetch(`${base}/login`, { method: "POST", headers: { "Content-Type": "application/json", "X-Forwarded-For": `203.0.113.${attempt + 1}` }, body: JSON.stringify({ email: "unknown@test.invalid", password: "incorrect" }) });
-    if (attempt >= 5) assert.equal(response.status, 429);
+    assert.equal(response.status, attempt === 8 ? 429 : 401);
   }
+  const otherAccount = await fetch(`${base}/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "another@test.invalid", password: "incorrect" }) });
+  assert.equal(otherAccount.status, 401, "A blocked account must not lock out another account on the same network");
   console.log("✓ forged forwarded IPs cannot bypass login throttling when proxy trust is disabled");
   console.log("CareBridge targeted quality regression passed.");
 } finally {

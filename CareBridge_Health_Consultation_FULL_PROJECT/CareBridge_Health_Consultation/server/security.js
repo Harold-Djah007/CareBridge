@@ -19,7 +19,8 @@ function routeClass(req) {
 }
 
 const LIMITS = {
-  login: { windowMs: 15 * 60_000, max: 8 },
+  login: { windowMs: 15 * 60_000, max: 120 },
+  "login-account": { windowMs: 15 * 60_000, max: 8 },
   register: { windowMs: 60 * 60_000, max: 5 },
   contact: { windowMs: 60 * 60_000, max: 12 },
   "api-public": { windowMs: 60_000, max: 120 },
@@ -174,10 +175,8 @@ export function installSecurity(app, { readiness } = {}) {
     next();
   });
 
-  app.use(async (req, res, next) => {
-    const kind = routeClass(req);
+  const enforceLimit = async (req, res, next, kind = routeClass(req), ip = ipOf(req)) => {
     const limit = LIMITS[kind] || LIMITS.web;
-    const ip = ipOf(req);
     const now = nowMs();
     const resetAt = Math.floor(now / limit.windowMs) * limit.windowMs + limit.windowMs;
 
@@ -230,7 +229,12 @@ export function installSecurity(app, { readiness } = {}) {
       for (const [bucketKey, value] of buckets) if (value.resetAt <= now) buckets.delete(bucketKey);
     }
     return next();
-  });
+  };
+  app.use(enforceLimit);
+  stats.checkLogin = (req, res, next) => {
+    const account = crypto.createHash("sha256").update(String(req.body?.email || "").trim().toLowerCase()).digest("hex");
+    return enforceLimit(req, res, next, "login-account", `${ipOf(req)}:${account}`);
+  };
 
   app.get("/api/ready", (req, res) => {
     let details = {};

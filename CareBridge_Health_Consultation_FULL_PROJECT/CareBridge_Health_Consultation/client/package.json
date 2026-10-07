@@ -12,15 +12,16 @@
     "quality:release": "vite build && node scripts/quality-budget.mjs && playwright test"
   },
   "dependencies": {
+    "lucide-react": "0.475.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-router-dom": "7.18.3",
-    "lucide-react": "0.475.0",
     "socket.io-client": "4.8.3"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@vitejs/plugin-react": "4.7.0",
+    "terser": "5.51.2",
     "vite": "6.4.3"
   }
 }

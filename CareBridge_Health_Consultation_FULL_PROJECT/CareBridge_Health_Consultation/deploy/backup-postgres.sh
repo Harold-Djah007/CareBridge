@@ -18,10 +18,10 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" cp "postgres:/tmp/${NAM
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres rm -f "/tmp/${NAME}"
 
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum "$DEST" > "${DEST}.sha256"
+  (cd backups && sha256sum "$NAME") > "${DEST}.sha256"
   cat "${DEST}.sha256"
 elif command -v shasum >/dev/null 2>&1; then
-  shasum -a 256 "$DEST" > "${DEST}.sha256"
+  (cd backups && shasum -a 256 "$NAME") > "${DEST}.sha256"
   cat "${DEST}.sha256"
 fi
 

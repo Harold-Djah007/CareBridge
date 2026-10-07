@@ -17,7 +17,7 @@ export default class ErrorBoundary extends React.Component {
         <section className="card">
           <span className="eyebrow">Something went wrong</span>
           <h1>This screen could not load</h1>
-          <p className="muted">{this.state.error.message}</p>
+          <p className="muted">Please reload this screen. If it still cannot load, return home and try again.</p>
           <button className="primary-btn" type="button" onClick={() => window.location.assign("/")}>
             Return to home
           </button>
