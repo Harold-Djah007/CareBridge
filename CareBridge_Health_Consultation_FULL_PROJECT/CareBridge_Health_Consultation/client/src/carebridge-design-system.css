@@ -124,7 +124,7 @@ body{font-family:var(--cb-font);-webkit-font-smoothing:antialiased}
   .cbv6-app :is(.px-device-checks,.px-consent) strong { font-size: 13px; }
   .cbv6-app :is(.px-device-checks,.px-consent) small { font-size: 12px; line-height: 1.5; }
   .cbv6-app .px-consent input { width: 18px; min-width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; padding: 0; }
-  .cbv6-app .px-consent { display: flex !important; align-items: flex-start; gap: 10px; }
+  .cbv6-app .px-consent { display: flex !important; flex-direction: row; align-items: flex-start; gap: 10px; }
   .cbv6-app .px-consent > span { min-width: 0; }
   .cbv6-app .px-enter-room { min-height: 46px; }
 }
