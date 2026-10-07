@@ -267,7 +267,7 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }
   });
 }
 
-test("mobile cart keeps unavailable payments hidden and offline checkout reachable", async ({ page, request }, testInfo) => {
+test("mobile cart keeps payment options selectable and checkout reachable", async ({ page, request }, testInfo) => {
   test.skip(!testInfo.project.name.includes("mobile"), "Cart interaction runs in mobile Chromium and WebKit.");
   const session = await directLogin(page, request, "patient", testInfo.project.name);
   await request.delete(`http://127.0.0.1:5000/api/cart?userId=${session.user.id}`, { headers: { Authorization: `Bearer ${session.token}` } });
@@ -280,6 +280,12 @@ test("mobile cart keeps unavailable payments hidden and offline checkout reachab
   await expect(drawer.locator('input[type="radio"]:checked')).toHaveCount(1);
   await expect(drawer.locator(".payment-method-card").filter({ hasText: "Cash at cashier" }).locator("input")).toBeChecked();
   await expect(drawer.locator(".payment-method-card.disabled")).toHaveCount(0);
+  await expect(drawer.locator(".payment-method-card")).toHaveCount(5);
+  for (const label of ["Mobile Money", "Bank transfer", "NHIS / insurance", "Cash at cashier"]) {
+    const option = drawer.locator(".payment-method-card").filter({ hasText: label }).locator("input");
+    await option.check();
+    await expect(option).toBeChecked();
+  }
   await expect(drawer).not.toContainText("Flutterwave test keys");
   await expect.poll(() => drawer.evaluate(element => element.getAnimations().every(animation => animation.playState === "finished"))).toBe(true);
   const action = drawer.getByRole("button", { name: /Create cash payment/ });

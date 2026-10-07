@@ -331,8 +331,8 @@ function CartDrawer() {
   const payable = items.length;
   const flutterwaveReady = paymentConfig?.flutterwave?.configured === true;
   useEffect(() => {
-    if (paymentConfig && !flutterwaveReady && ["card", "momo", "bank"].includes(method)) setMethod("cash");
-  }, [paymentConfig, flutterwaveReady, method]);
+    if (paymentConfig && !flutterwaveReady) setMethod(current => ["card", "momo", "bank"].includes(current) ? "cash" : current);
+  }, [paymentConfig, flutterwaveReady]);
 
   const startPayment = async (invoiceIds, servicesToBill) => {
     const r = await api("/finance/checkout-cart", {
@@ -553,13 +553,12 @@ function CartDrawer() {
             <form onSubmit={(e) => checkout("online", e)} className="pay-form">
               <p className="checkout-title"><ShieldCheck size={16} /> Secure checkout</p>
               {paymentConfig?.flutterwave && !paymentConfig.flutterwave.configured && (
-                <p className="muted" role="status">{import.meta.env.VITE_CAREBRIDGE_DEMO === "true" ? "Online payments are disabled in this demo. Explore cash or insurance checkout below; no money is sent." : "Online payment is currently unavailable. Choose cash at the hospital or insurance below."}</p>
+                <p className="muted" role="status">{import.meta.env.VITE_CAREBRIDGE_DEMO === "true" ? "Demo: preview any payment method. No online money is sent." : "Online payment unavailable. Cash and health insurance remain available."}</p>
               )}
-              {METHODS.filter((m) => !m.online || flutterwaveReady).map((m) => {
-                const disabled = Boolean(m.online && !flutterwaveReady);
+              {METHODS.map((m) => {
                 return (
-                  <label className={`check-row payment-method-card ${disabled ? "disabled" : ""}`} key={m.id}>
-                    <input type="radio" name="method" disabled={disabled} checked={method === m.id} onChange={() => setMethod(m.id)} />
+                  <label className="check-row payment-method-card" key={m.id}>
+                    <input type="radio" name="method" checked={method === m.id} onChange={() => setMethod(m.id)} />
                     <span><b>{m.label}</b><small className="muted"> — {m.hint}</small></span>
                   </label>
                 );
@@ -600,7 +599,7 @@ function CartDrawer() {
                 <p className="muted">{accounts?.cashier?.desk}. {accounts?.cashier?.hours}. Your receipt appears only after hospital accounts posts the cash payment.</p>
               )}
               <button className="primary-btn full" disabled={busy || !payable || (["card", "momo", "bank"].includes(method) && !flutterwaveReady)}>
-                {busy ? "Starting checkout…" : method === "cash" ? `Create cash payment · ${ghs(cart.total)}` : method === "nhis" ? `Submit NHIS claim · ${ghs(cart.total)}` : `Pay securely · ${ghs(cart.total)}`}
+                {busy ? "Starting checkout…" : method === "cash" ? `Create cash payment · ${ghs(cart.total)}` : method === "nhis" ? `Submit NHIS claim · ${ghs(cart.total)}` : !flutterwaveReady ? "Online payment currently unavailable" : `Pay securely · ${ghs(cart.total)}`}
               </button>
             </form>
           )}

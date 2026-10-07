@@ -24,8 +24,9 @@ function ActionTile({ to, icon: Icon, title, text, badge, tone = "default" }) {
   );
 }
 
-function Signal({ label, value, detail, tone = "default" }) {
-  return <div className={`cbv6-signal tone-${tone}`}><small>{label}</small><strong>{value}</strong><span>{detail}</span></div>;
+function Signal({ label, value, detail, tone = "default", to }) {
+  const Tag = to ? Link : "div";
+  return <Tag to={to} className={`cbv6-signal tone-${tone}`}><small>{label}</small><strong>{value}</strong><span>{detail}</span></Tag>;
 }
 
 function PatientHome({ user, appointments, wards, due, doctors, badges, patientExperience }) {
@@ -74,10 +75,10 @@ function PatientHome({ user, appointments, wards, due, doctors, badges, patientE
       </section>}
 
       {homeOn("summary") && <div className="cbv6-patient-signal-row">
-        {moduleOn("appointments") && <Signal label="Next visit" value={next ? formatTime(next.time) : "No visit"} detail={next ? formatDate(next.date) : "Book when you need care"} tone="blue" />}
-        {moduleOn("shop") && <Signal label="Account" value={due.length ? ghs(dueTotal) : "Clear"} detail={due.length ? `${due.length} item${due.length === 1 ? "" : "s"} due` : "No unpaid charges"} tone={due.length ? "amber" : "green"} />}
-        {moduleOn("admissions") && <Signal label="Admission" value={admission ? admission.ward : "None"} detail={admission ? admission.status : "No active bed request"} tone="violet" />}
-        {moduleOn("careTeam") && <Signal label="Care team" value={chosen ? chosen.name.replace("Dr. ", "") : "Choose"} detail={chosen?.specialty || "Select a preferred clinician"} tone="teal" />}
+        {moduleOn("appointments") && <Signal to="/appointments" label="Next visit" value={next ? formatTime(next.time) : "No visit"} detail={next ? formatDate(next.date) : "Book when you need care"} tone="blue" />}
+        {moduleOn("shop") && <Signal to="/pay?tab=bills" label="Account" value={due.length ? ghs(dueTotal) : "Clear"} detail={due.length ? `${due.length} item${due.length === 1 ? "" : "s"} due` : "No unpaid charges"} tone={due.length ? "amber" : "green"} />}
+        {moduleOn("admissions") && <Signal to="/wards" label="Admission" value={admission ? admission.ward : "None"} detail={admission ? admission.status : "No active bed request"} tone="violet" />}
+        {moduleOn("careTeam") && <Signal to="/care" label="Care team" value={chosen ? chosen.name.replace("Dr. ", "") : "Choose"} detail={chosen?.specialty || "Select a preferred clinician"} tone="teal" />}
       </div>}
 
       {(homeOn("careStream") || homeOn("clinician")) && <div className="cbv6-patient-grid">

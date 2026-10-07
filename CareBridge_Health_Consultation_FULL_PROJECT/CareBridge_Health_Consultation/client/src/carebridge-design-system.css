@@ -112,6 +112,8 @@ body{font-family:var(--cb-font);-webkit-font-smoothing:antialiased}
   .cart-drawer .payment-method-card input { flex: 0 0 18px; width: 18px; height: 18px; min-height: 18px; margin-top: 3px; }
 }
 .cbv6-app .px-lobby-copy h2 { color: #fff !important; }
+.cbv6-signal[href] { text-decoration: none; cursor: pointer; }
+.cbv6-signal[href]:focus-visible { outline: 3px solid var(--v6-accent); outline-offset: 3px; }
 @media (max-width: 900px) {
   html { scroll-padding-block: 76px calc(104px + env(safe-area-inset-bottom)); }
   .cbv6-app .cbv6-content { padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important; }
