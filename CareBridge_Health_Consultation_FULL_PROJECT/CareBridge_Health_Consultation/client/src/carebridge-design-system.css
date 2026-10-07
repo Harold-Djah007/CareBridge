@@ -97,6 +97,20 @@ body{font-family:var(--cb-font);-webkit-font-smoothing:antialiased}
 @media(max-width:900px){.cbv6-content{padding:18px!important}.cbv6-context-strip{margin:10px 16px 0!important}.cbv6-content h1{font-size:29px!important}.cbv6-patient-welcome-copy{padding:26px!important}.cbv6-mobile-nav{grid-template-columns:repeat(5,minmax(0,1fr))!important;padding-bottom:max(8px,env(safe-area-inset-bottom))!important}.cbv6-mobile-nav .cbv6-nav-link{min-height:48px!important}.cbv6-mobile-nav .cbv6-nav-link>span:not(.cbv6-nav-icon){font-size:10px!important}.hospital-site .hero-home .hero-card{padding:28px!important}.portal-shell .login-card{padding:28px!important}}
 @media(max-width:600px){.cbv6-content{padding:14px!important}.cbv6-context-strip{margin-inline:12px!important;padding:10px!important}.cbv6-context-strip>div{display:none!important}.cbv6-inline-search{flex:1}.cbv6-patient-welcome{min-height:0!important}.cbv6-patient-welcome-copy{padding:24px!important}.cbv6-patient-welcome h1{font-size:30px!important}.cbv6-patient-portrait{display:none!important}.cbv6-patient-signal-row{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}.cbv6-signal{padding:15px!important;min-height:118px!important}.cbv6-signal strong{font-size:22px!important}.cbv6-care-focus{padding:18px!important;gap:14px!important}.cbv6-care-focus h2{font-size:18px!important}.cbv6-panel>header{padding:18px!important}.cbv6-content h2{font-size:20px!important}.cbv6-pagehead{padding:20px!important}.cbv6-content :is(th,td){padding:12px!important}.hospital-site .hero-home{min-height:580px!important}.hospital-site .hero-home .hero-card{padding:24px!important;border-radius:16px}.hospital-site .hero-card h1{font-size:36px!important}.hospital-site .hero-card .lead{font-size:15px}.hospital-site .hero-trustline{flex-wrap:wrap}.hospital-site .quick-band{margin-top:18px!important;gap:10px!important}.hospital-site .quick-card{padding:20px}.portal-shell .login-card{padding:24px!important}.portal-shell .login-card h2{font-size:27px}.cbv6-workspace-menu nav{grid-template-columns:1fr 1fr}}
 /* Let the consultation checklist determine its height instead of clipping it inside a fixed video stage. */
+.cart-drawer { z-index: 11001 !important; }
+.cart-scrim { z-index: 11000 !important; }
+.cart-drawer > :is(.cart-drawer-head,.running-total) { flex: 0 0 auto; }
+.cart-drawer > .cart-drawer-body { flex: 1 1 0; min-height: 0; overflow-y: auto; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+@media (max-width: 700px) {
+  .cart-drawer.open { inset: auto 0 0 !important; width: 100% !important; height: min(760px, calc(100dvh - 12px)) !important; max-height: calc(100dvh - 12px) !important; }
+  .cart-drawer-head { padding: 14px; gap: 8px; }
+  .cart-drawer-head h3 { font-size: 20px; margin-block: 4px; }
+  .cart-drawer .basket-row { display: grid; grid-template-columns: minmax(0,1fr) auto 40px; gap: 10px; }
+  .cart-drawer .basket-row > .grow { grid-column: 1 / -1; min-width: 0; overflow-wrap: anywhere; }
+  .cart-drawer .basket-row > b { white-space: nowrap; }
+  .cart-drawer .payment-method-card { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; }
+  .cart-drawer .payment-method-card input { flex: 0 0 18px; width: 18px; height: 18px; min-height: 18px; margin-top: 3px; }
+}
 .cbv6-app .px-lobby-copy h2 { color: #fff !important; }
 @media (max-width: 900px) {
   html { scroll-padding-block: 76px calc(104px + env(safe-area-inset-bottom)); }

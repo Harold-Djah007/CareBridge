@@ -308,7 +308,7 @@ function CartDrawer() {
   useEffect(() => {
     if (!cart?.open) return;
     api("/finance/accounts").then(setAccounts).catch(() => {});
-    api("/finance/payment-config").then(setPaymentConfig).catch(() => {});
+    api("/finance/payment-config").then(setPaymentConfig).catch(() => setPaymentConfig({ flutterwave: { configured: false } }));
   }, [cart?.open]);
 
   useEffect(() => {
@@ -329,7 +329,10 @@ function CartDrawer() {
   const billTotal = billItems.reduce((s, i) => s + Number(i.amount || i.price || 0), 0);
   const pid = user?.id;
   const payable = items.length;
-  const flutterwaveReady = paymentConfig?.flutterwave?.configured !== false;
+  const flutterwaveReady = paymentConfig?.flutterwave?.configured === true;
+  useEffect(() => {
+    if (paymentConfig && !flutterwaveReady && ["card", "momo", "bank"].includes(method)) setMethod("cash");
+  }, [paymentConfig, flutterwaveReady, method]);
 
   const startPayment = async (invoiceIds, servicesToBill) => {
     const r = await api("/finance/checkout-cart", {
@@ -498,7 +501,7 @@ function CartDrawer() {
           </div>
           <div className="row-actions">
             {items.length > 0 && !payment && (
-              <button type="button" className="ghost-btn" onClick={cart.clear}>Empty</button>
+              <button type="button" className="ghost-btn" onClick={cart.clear}>Clear cart</button>
             )}
             <button type="button" className="icon-btn" onClick={closeDrawer} aria-label="Close cart">
               <X size={18} />
@@ -550,9 +553,9 @@ function CartDrawer() {
             <form onSubmit={(e) => checkout("online", e)} className="pay-form">
               <p className="checkout-title"><ShieldCheck size={16} /> Secure checkout</p>
               {paymentConfig?.flutterwave && !paymentConfig.flutterwave.configured && (
-                <div className="error-box">Online card, Mobile Money, and bank transfer are installed but disabled until the server has Flutterwave test keys.</div>
+                <p className="muted" role="status">{import.meta.env.VITE_CAREBRIDGE_DEMO === "true" ? "Online payments are disabled in this demo. Explore cash or insurance checkout below; no money is sent." : "Online payment is currently unavailable. Choose cash at the hospital or insurance below."}</p>
               )}
-              {METHODS.map((m) => {
+              {METHODS.filter((m) => !m.online || flutterwaveReady).map((m) => {
                 const disabled = Boolean(m.online && !flutterwaveReady);
                 return (
                   <label className={`check-row payment-method-card ${disabled ? "disabled" : ""}`} key={m.id}>

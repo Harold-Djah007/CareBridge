@@ -267,6 +267,29 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }
   });
 }
 
+test("mobile cart keeps unavailable payments hidden and offline checkout reachable", async ({ page, request }, testInfo) => {
+  test.skip(!testInfo.project.name.includes("mobile"), "Cart interaction runs in mobile Chromium and WebKit.");
+  const session = await directLogin(page, request, "patient", testInfo.project.name);
+  await request.delete(`http://127.0.0.1:5000/api/cart?userId=${session.user.id}`, { headers: { Authorization: `Bearer ${session.token}` } });
+  await page.route("**/api/finance/payment-config", route => route.fulfill({ json: { flutterwave: { configured: false } } }));
+  await page.goto("/pay?tab=labs");
+  await waitForRoute(page);
+  await page.locator(".add-cart-btn").first().click();
+  const drawer = page.getByRole("dialog", { name: "Shopping cart" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.locator('input[type="radio"]:checked')).toHaveCount(1);
+  await expect(drawer.locator(".payment-method-card").filter({ hasText: "Cash at cashier" }).locator("input")).toBeChecked();
+  await expect(drawer.locator(".payment-method-card.disabled")).toHaveCount(0);
+  await expect(drawer).not.toContainText("Flutterwave test keys");
+  await expect.poll(() => drawer.evaluate(element => element.getAnimations().every(animation => animation.playState === "finished"))).toBe(true);
+  const action = drawer.getByRole("button", { name: /Create cash payment/ });
+  await action.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
+  expect(await action.evaluate(element => { const r = element.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return Boolean(hit && element.contains(hit) && r.bottom <= innerHeight); })).toBe(true);
+  await drawer.getByRole("button", { name: "Clear cart", exact: true }).click();
+  await drawer.getByRole("button", { name: "Close cart" }).click();
+  await expect(drawer).toBeHidden();
+});
+
 test("desktop shell keyboard, command palette and notification reader remain accessible", async ({ page, request }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium", "Keyboard shell audit runs on desktop Chromium.");
   await directLogin(page, request, "patient", testInfo.project.name);
