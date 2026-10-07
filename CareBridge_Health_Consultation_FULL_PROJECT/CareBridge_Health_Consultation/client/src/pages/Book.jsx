@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { ArrowRight, Phone, Mail, Check } from "lucide-react";
-import { CONSULTANTS, HOSPITAL, homeFor } from "../utils";
+import { CONSULTANTS, HOSPITAL, homeFor, todayISO } from "../utils";
 import { useAuth } from "../state";
 import PublicChrome, { PageBanner } from "../components/PublicChrome";
 
@@ -67,7 +67,7 @@ export default function Book() {
               <div className="step-pane">
                 <h2>Appointment details</h2>
                 <label>Specialty
-                  <select value={form.specialty} onChange={(e) => set("specialty", e.target.value)}>
+                  <select value={form.specialty} onChange={(e) => setForm((current) => ({ ...current, specialty: e.target.value, doctorId: "" }))}>
                     <option>General Medicine</option>
                     <option>Cardiology</option>
                     <option>Pediatrics</option>
@@ -81,7 +81,7 @@ export default function Book() {
                   </select>
                 </label>
                 <div className="form-grid">
-                  <label>Preferred date<input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} required /></label>
+                  <label>Preferred date<input type="date" min={todayISO()} value={form.date} onChange={(e) => set("date", e.target.value)} required /></label>
                   <label>Mode
                     <select value={form.mode} onChange={(e) => set("mode", e.target.value)}>
                       <option value="campus">Ridge Campus clinic</option>
@@ -99,7 +99,7 @@ export default function Book() {
             {step === 2 && (
               <div className="step-pane">
                 <h2>Confirmation</h2>
-                <p className="muted">We will hold this intent until you open a patient file. Sign in if you already have an MRN, or register to finish the booking.</p>
+                <p className="muted">This summary is not a confirmed appointment. Create a patient account or sign in, then choose and confirm your consultation in Appointments.</p>
                 <ul className="confirm-list">
                   <li><b>Patient</b> {form.name} · {form.email} · {form.phone}</li>
                   <li><b>Visit</b> {form.specialty} · {form.mode === "video" ? "Teleconsult" : "Campus"} · {form.date || "date TBC"}</li>

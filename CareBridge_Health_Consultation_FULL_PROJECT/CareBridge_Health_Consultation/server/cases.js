@@ -286,13 +286,13 @@ export function mountCases(app, { readDb, writeDb, safeUser }) {
     const db = readDb();
     const row = (db.cases || []).find((c) => c.id === req.params.id);
     if (!row) return res.status(404).json({ message: "Case not found" });
-    const actor = db.users.find((u) => u.id === req.body.actorId) || {};
+    const actor = req.authUser;
     const form = req.body.form === "close" ? "close" : "followup";
     const event = {
       id: `ev${Date.now()}`,
       form,
       at: new Date().toISOString(),
-      actorId: actor.id || "",
+      actorId: actor.id,
       actorName: actor.name || "Operations",
       detail: String(req.body.detail || "").trim() || (form === "close" ? "Case closed" : "Follow-up recorded"),
       properties: req.body.properties || {},
@@ -334,6 +334,6 @@ export function mountCases(app, { readDb, writeDb, safeUser }) {
     row.lastModified = new Date().toISOString();
     if (row.status === "closed") row.closedAt = row.closedAt || row.lastModified;
     writeDb(db);
-    res.json(enrich(db, { ...row, actor: safeUser(db.users.find((u) => u.id === req.body.actorId) || {}) }));
+    res.json(enrich(db, { ...row, actor: safeUser(req.authUser) }));
   });
 }

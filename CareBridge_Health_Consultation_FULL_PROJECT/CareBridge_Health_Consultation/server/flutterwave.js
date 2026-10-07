@@ -28,7 +28,7 @@ function config() {
 export function flutterwaveStatus() {
   const cfg = config();
   return {
-    configured: Boolean(cfg.secretKey && cfg.secretHash),
+    configured: process.env.CAREBRIDGE_DEMO !== "true" && Boolean(cfg.secretKey && cfg.secretHash),
     testMode: /_TEST-|TEST/i.test(cfg.secretKey),
     webhookPath: "/api/payments/webhook",
   };
@@ -36,6 +36,9 @@ export function flutterwaveStatus() {
 
 function requireConfig() {
   const cfg = config();
+  if (process.env.CAREBRIDGE_DEMO === "true") {
+    throw Object.assign(new Error("Online payments are unavailable in the sample demo. Use the hospital's production service to pay."), { status: 503 });
+  }
   if (!cfg.secretKey || !cfg.secretHash) {
     const error = new Error("Flutterwave is not configured on the server. Add FLW_SECRET_KEY and FLW_SECRET_HASH to server/.env.");
     error.status = 503;
@@ -93,6 +96,8 @@ export function paymentMatchesVerification(payment, verification) {
   const amount = Number(verification.amount);
   const expected = Number(payment.amount);
   return verification.status === "successful"
+    && Number.isFinite(expected) && expected > 0
+    && Boolean(payment.reference)
     && String(verification.currency || "").toUpperCase() === String(payment.currency || "GHS").toUpperCase()
     && String(verification.tx_ref || "") === String(payment.reference || "")
     && Number.isFinite(amount)

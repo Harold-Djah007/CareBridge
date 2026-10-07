@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const AuthContext = createContext(null);
 const ToastContext = createContext(null);
@@ -8,8 +8,21 @@ export const useToast = () => useContext(ToastContext);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("carebridge-user")); } catch { return null; }
+    try { return localStorage.getItem("carebridge-token") ? JSON.parse(localStorage.getItem("carebridge-user")) : null; } catch { return null; }
   });
+
+  useEffect(() => {
+    const expire = () => setUser(null);
+    const sync = (event) => {
+      if (event.key === "carebridge-token" || event.key === "carebridge-user" || event.key === null) {
+        try { setUser(localStorage.getItem("carebridge-token") ? JSON.parse(localStorage.getItem("carebridge-user")) : null); } catch { setUser(null); }
+      }
+    };
+    window.addEventListener("carebridge:session-expired", expire);
+    window.addEventListener("storage", sync);
+    return () => { window.removeEventListener("carebridge:session-expired", expire); window.removeEventListener("storage", sync); };
+  }, []);
+
   const auth = useMemo(() => ({
     user,
     login: (u, token) => {
@@ -42,7 +55,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ push }}>
       {children}
-      <div className="toasts">
+      <div className="toasts" role="status" aria-live="polite" aria-atomic="false">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.type === "error" ? "error" : ""}`}>{t.msg}</div>
         ))}

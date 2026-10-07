@@ -1,0 +1,24 @@
+{$CAREBRIDGE_DOMAIN} {
+  encode zstd gzip
+
+  @assets path /assets/*
+  header @assets Cache-Control "public, max-age=31536000, immutable"
+
+  @appShell not path /api/* /socket.io/* /assets/*
+  header @appShell Cache-Control "no-cache"
+
+  reverse_proxy app:5000 {
+    health_uri /api/health
+    health_interval 15s
+    health_timeout 5s
+  }
+
+  header {
+    -Server
+  }
+
+  log {
+    output stdout
+    format json
+  }
+}

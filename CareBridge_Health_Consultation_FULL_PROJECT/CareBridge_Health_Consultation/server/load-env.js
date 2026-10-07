@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { assertProductionConfiguration } from "./productionConfig.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.join(here, ".env");
@@ -18,4 +19,8 @@ if (fs.existsSync(envPath)) {
     }
     if (process.env[key] === undefined) process.env[key] = value;
   }
+}
+
+if (process.env.NODE_ENV === "production") {
+  assertProductionConfiguration(process.env);
 }

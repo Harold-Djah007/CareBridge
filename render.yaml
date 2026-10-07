@@ -1,0 +1,107 @@
+# Customer-ready baseline. Review paid plans in Render before provisioning.
+services:
+  - type: web
+    name: carebridge-web
+    runtime: docker
+    repo: https://github.com/Harold-Djah007/CareBridge
+    branch: rebuild/carebridge-premium-v6
+    rootDir: CareBridge_Health_Consultation_FULL_PROJECT/CareBridge_Health_Consultation
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    region: frankfurt
+    plan: 0.5c-512mb
+    numInstances: 1
+    autoDeployTrigger: off
+    healthCheckPath: /api/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: DATA_FILE
+        value: /app/server/data/production.json
+      - key: PERSISTENCE_PROVIDER
+        value: postgres
+      - key: DATABASE_URL
+        fromDatabase:
+          name: carebridge-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: carebridge-redis
+          property: connectionString
+      - key: REDIS_SESSION_ENFORCE
+        value: "true"
+      - key: CAREBRIDGE_BEHIND_TLS_PROXY
+        value: "true"
+      - key: APP_URL
+        fromService:
+          type: web
+          name: carebridge-web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: CLIENT_URL
+        fromService:
+          type: web
+          name: carebridge-web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: SESSION_DAYS
+        value: "7"
+      - key: SESSION_MAX_PER_USER
+        value: "8"
+      - key: PASSWORD_MIN_LENGTH
+        value: "10"
+      - key: MFA_ENCRYPTION_KEY
+        generateValue: true
+      - key: BACKUP_ENCRYPTION_KEY
+        generateValue: true
+      - key: FLW_SECRET_HASH
+        generateValue: true
+      - key: FLW_SECRET_KEY
+        sync: false
+      - key: CAREBRIDGE_ALLOW_TEST_PAYMENT_KEYS
+        value: "false"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_REQUIRE_TLS
+        value: "true"
+      - key: SMTP_REJECT_UNAUTHORIZED
+        value: "true"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: CAREBRIDGE_TURN_URLS
+        sync: false
+      - key: CAREBRIDGE_TURN_SECRET
+        sync: false
+      - key: CAREBRIDGE_BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: CAREBRIDGE_BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+      - key: PG_POOL_MAX
+        value: "5"
+  - type: keyvalue
+    name: carebridge-redis
+    region: frankfurt
+    plan: 256mb
+    maxmemoryPolicy: noeviction
+    persistenceMode: journal-snapshot
+    ipAllowList: []
+databases:
+  - name: carebridge-postgres
+    region: frankfurt
+    plan: 0.1c-256mb
+    postgresMajorVersion: "17"
+    diskSizeGB: 5
+    databaseName: carebridge
+    user: carebridge
+    ipAllowList: []

@@ -66,13 +66,13 @@ export default function Register() {
             <PhotoPicker value={form.photo} name={form.name} onChange={(photo) => set("photo", photo)} onError={setError} />
             <label>Full name<input value={form.name} onChange={(e) => set("name", e.target.value)} required /></label>
             <label>Email<input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} required /></label>
-            <label>Password<input type="password" value={form.password} onChange={(e) => set("password", e.target.value)} required minLength={6} /></label>
+            <label>Password<input type="password" value={form.password} onChange={(e) => set("password", e.target.value)} required minLength={10} pattern="(?=.*[A-Za-z])(?=.*[0-9]).{10,}" title="Use at least 10 characters, including a letter and a number." /></label>
             <div className="form-grid">
               <label>Phone<input value={form.phone} onChange={(e) => set("phone", e.target.value)} /></label>
               <label>City<input value={form.city} onChange={(e) => set("city", e.target.value)} /></label>
             </div>
             <label>NHIS / insurance number<input value={form.insurance} onChange={(e) => set("insurance", e.target.value)} placeholder="Leave blank for self-pay" /></label>
-            {error && <div className="error-box">{error}</div>}
+            {error && <div className="error-box" role="alert">{error}</div>}
             <button className="primary-btn full cta-pulse" disabled={loading}>{loading ? "Creating..." : <>Create account <ArrowRight size={18} /></>}</button>
             <p className="muted">Already registered? <Link to="/login"><b>Sign in to the patient portal</b></Link></p>
             <p className="muted"><Link to="/">Back to {HOSPITAL.campus}</Link></p>

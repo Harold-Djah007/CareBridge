@@ -1,5 +1,9 @@
 # CareBridge Health Consultation + Commerce
 
+Render hosting: use the repository-root `render.yaml` and follow `RENDER_DEPLOY.md`. The production deployment uses PostgreSQL/Redis and a clean first-administrator bootstrap; it does not import the local demonstration records.
+
+[Deploy CareBridge to Render](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2FHarold-Djah007%2FCareBridge%2Ftree%2Frebuild%2Fcarebridge-premium-v6)
+
 CareBridge is a full-stack telehealth and hospital-commerce prototype for patients, doctors, pharmacy nurses, and hospital administrators. This build integrates the existing hospital billing/cart experience with a server-verified Flutterwave checkout for Ghana.
 
 ## What is included
@@ -29,7 +33,7 @@ The passwords below still work; the database stores them as hashes after the sec
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 22 or newer
 - npm
 - A Flutterwave account for online payments
 
@@ -40,7 +44,7 @@ Do **not** copy a `node_modules` folder from another computer or operating syste
 From the project root:
 
 ```bash
-npm install
+npm ci
 npm run install:all
 npm run dev
 ```
@@ -49,6 +53,8 @@ Open:
 
 - Frontend: `http://localhost:5173`
 - API: `http://localhost:5000`
+
+If port 5000 is occupied, `npm run dev` selects a free API port and points the frontend and live connection at it. Vite prints the actual frontend URL if 5173 is occupied. Existing processes are left running. To require a specific API port, set `PORT` before starting; an occupied explicit port produces a clear startup error.
 
 Windows users can also run `start-windows.bat`. Linux/macOS users can run `./start-linux-mac.sh`.
 
@@ -112,6 +118,33 @@ The Express server serves `client/dist` when the frontend has been built.
 
 ## Security and production note
 
-This version is substantially hardened compared with the uploaded prototype, but the local JSON database and peer-to-peer WebRTC architecture are still intended for development/demo use. Before real patient or payment production use, move data to a production database, add managed secrets/key rotation, backups, rate limiting, MFA/identity verification, comprehensive authorization tests, a TURN service for WebRTC, observability, data-retention policies, and the privacy/security/compliance controls required by the hospitals and jurisdictions where CareBridge will operate.
+Local JSON persistence is for development and single-process demonstrations. Production requires the PostgreSQL runtime, Redis session enforcement and throttling, HTTPS, configured payment and email services, MFA and backup keys. Startup validates this configuration; see `PRODUCTION_RELEASE.md` for deployment and recovery instructions. Clinical and pharmacy normalization does not create demo clinical records, stock, or nurse accounts in production. Remove the example accounts and example records from the deployment seed before using real data.
+
+Video consultations use peer-to-peer WebRTC with STUN and authenticated TURN credentials. Production requires a configured Coturn REST-compatible relay. Run `npm run validate:integrations` with real service configuration to check SMTP authentication, an existing live payment and forced TURN connectivity; see `PRODUCTION_RELEASE.md` for the complete customer handover procedure. Live SMTP inbox delivery, browser payment/webhook flows and customer-network video calls must be validated in their target environments.
+
+## Quality checks
+
+The shared visual system uses local system fonts, consistent cards and controls, readable light/Sage/Midnight surfaces, responsive page hierarchy, and a mobile drawer for every role's workspaces. Booking and command dialogs trap keyboard focus, close with Escape, and return focus to their trigger. Clinical "today" summaries filter by date; occupancy is calculated from configured ward capacities. Clinical Orders and Patient Experience load their styles only when those routes are opened, keeping startup assets within the existing performance budgets.
+
+```bash
+npm test
+npm run quality:release
+npm run audit:release
+```
+
+`npm test` runs targeted bug regressions, all-role API workflows, security/MFA/persistence checks and authenticated concurrency checks against fresh temporary database copies. It leaves `server/data/db.json` unchanged. The browser suite checks desktop Chromium, Firefox and WebKit plus mobile Chromium and WebKit; install its browsers with `npx --prefix client playwright install` first. CI also exercises PostgreSQL restart and conflict recovery, encrypted backups, Redis coordination and production configuration.
+
+Only set `CAREBRIDGE_BEHIND_TLS_PROXY=true` when the app is reached through a trusted proxy that replaces forwarded headers. Direct local servers default to ignoring those headers.
+
+For a reproducible browser test environment with all operating-system dependencies, use Docker:
+
+```bash
+docker build -f Dockerfile.quality -t carebridge-quality .
+docker run --rm --init --shm-size=1g carebridge-quality
+```
+
+Browser checks create a temporary database by default and start their own servers. Stop development servers on ports 5000 and 5173 before running them; tests deliberately refuse to reuse an existing application server.
 
 See `CAREBRIDGE_REVIEW.md` for the project review and changes made in this pass.
+
+Video relay: set CAREBRIDGE_TURN_URLS and CAREBRIDGE_TURN_SECRET together to enable Coturn REST authentication. Authenticated participants receive one-hour credentials; the shared secret never reaches the browser. See https://github.com/coturn/coturn/blob/master/README.turnserver. Without a relay, restrictive networks may prevent a consultation connection.

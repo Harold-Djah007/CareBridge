@@ -1,0 +1,468 @@
+import { test, expect } from "@playwright/test";
+
+const ACCOUNTS = {
+  patient: { portal: "Patient", email: "patient@carebridge.test", password: "patient123", home: "/home" },
+  doctor: { portal: "Clinician", email: "doctor@carebridge.test", password: "doctor123", home: "/home" },
+  nurse: { portal: "Nurse", email: "nurse@carebridge.test", password: "nurse123", home: "/home" },
+  admin: { portal: "Operations", email: "admin@carebridge.test", password: "admin123", home: "/admin" },
+};
+
+const ROUTES = {
+  patient: ["/home", "/appointments", "/records", "/messages", "/wards", "/pay", "/support", "/settings"],
+  doctor: ["/home", "/appointments", "/records", "/orders", "/messages", "/settings"],
+  nurse: ["/home", "/orders", "/pharmacy-stock", "/messages", "/settings"],
+  admin: ["/admin", "/admin/hospital", "/admin/appointments", "/admin/users", "/admin/patient-experience", "/orders", "/admin/reports", "/support", "/settings"],
+};
+
+let loginSequence = 0;
+async function loginSession(request, role, projectName) {
+  const account = ACCOUNTS[role];
+  const lastOctet = 20 + Object.keys(ACCOUNTS).indexOf(role) + (projectName.includes("mobile") ? 20 : 0);
+  const response = await request.post("http://127.0.0.1:5000/api/login", {
+    headers: { "x-forwarded-for": `127.0.${lastOctet}.${1 + (loginSequence++ % 240)}` },
+    data: { email: account.email, password: account.password, expectedRole: role },
+  });
+  expect(response.ok(), `${role} API login failed: ${response.status()} ${await response.text()}`).toBeTruthy();
+  const session = await response.json();
+  expect(session.token).toBeTruthy();
+  expect(session.user?.role).toBe(role);
+  return session;
+}
+
+async function directLogin(page, request, role, projectName) {
+  const account = ACCOUNTS[role];
+  const session = await loginSession(request, role, projectName);
+  await page.goto("/login");
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(({ user, token }) => {
+    localStorage.setItem("carebridge-user", JSON.stringify(user));
+    localStorage.setItem("carebridge-token", token);
+  }, { user: session.user, token: session.token });
+  await page.goto(account.home);
+  await expect(page.locator("#cbv6-main")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  return session;
+}
+
+async function waitForRoute(page) {
+  await expect(page.locator("#cbv6-main")).toBeVisible();
+  await page.locator(".cbv6-route-loading").waitFor({ state: "hidden", timeout: 8_000 }).catch(() => {});
+  // Assess the loaded workspace before navigating away; WebKit reports requests
+  // interrupted by a document replacement as access-control/load failures.
+  await page.waitForLoadState("networkidle");
+}
+
+async function expectViewportQuality(page, route) {
+  await page.goto(route);
+  await waitForRoute(page);
+  const state = await page.evaluate(() => {
+    const overflow = document.documentElement.scrollWidth - window.innerWidth;
+    const offenders = [...document.querySelectorAll("body *")]
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return {
+          tag: element.tagName.toLowerCase(),
+          id: element.id || "",
+          classes: String(element.className || "").trim().replace(/\s+/g, ".").slice(0, 140),
+          left: Number(rect.left.toFixed(1)),
+          right: Number(rect.right.toFixed(1)),
+          width: Number(rect.width.toFixed(1)),
+          position: style.position,
+          overflowX: style.overflowX,
+        };
+      })
+      .filter((row) => row.width > 0 && (row.right > window.innerWidth + 2 || row.left < -2))
+      .slice(0, 12);
+    return {
+      overflow,
+      bodyOverflowX: getComputedStyle(document.body).overflowX,
+      mainVisible: Boolean(document.querySelector("#cbv6-main")),
+      offenders,
+    };
+  });
+  expect(state.mainVisible).toBeTruthy();
+  expect(
+    state.overflow,
+    `${route} horizontally overflows by ${state.overflow}px\nOffenders: ${JSON.stringify(state.offenders, null, 2)}`
+  ).toBeLessThanOrEqual(2);
+}
+
+async function semanticIssues(page) {
+  return page.evaluate(() => {
+    const issues = [];
+    const visible = (element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+    };
+    const referenceText = (element, attribute) => String(element.getAttribute(attribute) || "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)?.textContent?.trim() || "")
+      .join(" ")
+      .trim();
+    const labelText = (element) => [...(element.labels || [])].map((label) => label.textContent?.trim() || "").join(" ").trim();
+    const nameOf = (element) => [
+      element.getAttribute("aria-label"),
+      referenceText(element, "aria-labelledby"),
+      labelText(element),
+      element.textContent,
+      element.getAttribute("title"),
+    ].map((value) => String(value || "").trim()).find(Boolean) || "";
+    const describe = (element) => {
+      const id = element.id ? `#${element.id}` : "";
+      const classes = String(element.className || "").trim().split(/\s+/).filter(Boolean).slice(0, 3).map((value) => `.${value}`).join("");
+      return `${element.tagName.toLowerCase()}${id}${classes}`;
+    };
+
+    for (const element of document.querySelectorAll("button, a[href]")) {
+      if (!visible(element)) continue;
+      if (!nameOf(element)) issues.push(`${describe(element)} has no accessible name`);
+    }
+
+    for (const element of document.querySelectorAll("input, select, textarea")) {
+      if (!visible(element) || element.type === "hidden") continue;
+      const hasName = Boolean(element.getAttribute("aria-label") || referenceText(element, "aria-labelledby") || labelText(element));
+      if (!hasName) issues.push(`${describe(element)} is a visible form control without a label`);
+    }
+
+    for (const image of document.querySelectorAll("img")) {
+      if (visible(image) && !image.hasAttribute("alt")) issues.push(`${describe(image)} has no alt attribute`);
+    }
+
+    for (const dialog of document.querySelectorAll('[role="dialog"], dialog')) {
+      if (!visible(dialog)) continue;
+      if (!dialog.getAttribute("aria-label") && !referenceText(dialog, "aria-labelledby")) {
+        issues.push(`${describe(dialog)} has no accessible dialog name`);
+      }
+    }
+
+    const ids = [...document.querySelectorAll("[id]")].map((element) => element.id).filter(Boolean);
+    const duplicates = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+    duplicates.slice(0, 10).forEach((id) => issues.push(`duplicate id #${id}`));
+    return issues.slice(0, 30);
+  });
+}
+
+test("mobile navigation reaches secondary workspaces and restores focus after closing", async ({ page, request }, testInfo) => {
+  test.skip(!testInfo.project.name.includes("mobile"), "Mobile workspace drawer");
+  await directLogin(page, request, "patient", testInfo.project.name);
+  await expect(page.locator("#shop-basket")).toBeHidden();
+  const trigger = page.getByRole("button", { name: "All workspaces" });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "All workspaces" });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await dialog.getByRole("link", { name: "Admissions", exact: true }).click();
+  await expect(page).toHaveURL(/\/wards$/);
+  await expect(dialog).toBeHidden();
+});
+
+test("booking dialog keeps keyboard focus inside and closes with Escape", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "Shared dialog focus regression");
+  await directLogin(page, request, "patient", testInfo.project.name);
+  await page.goto("/appointments");
+  const trigger = page.getByRole("button", { name: "Book care", exact: true });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "Book consultation" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Confirm appointment" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("button", { name: "Close booking" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+test("login UI establishes a secure patient session", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Patient" }).click();
+  await page.getByLabel("Email used at registration").fill(ACCOUNTS.patient.email);
+  await page.getByLabel("Password").fill(ACCOUNTS.patient.password);
+  await page.getByRole("button", { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(page.locator("#cbv6-main")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Home", exact: true }).first()).toBeVisible();
+});
+
+test("critical role workspaces render without browser crashes or viewport overflow", async ({ page, request }, testInfo) => {
+  test.setTimeout(90_000);
+  const pageErrors = [];
+  const serverErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("response", (response) => {
+    if (response.url().includes("/api/") && response.status() >= 500) serverErrors.push(`${response.status()} ${response.url()}`);
+  });
+
+  for (const role of Object.keys(ACCOUNTS)) {
+    await directLogin(page, request, role, testInfo.project.name);
+    for (const route of ROUTES[role]) await expectViewportQuality(page, route);
+    await page.evaluate(() => {
+      localStorage.removeItem("carebridge-user");
+      localStorage.removeItem("carebridge-token");
+    });
+  }
+
+  expect(pageErrors, `Unhandled browser errors:\n${pageErrors.join("\n")}`).toEqual([]);
+  expect(serverErrors, `HTTP 5xx responses:\n${serverErrors.join("\n")}`).toEqual([]);
+});
+
+test("critical desktop routes meet semantic accessibility basics", async ({ page, request }, testInfo) => {
+  test.setTimeout(90_000);
+  test.skip(testInfo.project.name !== "desktop-chromium", "Semantic audit runs once on desktop Chromium.");
+  const failures = [];
+  for (const role of Object.keys(ACCOUNTS)) {
+    await directLogin(page, request, role, testInfo.project.name);
+    for (const route of ROUTES[role]) {
+      await page.goto(route);
+      await waitForRoute(page);
+      const issues = await semanticIssues(page);
+      if (issues.length) failures.push(`${role} ${route}:\n  - ${issues.join("\n  - ")}`);
+    }
+    await page.evaluate(() => {
+      localStorage.removeItem("carebridge-user");
+      localStorage.removeItem("carebridge-token");
+    });
+  }
+  expect(failures, `Semantic accessibility regressions:\n${failures.join("\n")}`).toEqual([]);
+});
+
+for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }, { width: 768, height: 1024 }]) {
+  test(`consultation and notification controls fit ${viewport.width}x${viewport.height}`, async ({ page, request }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop-chromium", "Screen-size matrix runs once.");
+    test.setTimeout(120_000);
+    await page.setViewportSize(viewport);
+    await directLogin(page, request, "patient", testInfo.project.name);
+    await expect(page.locator(".carebridge-demo-notice")).toHaveCount(0);
+    for (const route of ["/home", "/appointments", "/video", "/settings"]) await expectViewportQuality(page, route);
+    await page.goto("/video");
+    await waitForRoute(page);
+    if (await page.locator(".px-lobby-contacts button").count()) await page.locator(".px-lobby-contacts button").first().click();
+    const enter = page.locator(".px-enter-room");
+    await expect(enter).toBeVisible();
+    await enter.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
+    const reachable = await enter.evaluate(element => {
+      const r = element.getBoundingClientRect();
+      const stage = document.querySelector(".px-video-stage").getBoundingClientRect();
+      const center = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return r.bottom <= stage.bottom + 1 && Boolean(center && element.contains(center));
+    });
+    expect(reachable, "Consultation entry must not be clipped or covered by navigation").toBe(true);
+    await page.getByRole("button", { name: "Notifications", exact: true }).click();
+    await page.locator(".cbv6-notice-item").first().click();
+    const reader = page.locator(".cb-notification-reader");
+    await expect(reader).toBeVisible();
+    await expect.poll(() => reader.evaluate(element => element.getAnimations().every(animation => animation.playState === "finished"))).toBe(true);
+    const box = await reader.boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+    await reader.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(reader).toBeHidden();
+  });
+}
+
+test("mobile cart keeps payment options selectable and checkout reachable", async ({ page, request }, testInfo) => {
+  test.skip(!testInfo.project.name.includes("mobile"), "Cart interaction runs in mobile Chromium and WebKit.");
+  const session = await directLogin(page, request, "patient", testInfo.project.name);
+  await request.delete(`http://127.0.0.1:5000/api/cart?userId=${session.user.id}`, { headers: { Authorization: `Bearer ${session.token}` } });
+  await page.route("**/api/finance/payment-config", route => route.fulfill({ json: { flutterwave: { configured: false } } }));
+  await page.goto("/pay?tab=labs");
+  await waitForRoute(page);
+  await page.locator(".add-cart-btn").first().click();
+  const drawer = page.getByRole("dialog", { name: "Shopping cart" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.locator('input[type="radio"]:checked')).toHaveCount(1);
+  await expect(drawer.locator(".payment-method-card").filter({ hasText: "Cash at cashier" }).locator("input")).toBeChecked();
+  await expect(drawer.locator(".payment-method-card.disabled")).toHaveCount(0);
+  await expect(drawer.locator(".payment-method-card")).toHaveCount(5);
+  for (const label of ["Mobile Money", "Bank transfer", "NHIS / insurance", "Cash at cashier"]) {
+    const option = drawer.locator(".payment-method-card").filter({ hasText: label }).locator("input");
+    await option.check();
+    await expect(option).toBeChecked();
+  }
+  await expect(drawer).not.toContainText("Flutterwave test keys");
+  await expect.poll(() => drawer.evaluate(element => element.getAnimations().every(animation => animation.playState === "finished"))).toBe(true);
+  const action = drawer.getByRole("button", { name: /Create cash payment/ });
+  await action.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
+  expect(await action.evaluate(element => { const r = element.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return Boolean(hit && element.contains(hit) && r.bottom <= innerHeight); })).toBe(true);
+  await drawer.getByRole("button", { name: "Clear cart", exact: true }).click();
+  await drawer.getByRole("button", { name: "Close cart" }).click();
+  await expect(drawer).toBeHidden();
+});
+
+test("desktop shell keyboard, command palette and notification reader remain accessible", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "Keyboard shell audit runs on desktop Chromium.");
+  await directLogin(page, request, "patient", testInfo.project.name);
+
+  const skipLink = page.locator(".skip-link");
+  await skipLink.focus();
+  await expect(skipLink).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#cbv6-main")).toBeFocused();
+
+  await page.keyboard.press("Control+k");
+  const palette = page.getByRole("dialog", { name: "CareBridge command palette" });
+  await expect(palette).toBeVisible();
+  await expect(palette.locator("input")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(palette).toBeHidden();
+
+  await page.getByRole("button", { name: "Notifications" }).click();
+  const feed = page.locator(".cbv6-notice-panel");
+  await expect(feed).toBeVisible();
+  const firstNotice = feed.locator(".cbv6-notice-item").first();
+  await expect(firstNotice).toBeVisible();
+  await firstNotice.click();
+
+  const reader = page.locator(".cb-notification-reader");
+  await expect(reader).toBeVisible();
+  await expect(reader.locator(".cb-notification-reader-close")).toBeFocused();
+  const layers = await page.evaluate(() => ({
+    overlay: Number.parseInt(getComputedStyle(document.querySelector(".cb-notification-portal")).zIndex || "0", 10),
+    topbar: Number.parseInt(getComputedStyle(document.querySelector(".cbv6-topbar")).zIndex || "0", 10),
+    bodyOverflow: document.body.style.overflow,
+  }));
+  expect(layers.overlay).toBeGreaterThan(layers.topbar);
+  expect(layers.bodyOverflow).toBe("hidden");
+  await page.keyboard.press("Escape");
+  await expect(reader).toBeHidden();
+});
+
+test("support live badge clears after the incoming admin reply is viewed", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "Support read lifecycle runs once on desktop Chromium.");
+  const patient = await loginSession(request, "patient", testInfo.project.name);
+  const admin = await loginSession(request, "admin", testInfo.project.name);
+  const patientHeaders = { Authorization: `Bearer ${patient.token}` };
+  const adminHeaders = { Authorization: `Bearer ${admin.token}` };
+
+  const existingResponse = await request.get(`http://127.0.0.1:5000/api/tickets?userId=${patient.user.id}&role=patient`, { headers: patientHeaders });
+  expect(existingResponse.ok()).toBeTruthy();
+  for (const ticket of await existingResponse.json()) {
+    const seen = await request.get(`http://127.0.0.1:5000/api/tickets/${ticket.id}?userId=${patient.user.id}&role=patient`, { headers: patientHeaders });
+    expect(seen.ok()).toBeTruthy();
+  }
+
+  const subject = `Badge lifecycle ${Date.now()}`;
+  const createdResponse = await request.post("http://127.0.0.1:5000/api/tickets", {
+    headers: patientHeaders,
+    data: { userId: patient.user.id, category: "account", subject, body: "Please verify the live support badge lifecycle." },
+  });
+  expect(createdResponse.ok()).toBeTruthy();
+  const created = await createdResponse.json();
+
+  const replyResponse = await request.post(`http://127.0.0.1:5000/api/tickets/${created.id}/replies`, {
+    headers: adminHeaders,
+    data: { actorId: admin.user.id, body: "Operations replied. Viewing this thread should clear its live badge." },
+  });
+  expect(replyResponse.ok()).toBeTruthy();
+
+  const unreadResponse = await request.get(`http://127.0.0.1:5000/api/tickets?userId=${patient.user.id}&role=patient`, { headers: patientHeaders });
+  const unreadRows = await unreadResponse.json();
+  expect(unreadRows.find((ticket) => ticket.id === created.id)?.unread).toBe(true);
+
+  await page.goto("/login");
+  await page.evaluate(({ user, token }) => {
+    localStorage.setItem("carebridge-user", JSON.stringify(user));
+    localStorage.setItem("carebridge-token", token);
+  }, { user: patient.user, token: patient.token });
+  await page.goto("/home");
+  await waitForRoute(page);
+
+  const supportLink = page.locator('a[href="/support"]').first();
+  await expect(supportLink.locator("b")).toBeVisible();
+  await supportLink.click();
+  await waitForRoute(page);
+  await expect(page.getByRole("heading", { name: subject, exact: true })).toBeVisible();
+  await expect(supportLink.locator("b")).toHaveCount(0);
+
+  const readResponse = await request.get(`http://127.0.0.1:5000/api/tickets?userId=${patient.user.id}&role=patient`, { headers: patientHeaders });
+  const readRows = await readResponse.json();
+  const viewed = readRows.find((ticket) => ticket.id === created.id);
+  expect(viewed?.unread).toBe(false);
+  expect(viewed?.status).toBe("in_progress");
+});
+
+test("admin-managed social links publish safely to the public footer", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "Public social-link governance runs once on desktop Chromium.");
+  const admin = await directLogin(page, request, "admin", testInfo.project.name);
+  const headers = { Authorization: `Bearer ${admin.token}` };
+  const links = {
+    facebook: "https://facebook.com/carebridge.health",
+    instagram: "https://instagram.com/carebridge.health",
+    x: "https://x.com/carebridge_health",
+    whatsapp: "https://wa.me/233306104400",
+  };
+
+  await page.goto("/admin/patient-experience");
+  await waitForRoute(page);
+  for (const [label, value] of [["Facebook", links.facebook], ["Instagram", links.instagram], ["X / Twitter", links.x], ["WhatsApp", links.whatsapp]]) {
+    await page.getByLabel(label, { exact: true }).fill(value);
+  }
+  await page.getByRole("button", { name: "Publish social links" }).click();
+  await expect(page.getByText("4 public links active")).toBeVisible();
+
+  const publicResponse = await request.get("http://127.0.0.1:5000/api/public/social-links");
+  expect(publicResponse.ok()).toBeTruthy();
+  const published = await publicResponse.json();
+  expect(published.facebook).toBe(links.facebook);
+  expect(published.whatsapp).toBe(links.whatsapp);
+
+  await page.evaluate(() => {
+    localStorage.removeItem("carebridge-user");
+    localStorage.removeItem("carebridge-token");
+  });
+  await page.goto("/");
+  const facebook = page.getByRole("link", { name: "Facebook", exact: true });
+  await expect(facebook).toHaveAttribute("href", links.facebook);
+  await expect(facebook).toHaveAttribute("target", "_blank");
+  await expect(page.getByRole("link", { name: "WhatsApp", exact: true })).toHaveAttribute("href", links.whatsapp);
+  await expect(page.getByRole("link", { name: "LinkedIn", exact: true })).toHaveCount(0);
+
+  const unsafe = await request.patch("http://127.0.0.1:5000/api/admin/public/social-links", {
+    headers,
+    data: { facebook: "javascript:alert(1)" },
+  });
+  expect(unsafe.status()).toBe(400);
+});
+
+test("operations dashboard recovers from unavailable data", async ({ page, request }, testInfo) => {
+  await page.route("**/api/admin/overview", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Temporary service interruption" }) }));
+  await directLogin(page, request, "admin", testInfo.project.name);
+  await expect(page.getByRole("heading", { name: "Hospital data unavailable" })).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("Temporary service interruption");
+  await page.unroute("**/api/admin/overview");
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Hospital command", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Hospital data unavailable" })).toHaveCount(0);
+});
+
+test("payment status discards a delayed response after navigation", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium");
+  await directLogin(page, request, "patient", testInfo.project.name);
+  let release;
+  let started;
+  const received = new Promise((resolve) => { started = resolve; });
+  const delayed = new Promise((resolve) => { release = resolve; });
+  await page.route("**/api/finance/payments/old-payment/status*", async (route) => {
+    started();
+    await delayed;
+    await route.fulfill({ json: { payment: { id: "old-payment", reference: "Old payment", status: "paid", amount: 20, method: "cash" } } }).catch(() => {});
+  });
+  await page.route("**/api/finance/payments/new-payment/status*", (route) => route.fulfill({ json: { payment: { id: "new-payment", reference: "New payment", status: "paid", amount: 30, method: "cash" } } }));
+  await page.goto("/payments/old-payment");
+  await received;
+  await page.evaluate(() => {
+    history.pushState({}, "", "/payments/new-payment");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(page.getByRole("link", { name: "Open receipt" })).toHaveAttribute("href", "/receipts/new-payment");
+  release();
+  await expect(page.locator(".px-payment-sheet")).toContainText("New payment");
+  await expect(page.getByRole("link", { name: "Open receipt" })).toHaveAttribute("href", "/receipts/new-payment");
+});

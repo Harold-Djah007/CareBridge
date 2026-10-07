@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, FileText, Hospital, PackageCheck, Pill, Printer, ShieldCheck, ShoppingBag } from "lucide-react";
+import { CalendarDays, FileText, Hospital, PackageCheck, Pill, Printer, ShieldCheck, ShoppingBag, Sparkles } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../state";
 import { formatDate } from "../utils";
 import { IMAGERY } from "../imagery";
 import Avatar from "../components/Avatar";
-import PageHero, { EmptyPlate } from "../components/PageHero";
 
 export default function Prescriptions() {
   const { user } = useAuth();
@@ -21,49 +20,33 @@ export default function Prescriptions() {
   const isPatient = user.role === "patient";
 
   return (
-    <div className="prescription-workspace">
-      <PageHero
-        scene="pharmacy"
-        eyebrow={user.role === "doctor" ? "Medication management" : "My medicines"}
-        title="Prescriptions"
-        lead={user.role === "doctor" ? "Review prescriptions you have issued and how patients can fulfil them through CareBridge or Ridge pharmacy." : "See what was prescribed, print a copy, buy medicines online or arrange hospital collection."}
-        actions={isPatient ? <Link className="primary-btn" to="/pay?tab=pharmacy"><ShoppingBag size={15} /> Open pharmacy</Link> : null}
-      />
-
-      <div className="product-metric-grid prescription-metrics">
-        <div className="product-metric-card"><span className="metric-icon tone-violet"><Pill size={18} /></span><div className="metric-copy"><small>Active</small><strong>{active.length}</strong><span>Current prescriptions</span></div></div>
-        <div className="product-metric-card"><span className="metric-icon tone-blue"><FileText size={18} /></span><div className="metric-copy"><small>Total issued</small><strong>{rows.length}</strong><span>On this account</span></div></div>
-        <div className="product-metric-card"><span className="metric-icon tone-amber"><PackageCheck size={18} /></span><div className="metric-copy"><small>Refill requests</small><strong>{refill.length}</strong><span>{isPatient ? "Requested" : "Needs review"}</span></div></div>
-        <div className="product-metric-card"><span className="metric-icon tone-green"><ShieldCheck size={18} /></span><div className="metric-copy"><small>Fulfilment</small><strong>Connected</strong><span>Shop or Ridge pickup</span></div></div>
-      </div>
-
-      <section className="product-imagery-strip prescription-visual" style={{ backgroundImage: `url(${IMAGERY.pharmacy})` }}>
-        <div><span className="eyebrow">Ridge Campus pharmacy</span><h3>{isPatient ? "From prescription to pickup or payment" : "Medication orders connected to dispensing"}</h3><p>{isPatient ? "CareBridge can move a prescription into Shop & pay, keep medicine quantities together and support hospital collection." : "Patients can print prescriptions, purchase available medicines, or send them to the hospital dispensary."}</p></div>
+    <div className="px-page px-prescriptions">
+      <section className="px-med-hero">
+        <div className="px-med-copy"><span className="px-kicker"><Sparkles size={14} /> {user.role === "doctor" ? "Medication management" : "My medicines"}</span><h1>{isPatient ? "From prescription to medicine, without the paper chase." : "Medication orders that stay connected to care."}</h1><p>{isPatient ? "Review what was prescribed, understand how to take it, print a copy or move it straight into pharmacy fulfilment." : "See issued prescriptions, refill requests and fulfilment pathways in one medication workspace."}</p>{isPatient && <Link className="px-primary" to="/pay?tab=pharmacy"><ShoppingBag size={16} /> Open pharmacy</Link>}</div>
+        <div className="px-med-photo" style={{ backgroundImage: `linear-gradient(180deg,transparent,rgba(6,22,29,.55)),url(${IMAGERY.pharmacy})` }}><div><span>Active prescriptions</span><strong>{active.length}</strong><small>{refill.length} refill request{refill.length === 1 ? "" : "s"}</small></div></div>
       </section>
 
-      <section className="product-section prescription-list-section">
-        <div className="product-section-head"><div><span className="eyebrow">Medication orders</span><h2>{rows.length} prescription{rows.length === 1 ? "" : "s"}</h2></div><span className="section-hint">Newest orders remain linked to patient and clinician identity</span></div>
-        <div className="prescription-product-list">
-          {rows.length === 0 && <EmptyPlate scene="pharmacy" icon={Pill} title="No prescriptions yet" hint={user.role === "doctor" ? "Issue one from Messages, the video room, or a chart." : "When a doctor writes a prescription it will appear here."} />}
-          {rows.map((rx) => (
-            <article className={`prescription-product-card ${rx.status}`} key={rx.id}>
-              <div className="prescription-card-head">
-                <span className="prescription-card-icon"><Pill size={18} /></span>
-                <div className="grow"><span className="eyebrow">{formatDate(rx.date)} · {rx.pharmacy}</span><h3>{rx.drug}</h3><div className="prescription-person">{isPatient ? <><Avatar person={rx.doctor} className="small" /><span>{rx.doctor?.name || "Clinician"}</span></> : <><Avatar person={rx.patient} className="small" /><span>{rx.patient?.name || "Patient"}</span></>}</div></div>
-                <span className={`status ${rx.status}`}>{rx.status}</span>
-              </div>
-              <div className="prescription-lines">{(rx.items || []).map((line, index) => <div key={index}><span><b>{line.drug}</b><small>{line.sig || "As directed"}</small></span><strong>{line.qty}</strong></div>)}</div>
-              {rx.notes && <div className="prescription-note"><FileText size={14} /><span>{rx.notes}</span></div>}
-              <div className="prescription-card-foot">
-                <span className="prescription-source"><CalendarDays size={14} /> {rx.source || "chart"}</span>
-                <div className="prescription-actions"><Link className="secondary-btn" to={`/prescriptions/${rx.id}`}><Printer size={15} /> Print / save</Link>{isPatient && <><Link className="primary-btn" to={`/pay?rx=${rx.id}`}><ShoppingBag size={15} /> Buy on CareBridge</Link><Link className="ghost-btn" to={`/pay?rx=${rx.id}&fulfill=hospital`}><Hospital size={15} /> Collect at hospital</Link></>}</div>
-              </div>
-            </article>
-          ))}
+      <section className="px-signal-grid">
+        <article><span><Pill size={17} /></span><div><small>Active</small><strong>{active.length}</strong></div></article>
+        <article><span><FileText size={17} /></span><div><small>Total issued</small><strong>{rows.length}</strong></div></article>
+        <article><span><PackageCheck size={17} /></span><div><small>Refill requests</small><strong>{refill.length}</strong></div></article>
+        <article><span><ShieldCheck size={17} /></span><div><small>Fulfilment</small><strong>Live</strong></div></article>
+      </section>
+
+      <section className="px-med-ledger">
+        <header className="px-board-head"><div><span className="px-kicker">Medication orders</span><h2>{rows.length} prescription{rows.length === 1 ? "" : "s"}</h2></div><span className="px-board-note">Newest orders first</span></header>
+        <div className="px-med-list">
+          {rows.length === 0 && <div className="px-empty"><Pill size={28} /><h3>No prescriptions yet</h3><p>{user.role === "doctor" ? "Issue one from Messages, Video, or a patient chart." : "When a clinician writes a prescription it will appear here."}</p></div>}
+          {rows.map((rx) => <article className={`px-med-card ${rx.status}`} key={rx.id}>
+            <div className="px-med-card-head"><span className="px-med-icon"><Pill size={19} /></span><div className="grow"><span className="px-kicker">{formatDate(rx.date)} · {rx.pharmacy}</span><h3>{rx.drug}</h3><div className="px-med-person">{isPatient ? <><Avatar person={rx.doctor} className="small" /><span>{rx.doctor?.name || "Clinician"}</span></> : <><Avatar person={rx.patient} className="small" /><span>{rx.patient?.name || "Patient"}</span></>}</div></div><span className={`status ${rx.status}`}>{rx.status}</span></div>
+            <div className="px-med-lines">{(rx.items || []).map((line, index) => <div key={index}><span><strong>{line.drug}</strong><small>{line.sig || "As directed"}</small></span><b>{line.qty}</b></div>)}</div>
+            {rx.notes && <div className="px-med-note"><FileText size={14} /><span>{rx.notes}</span></div>}
+            <footer><span><CalendarDays size={14} /> {rx.source || "chart"}</span><div><Link to={`/prescriptions/${rx.id}`}><Printer size={15} /> Print</Link>{isPatient && <><Link className="strong" to={`/pay?rx=${rx.id}`}><ShoppingBag size={15} /> Buy</Link><Link to={`/pay?rx=${rx.id}&fulfill=hospital`}><Hospital size={15} /> Hospital pickup</Link></>}</div></footer>
+          </article>)}
         </div>
       </section>
 
-      {user.role === "doctor" && <div className="ops-footer-assurance"><ShieldCheck size={15} /><span>Issue new prescriptions from a patient chart, secure message or teleconsultation so the order remains connected to clinical context.</span></div>}
+      <div className="px-med-assurance"><ShieldCheck size={16} /><span>{isPatient ? "Medication orders remain linked to the prescribing clinician and your CareBridge record." : "Issue prescriptions from the patient chart, secure message or teleconsultation so clinical context remains attached."}</span></div>
     </div>
   );
 }

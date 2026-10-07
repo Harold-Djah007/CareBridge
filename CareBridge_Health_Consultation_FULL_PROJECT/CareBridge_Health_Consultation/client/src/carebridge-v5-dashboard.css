@@ -1,0 +1,141 @@
+/* Commercial V5 dashboard-specific layouts */
+.v5-empty-inline {
+  min-height: 92px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: #6f7d86;
+  background: #f8fafb;
+  border: 1px dashed #d9e2e6;
+  border-radius: 8px;
+}
+.v5-empty-inline strong { color: #2a3b46; font-size: 11px; }
+.v5-empty-inline span { margin-top: 4px; font-size: 8px; line-height: 1.45; }
+
+.v5-attention-body {
+  min-height: 150px;
+  display: grid;
+  grid-template-columns: 48px minmax(0,1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+.v5-attention-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  color: #0b796f;
+  background: #eaf6f3;
+  border-radius: 10px;
+}
+.v5-attention-body h2 { margin: 0; font-family: inherit; font-size: 18px; }
+.v5-attention-body p { margin: 6px 0 0; color: #6f7e88; font-size: 10px; line-height: 1.5; }
+.v5-live-chip, .v5-duty-state {
+  min-height: 27px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #2f7058;
+  background: #eff8f4;
+  border: 1px solid #d8eae1;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.v5-live-chip i, .v5-duty-state i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #32aa83;
+  box-shadow: 0 0 0 4px rgba(50,170,131,.09);
+  animation: v5-status-pulse 1.8s ease-in-out infinite;
+}
+.v5-duty-state.off { color: #8d6c3a; background: #fff8e9; border-color: #efe0bd; }
+.v5-duty-state.off i { background: #c69143; box-shadow: 0 0 0 4px rgba(198,145,67,.09); }
+
+.v5-account-panel .v5-panel-body { display: flex; flex-direction: column; align-items: flex-start; }
+.v5-balance { color: #17303e; font-size: 34px; letter-spacing: -.04em; }
+.v5-account-panel p { margin: 8px 0 14px; color: #74828b; font-size: 9px; line-height: 1.5; }
+
+.v5-clinician-header {
+  min-height: 124px;
+  padding: 20px 22px;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 220px auto;
+  gap: 18px;
+  align-items: center;
+  color: #eef7fb;
+  background: #17364f;
+  border: 1px solid #17364f;
+  border-radius: 11px;
+  overflow: hidden;
+  position: relative;
+}
+.v5-clinician-header h1 { margin: 5px 0 4px; color: #fff; font-family: inherit; font-size: 28px; letter-spacing: -.035em; }
+.v5-clinician-header p { margin: 0; color: #a9c0ce; font-size: 9px; }
+.v5-clinician-header .v5-kicker { color: #7dd7c8; }
+.v5-clinician-header .duty-toggle, .v5-clinician-header .availability-toggle { justify-self: end; }
+
+.v5-nurse-header { background: #24483d; border-color: #24483d; }
+.v5-nurse-header .v5-kicker { color: #8dd9c3; }
+
+.v5-clinic-pulse, .v5-dispensary-signal {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  opacity: .85;
+}
+.v5-clinic-pulse i {
+  width: 4px;
+  border-radius: 999px;
+  background: #78d1c2;
+  animation: v5-bar 1.35s ease-in-out infinite;
+}
+.v5-clinic-pulse i:nth-child(1), .v5-clinic-pulse i:nth-child(7) { height: 10px; }
+.v5-clinic-pulse i:nth-child(2), .v5-clinic-pulse i:nth-child(6) { height: 18px; animation-delay: .08s; }
+.v5-clinic-pulse i:nth-child(3), .v5-clinic-pulse i:nth-child(5) { height: 32px; animation-delay: .16s; }
+.v5-clinic-pulse i:nth-child(4) { height: 46px; animation-delay: .24s; }
+.v5-dispensary-signal span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #91d8c6;
+  animation: v5-dots 1.5s ease-in-out infinite;
+}
+.v5-dispensary-signal span:nth-child(2) { animation-delay: .12s; }
+.v5-dispensary-signal span:nth-child(3) { animation-delay: .24s; }
+.v5-dispensary-signal span:nth-child(4) { animation-delay: .36s; }
+.v5-dispensary-signal span:nth-child(5) { animation-delay: .48s; }
+
+.v5-clinician-header .primary-btn {
+  min-height: 38px;
+  padding: 0 13px;
+  color: #17364f !important;
+  background: #fff !important;
+  border-color: #fff !important;
+}
+.v5-nurse-header .primary-btn { color: #24483d !important; }
+
+.v5-row-actions .ghost-btn, .v5-row-actions .primary-btn { min-height: 30px; padding-inline: 8px; font-size: 8px; }
+.v5-order-card .primary-btn, .v5-order-card .secondary-btn { min-height: 30px; padding-inline: 8px; font-size: 8px; }
+
+@keyframes v5-status-pulse { 0%,100% { opacity: .7; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.08); } }
+@keyframes v5-bar { 0%,100% { transform: scaleY(.55); opacity: .55; } 50% { transform: scaleY(1.08); opacity: 1; } }
+@keyframes v5-dots { 0%,100% { transform: translateY(0); opacity: .45; } 50% { transform: translateY(-8px); opacity: 1; } }
+
+@media (max-width: 1050px) {
+  .v5-clinician-header { grid-template-columns: minmax(0,1fr) auto; }
+  .v5-clinic-pulse, .v5-dispensary-signal { display: none; }
+}
+
+@media (max-width: 700px) {
+  .v5-attention-body { grid-template-columns: 42px minmax(0,1fr); }
+  .v5-attention-body > .primary-btn { grid-column: 1 / -1; width: 100%; }
+  .v5-clinician-header { grid-template-columns: 1fr; align-items: start; }
+  .v5-clinician-header .duty-toggle, .v5-clinician-header .availability-toggle { justify-self: start; }
+}

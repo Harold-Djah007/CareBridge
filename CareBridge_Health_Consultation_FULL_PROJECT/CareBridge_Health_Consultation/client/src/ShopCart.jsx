@@ -308,7 +308,7 @@ function CartDrawer() {
   useEffect(() => {
     if (!cart?.open) return;
     api("/finance/accounts").then(setAccounts).catch(() => {});
-    api("/finance/payment-config").then(setPaymentConfig).catch(() => {});
+    api("/finance/payment-config").then(setPaymentConfig).catch(() => setPaymentConfig({ flutterwave: { configured: false } }));
   }, [cart?.open]);
 
   useEffect(() => {
@@ -329,7 +329,10 @@ function CartDrawer() {
   const billTotal = billItems.reduce((s, i) => s + Number(i.amount || i.price || 0), 0);
   const pid = user?.id;
   const payable = items.length;
-  const flutterwaveReady = paymentConfig?.flutterwave?.configured !== false;
+  const flutterwaveReady = paymentConfig?.flutterwave?.configured === true;
+  useEffect(() => {
+    if (paymentConfig && !flutterwaveReady) setMethod(current => ["card", "momo", "bank"].includes(current) ? "cash" : current);
+  }, [paymentConfig, flutterwaveReady]);
 
   const startPayment = async (invoiceIds, servicesToBill) => {
     const r = await api("/finance/checkout-cart", {
@@ -482,6 +485,7 @@ function CartDrawer() {
         className={`cart-drawer ${cart.open ? "open" : ""}`}
         id="shop-basket"
         inert={!cart.open}
+        aria-hidden={!cart.open}
         role="dialog"
         aria-modal={cart.open}
         aria-label="Shopping cart"
@@ -497,7 +501,7 @@ function CartDrawer() {
           </div>
           <div className="row-actions">
             {items.length > 0 && !payment && (
-              <button type="button" className="ghost-btn" onClick={cart.clear}>Empty</button>
+              <button type="button" className="ghost-btn" onClick={cart.clear}>Clear cart</button>
             )}
             <button type="button" className="icon-btn" onClick={closeDrawer} aria-label="Close cart">
               <X size={18} />
@@ -549,13 +553,12 @@ function CartDrawer() {
             <form onSubmit={(e) => checkout("online", e)} className="pay-form">
               <p className="checkout-title"><ShieldCheck size={16} /> Secure checkout</p>
               {paymentConfig?.flutterwave && !paymentConfig.flutterwave.configured && (
-                <div className="error-box">Online card, Mobile Money, and bank transfer are installed but disabled until the server has Flutterwave test keys.</div>
+                <p className="muted" role="status">{import.meta.env.VITE_CAREBRIDGE_DEMO === "true" ? "Demo: preview any payment method. No online money is sent." : "Online payment unavailable. Cash and health insurance remain available."}</p>
               )}
               {METHODS.map((m) => {
-                const disabled = Boolean(m.online && !flutterwaveReady);
                 return (
-                  <label className={`check-row payment-method-card ${disabled ? "disabled" : ""}`} key={m.id}>
-                    <input type="radio" name="method" disabled={disabled} checked={method === m.id} onChange={() => setMethod(m.id)} />
+                  <label className="check-row payment-method-card" key={m.id}>
+                    <input type="radio" name="method" checked={method === m.id} onChange={() => setMethod(m.id)} />
                     <span><b>{m.label}</b><small className="muted"> — {m.hint}</small></span>
                   </label>
                 );
@@ -596,7 +599,7 @@ function CartDrawer() {
                 <p className="muted">{accounts?.cashier?.desk}. {accounts?.cashier?.hours}. Your receipt appears only after hospital accounts posts the cash payment.</p>
               )}
               <button className="primary-btn full" disabled={busy || !payable || (["card", "momo", "bank"].includes(method) && !flutterwaveReady)}>
-                {busy ? "Starting checkout…" : method === "cash" ? `Create cash payment · ${ghs(cart.total)}` : method === "nhis" ? `Submit NHIS claim · ${ghs(cart.total)}` : `Pay securely · ${ghs(cart.total)}`}
+                {busy ? "Starting checkout…" : method === "cash" ? `Create cash payment · ${ghs(cart.total)}` : method === "nhis" ? `Submit NHIS claim · ${ghs(cart.total)}` : !flutterwaveReady ? "Online payment currently unavailable" : `Pay securely · ${ghs(cart.total)}`}
               </button>
             </form>
           )}
