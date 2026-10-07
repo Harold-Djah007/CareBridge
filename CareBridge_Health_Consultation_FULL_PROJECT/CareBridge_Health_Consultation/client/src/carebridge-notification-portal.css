@@ -274,14 +274,21 @@ body:has(.cb-notification-portal) .cbv6-mobile-nav {
 }
 
 @media (max-width: 720px) {
-  .cb-notification-portal { align-items: flex-end; padding: 10px; }
+  .cb-notification-portal { align-items: center; padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
   .cb-notification-reader {
     width: 100%;
-    max-height: 84dvh;
+    max-height: calc(100dvh - max(10px, env(safe-area-inset-top)) - max(10px, env(safe-area-inset-bottom)));
     border-radius: 22px 22px 14px 14px;
     animation-name: cbNotificationReaderMobileIn;
   }
-  .cb-notification-reader-head { min-height: 100px; padding: 16px; }
+  .cb-notification-reader-head { min-height: 0; padding: 14px; grid-template-columns: 36px minmax(0,1fr) 44px; gap: 10px; }
+  .cb-notification-reader-icon { width: 36px; height: 36px; border-radius: 10px; }
+  .cb-notification-reader-title h2 { font-size: 20px; line-height: 1.2; overflow-wrap: anywhere; }
+  .cb-notification-reader-title > span { font-size: 9px; letter-spacing: .05em; }
+  .cb-notification-reader-close { width: 44px; height: 44px; }
+  .cb-notification-reader-meta { overflow-wrap: anywhere; }
+  .cb-notification-reader-message { padding: 14px; }
+  .cb-notification-reader-message p { font-size: 14px; overflow-wrap: anywhere; }
   .cb-notification-reader-body { padding: 15px; }
   .cb-notification-reader-footer small { display: none; }
   .cb-notification-reader-footer button { width: 100%; }

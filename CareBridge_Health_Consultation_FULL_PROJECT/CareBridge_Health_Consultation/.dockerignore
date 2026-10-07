@@ -25,5 +25,6 @@ backups
 Thumbs.db
 .quality
 server/data/*.bak*
+server/data/db.json
 server/data/*.sha256
 server/data/*.journal.ndjson

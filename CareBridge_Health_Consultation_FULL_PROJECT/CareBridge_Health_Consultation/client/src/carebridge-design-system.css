@@ -96,4 +96,36 @@ body{font-family:var(--cb-font);-webkit-font-smoothing:antialiased}
 @media(min-width:1200px){.cbv6-shell-staff{grid-template-columns:248px minmax(0,1fr)}.cbv6-shell-patient .cbv6-content{padding-inline:32px!important}}
 @media(max-width:900px){.cbv6-content{padding:18px!important}.cbv6-context-strip{margin:10px 16px 0!important}.cbv6-content h1{font-size:29px!important}.cbv6-patient-welcome-copy{padding:26px!important}.cbv6-mobile-nav{grid-template-columns:repeat(5,minmax(0,1fr))!important;padding-bottom:max(8px,env(safe-area-inset-bottom))!important}.cbv6-mobile-nav .cbv6-nav-link{min-height:48px!important}.cbv6-mobile-nav .cbv6-nav-link>span:not(.cbv6-nav-icon){font-size:10px!important}.hospital-site .hero-home .hero-card{padding:28px!important}.portal-shell .login-card{padding:28px!important}}
 @media(max-width:600px){.cbv6-content{padding:14px!important}.cbv6-context-strip{margin-inline:12px!important;padding:10px!important}.cbv6-context-strip>div{display:none!important}.cbv6-inline-search{flex:1}.cbv6-patient-welcome{min-height:0!important}.cbv6-patient-welcome-copy{padding:24px!important}.cbv6-patient-welcome h1{font-size:30px!important}.cbv6-patient-portrait{display:none!important}.cbv6-patient-signal-row{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}.cbv6-signal{padding:15px!important;min-height:118px!important}.cbv6-signal strong{font-size:22px!important}.cbv6-care-focus{padding:18px!important;gap:14px!important}.cbv6-care-focus h2{font-size:18px!important}.cbv6-panel>header{padding:18px!important}.cbv6-content h2{font-size:20px!important}.cbv6-pagehead{padding:20px!important}.cbv6-content :is(th,td){padding:12px!important}.hospital-site .hero-home{min-height:580px!important}.hospital-site .hero-home .hero-card{padding:24px!important;border-radius:16px}.hospital-site .hero-card h1{font-size:36px!important}.hospital-site .hero-card .lead{font-size:15px}.hospital-site .hero-trustline{flex-wrap:wrap}.hospital-site .quick-band{margin-top:18px!important;gap:10px!important}.hospital-site .quick-card{padding:20px}.portal-shell .login-card{padding:24px!important}.portal-shell .login-card h2{font-size:27px}.cbv6-workspace-menu nav{grid-template-columns:1fr 1fr}}
+/* Let the consultation checklist determine its height instead of clipping it inside a fixed video stage. */
+@media (max-width: 900px) {
+  html { scroll-padding-block: 76px calc(104px + env(safe-area-inset-bottom)); }
+  .cbv6-app .cbv6-content { padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important; }
+  .cbv6-app .cbv6-mobile-nav { height: calc(68px + env(safe-area-inset-bottom)); bottom: 8px; box-sizing: border-box; }
+}
+@media (max-width: 1050px) {
+  .cbv6-app .px-video-shell.lobby { min-height: 0; }
+  .cbv6-app .px-video-shell.lobby .px-video-stage { min-height: 0; }
+  .cbv6-app .px-video-shell.lobby .px-remote-video { display: none; }
+  .cbv6-app .px-video-lobby { position: relative; inset: auto; padding: 24px; gap: 22px; }
+  .cbv6-app .px-lobby-card { width: 100%; max-width: none; min-width: 0; box-sizing: border-box; }
+}
+@media (max-width: 600px) {
+  .cbv6-app .px-video-lobby { padding: 16px; gap: 18px; }
+  .cbv6-app .px-lobby-card { padding: 16px; border-radius: 18px; }
+  .cbv6-app .px-lobby-copy h2 { font-size: clamp(26px, 7vw, 34px); line-height: 1.12; }
+  .cbv6-app .px-lobby-copy p { font-size: 14px; }
+  .cbv6-app .px-lobby-peer { grid-template-columns: 44px minmax(0,1fr); gap: 10px; }
+  .cbv6-app .px-lobby-peer .avatar { width: 44px; height: 44px; }
+  .cbv6-app .px-lobby-peer > div { min-width: 0; }
+  .cbv6-app .px-lobby-peer h2 { font-size: 18px !important; overflow-wrap: anywhere; }
+  .cbv6-app .px-lobby-peer > button { grid-column: 1 / -1; min-height: 44px; }
+  .cbv6-app .px-device-checks > div { padding: 10px; gap: 8px; }
+  .cbv6-app :is(.px-device-checks,.px-consent) svg { flex-shrink: 0; }
+  .cbv6-app :is(.px-device-checks,.px-consent) strong { font-size: 13px; }
+  .cbv6-app :is(.px-device-checks,.px-consent) small { font-size: 12px; line-height: 1.5; }
+  .cbv6-app .px-consent input { width: 18px; min-width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; padding: 0; }
+  .cbv6-app .px-consent { display: flex !important; align-items: flex-start; gap: 10px; }
+  .cbv6-app .px-consent > span { min-width: 0; }
+  .cbv6-app .px-enter-room { min-height: 46px; }
+}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}

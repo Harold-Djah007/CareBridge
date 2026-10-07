@@ -14,11 +14,12 @@ const ROUTES = {
   admin: ["/admin", "/admin/hospital", "/admin/appointments", "/admin/users", "/admin/patient-experience", "/orders", "/admin/reports", "/support", "/settings"],
 };
 
+let loginSequence = 0;
 async function loginSession(request, role, projectName) {
   const account = ACCOUNTS[role];
   const lastOctet = 20 + Object.keys(ACCOUNTS).indexOf(role) + (projectName.includes("mobile") ? 20 : 0);
   const response = await request.post("http://127.0.0.1:5000/api/login", {
-    headers: { "x-forwarded-for": `127.0.0.${lastOctet}` },
+    headers: { "x-forwarded-for": `127.0.${lastOctet}.${1 + (loginSequence++ % 240)}` },
     data: { email: account.email, password: account.password, expectedRole: role },
   });
   expect(response.ok(), `${role} API login failed: ${response.status()} ${await response.text()}`).toBeTruthy();
@@ -229,6 +230,42 @@ test("critical desktop routes meet semantic accessibility basics", async ({ page
   }
   expect(failures, `Semantic accessibility regressions:\n${failures.join("\n")}`).toEqual([]);
 });
+
+for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }, { width: 768, height: 1024 }]) {
+  test(`consultation and notification controls fit ${viewport.width}x${viewport.height}`, async ({ page, request }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop-chromium", "Screen-size matrix runs once.");
+    test.setTimeout(120_000);
+    await page.setViewportSize(viewport);
+    await directLogin(page, request, "patient", testInfo.project.name);
+    await expect(page.locator(".carebridge-demo-notice")).toHaveCount(0);
+    for (const route of ["/home", "/appointments", "/video", "/settings"]) await expectViewportQuality(page, route);
+    await page.goto("/video");
+    await waitForRoute(page);
+    if (await page.locator(".px-lobby-contacts button").count()) await page.locator(".px-lobby-contacts button").first().click();
+    const enter = page.locator(".px-enter-room");
+    await expect(enter).toBeVisible();
+    await enter.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
+    const reachable = await enter.evaluate(element => {
+      const r = element.getBoundingClientRect();
+      const stage = document.querySelector(".px-video-stage").getBoundingClientRect();
+      const center = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return r.bottom <= stage.bottom + 1 && Boolean(center && element.contains(center));
+    });
+    expect(reachable, "Consultation entry must not be clipped or covered by navigation").toBe(true);
+    await page.getByRole("button", { name: "Notifications", exact: true }).click();
+    await page.locator(".cbv6-notice-item").first().click();
+    const reader = page.locator(".cb-notification-reader");
+    await expect(reader).toBeVisible();
+    await expect.poll(() => reader.evaluate(element => element.getAnimations().every(animation => animation.playState === "finished"))).toBe(true);
+    const box = await reader.boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+    await reader.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(reader).toBeHidden();
+  });
+}
 
 test("desktop shell keyboard, command palette and notification reader remain accessible", async ({ page, request }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium", "Keyboard shell audit runs on desktop Chromium.");
